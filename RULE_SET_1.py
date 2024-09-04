@@ -4,9 +4,6 @@ import numpy as np
 from functools import lru_cache
 from multiprocessing import Pool, cpu_count
 
-# Load the instruments DataFrame once
-instruments_df = pd.read_csv("Instruments.csv")
-
 
 @lru_cache(maxsize=None)
 def load_historical_data(symbol):
@@ -162,6 +159,8 @@ def Rule_1(data):
     Returns:
     list: A list of dictionaries containing the buy/sell decisions for each stock.
     """
+    # Load the instruments DataFrame once
+    instruments_df = pd.read_csv("Instruments.csv")
     data = pd.DataFrame(data=data)[["last_price", "volume_traded", "instrument_token"]]
     data = pd.merge(
         data,

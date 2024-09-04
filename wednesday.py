@@ -27,7 +27,8 @@ class MarketMonitor(threading.Thread):
             time.sleep(60)  # Check the market status every 60 seconds
 
     def start_ticker(self):
-        run_ticker(create_master())
+        instruments = create_master()
+        run_ticker(instruments)
 
     def force_stop_ticker(self):
         if self.ticker_thread:
