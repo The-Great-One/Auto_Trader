@@ -3,7 +3,6 @@ from kiteconnect import KiteConnect
 import pandas as pd
 import json
 import numpy as np
-from sympy import true
 import ta
 from my_secrets import API_KEY, API_SECRET
 from Request_Token import get_request_token
