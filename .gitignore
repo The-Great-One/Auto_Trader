@@ -1,0 +1,9 @@
+Hist_Data/*
+__pycache__/
+.vscode/
+.DS_Store
+*.csv
+*.json
+Deprecated/
+*.lock
+my_secrets.py
