@@ -76,16 +76,15 @@ def buy_or_sell(df):
     # Calculate key indicators
     df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
     macd_indicator = ta.trend.MACD(close=df['Close'], window_fast=9, window_slow=23, window_sign=9)
-    df['MACD'] = np.floor(macd_indicator.macd())
-    df['MACD_Signal'] = np.floor(macd_indicator.macd_signal())
-    df['MACD_Hist'] = np.floor(macd_indicator.macd_diff())
-    df['EMA10'] = np.floor(ta.trend.EMAIndicator(close=df['Close'], window=10).ema_indicator())
-    df['EMA20'] = np.floor(ta.trend.EMAIndicator(close=df['Close'], window=20).ema_indicator())
-    df['EMA50'] = np.floor(ta.trend.EMAIndicator(close=df['Close'], window=50).ema_indicator())
-    df['EMA100'] = np.floor(ta.trend.EMAIndicator(close=df['Close'], window=100).ema_indicator())
-    df['EMA200'] = np.floor(ta.trend.EMAIndicator(close=df['Close'], window=200).ema_indicator())
-
-    df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
+    df['MACD'] = macd_indicator.macd()
+    df['MACD_Signal'] = macd_indicator.macd_signal()
+    df['MACD_Hist'] = macd_indicator.macd_diff()
+    df["EMA10"] = ta.trend.EMAIndicator(close=df["Close"], window=10).ema_indicator() 
+    df["EMA20"] = ta.trend.EMAIndicator(close=df["Close"], window=20).ema_indicator() 
+    df["EMA50"] = ta.trend.EMAIndicator(close=df["Close"], window=50).ema_indicator() 
+    df["EMA100"] = ta.trend.EMAIndicator(close=df["Close"], window=100).ema_indicator() 
+    df["EMA200"] = ta.trend.EMAIndicator(close=df["Close"], window=200).ema_indicator() 
+    df['Volume_MA20'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
 
     # Ensure NaNs are filled forward/backward
     df.ffill(inplace=True)
@@ -93,7 +92,7 @@ def buy_or_sell(df):
 
    # Buy Signal
     df['Buy'] = (
-        (df['RSI'] >= 60) & (df['RSI'] <= 70) &
+        (df['RSI'] >= 60) & (df['RSI'] <= 65) &
         (df['MACD'] >= df['MACD_Signal']) &
         (df['MACD_Hist'] >= 0) &
         (df['Close'] >= df['EMA20']) &
@@ -102,13 +101,14 @@ def buy_or_sell(df):
         (df['Close'] >= df['EMA200']) &
         (df['RSI'] > df['RSI'].shift(1)) &
         (df['RSI'].shift(1) > df['RSI'].shift(2)) &
-        (df['RSI'].shift(2) > df['RSI'].shift(3))
+        (df['RSI'].shift(2) > df['RSI'].shift(3)) &
+        (df['Volume'] > 1.05 * df["Volume_MA20"])
     )
 
     # Sell Signal
     df['Sell'] = (
-        (df['RSI'] > 75) |
-        (df['RSI'] < 50) |
+        (df['RSI'] >= 75) |
+        (df['RSI'] <= 50) |
         (df['MACD'] < df['MACD_Signal']) |
         (df['MACD_Hist'] < 0) |
         (df['Close'] < df['EMA10'])

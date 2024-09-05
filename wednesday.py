@@ -23,11 +23,14 @@ def monitor_market():
                 
                 p1 = Process(target=run_ticker, args=(create_master(), q))
                 p2 = Process(target=Apply_Rules, args=(q,))
+                p3 = Process(target=Updater)
+
                 
                 p1.start()
                 p2.start()
+                p3.start()
                 
-                processes = [p1, p2]
+                processes = [p1, p2, p3]
         else:
             if processes:  # Stop processes if they are running when the market closes
                 print("Market is closed. Stopping processes.")

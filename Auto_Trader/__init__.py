@@ -9,7 +9,7 @@ from multiprocessing import Process, Queue
 
 import pandas as pd
 import requests
-
+from .updater import Updater
 from .my_secrets import *
 
 from .kite_ticker import run_ticker
