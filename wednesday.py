@@ -1,57 +1,46 @@
 import time
-import threading
-from kite_ticker import run_ticker
-from utils import is_Market_Open
-from Build_Master import create_master
+from datetime import datetime, timedelta
+from multiprocessing import Process, Queue
+from Auto_Trader import *
 
-class MarketMonitor(threading.Thread):
-    def __init__(self):
-        super().__init__()
-        self.ticker_thread = None
-        self.ticker_running = False
-        self.stop_thread = False
+def monitor_market():
+    processes = []
+    q = Queue()
+    last_check_time = datetime.now() - timedelta(minutes=10)  # Initial check time in the past
+    market_status_cache = False  # Cache for market status
 
-    def run(self):
-        while not self.stop_thread:
-            if is_Market_Open():
-                if not self.ticker_running:
-                    print("Market is open. Starting ticker...")
-                    self.ticker_thread = threading.Thread(target=self.start_ticker)
-                    self.ticker_running = True
-                    self.ticker_thread.start()
-            else:
-                if self.ticker_running:
-                    print("Market is closed. Stopping ticker...")
-                    self.ticker_running = False
-                    self.force_stop_ticker()
-            time.sleep(60)  # Check the market status every 60 seconds
+    while True:
+        current_time = datetime.now()
+        
+        # Only call is_Market_Open() every 10 minutes or when the cache is outdated
+        if (current_time - last_check_time).total_seconds() > 600:  # 600 seconds = 10 minutes
+            market_status_cache = is_Market_Open()
+            last_check_time = current_time  # Update the last check time
 
-    def start_ticker(self):
-        instruments = create_master()
-        run_ticker(instruments)
+        if market_status_cache:
+            if not processes:  # Start processes if the market is open and no processes are running
+                print("Market is open. Starting processes.")
+                
+                p1 = Process(target=run_ticker, args=(create_master(), q))
+                p2 = Process(target=Apply_Rules, args=(q,))
+                
+                p1.start()
+                p2.start()
+                
+                processes = [p1, p2]
+        else:
+            if processes:  # Stop processes if they are running when the market closes
+                print("Market is closed. Stopping processes.")
+                
+                for p in processes:
+                    p.terminate()
+                    p.join()  # Wait for processes to terminate
+                
+                processes = []
 
-    def force_stop_ticker(self):
-        if self.ticker_thread:
-            # Simply set the flag to stop the ticker thread
-            self.stop_thread = True
-            self.ticker_thread.join()  # Wait for the ticker thread to finish
-
-    def stop(self):
-        self.stop_thread = True
-        if self.ticker_running and self.ticker_thread:
-            self.ticker_thread.join()
-
-def main():
-    market_monitor = MarketMonitor()
-    market_monitor.start()
-
-    try:
-        while True:
-            time.sleep(1)  # Keep the main thread alive
-    except KeyboardInterrupt:
-        print("Stopping market monitor...")
-        market_monitor.stop()
-        market_monitor.join()
+        # Adjust sleep time based on market status
+        sleep_time = 60 if market_status_cache else 600  # Check every minute when market is open, every 10 minutes otherwise
+        time.sleep(sleep_time)
 
 if __name__ == '__main__':
-    main()
+    monitor_market()

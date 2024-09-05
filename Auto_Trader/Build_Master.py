@@ -1,8 +1,8 @@
 import glob
 import pandas as pd
-from utils import fetch_instruments_list, get_instrument_token
-from StrongFundamentalsStockList import goodStocks
-from FetchPricesYfinance import download_historical_quotes
+from .utils import fetch_instruments_list, get_instrument_token
+from .StrongFundamentalsStockList import goodStocks
+from .FetchPricesYfinance import download_historical_quotes
 
 def create_master():
     """
@@ -16,7 +16,7 @@ def create_master():
     instrument_master = fetch_instruments_list()
     ticker_tape_list = goodStocks()
     
-    holdings = pd.read_csv("Holdings.csv")
+    holdings = pd.read_csv("intermediary_files/Holdings.csv")
 
     # Rename columns in holdings to match those in merged_df
     holdings.rename(columns={"tradingsymbol": "Symbol"}, inplace=True)
@@ -48,7 +48,7 @@ def create_master():
     merged_df = pd.merge(fetched_data, mapped_df, on='Symbol', how='inner')
 
     # Save the final DataFrame to a CSV file
-    merged_df.to_csv("Instruments.csv", index=False)
+    merged_df.to_csv("intermediary_files/Instruments.csv", index=False)
 
     # Return the list of instrument tokens
     return merged_df["instrument_token"].to_list()

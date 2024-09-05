@@ -5,7 +5,7 @@ import glob
 import ray
 from tqdm import tqdm
 from retry import retry
-from utils import Indicators, is_Market_Open, is_PreMarket_Open
+from Auto_Trader.utils import Indicators, is_Market_Open, is_PreMarket_Open
 from NSEDownload import stocks
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -14,8 +14,8 @@ import json
 from filelock import FileLock
 
 # JSON file to store fetched symbols and dates
-FETCHED_DATA_FILE = "fetched_data.json"
-LOCK_FILE = "fetched_data.lock"
+FETCHED_DATA_FILE = "intermediary_files/fetched_data.json"
+LOCK_FILE = "intermediary_files/fetched_data.lock"
 
 # Ray actor to manage shared state
 @ray.remote
@@ -101,9 +101,9 @@ def download_ticker_data(ticker, fetched_data_manager):
             if is_Market_Open() or is_PreMarket_Open():
                 today = datetime.today().date()
                 data = data[data['Date'] != str(today)]
-                data.to_csv(f"Hist_Data/{ticker}.csv", index=False)
+                data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
             else:
-                data.to_csv(f"Hist_Data/{ticker}.csv", index=False)
+                data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
 
             # Mark as fetched today
             ray.get(fetched_data_manager.mark_fetched.remote(ticker))

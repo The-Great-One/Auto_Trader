@@ -1,8 +1,8 @@
 from datetime import datetime
 import uuid
 from kiteconnect import KiteConnect
-from my_secrets import API_KEY
-from utils import read_session_data
+from Auto_Trader.my_secrets import API_KEY
+from Auto_Trader.utils import read_session_data
 from math import floor
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -80,7 +80,6 @@ def get_positions():
     """
     try:
         positions = pd.DataFrame(kite.positions())
-        positions.to_csv("positions.csv", index=False)
         net_positions = positions['net']
         position_dict = {pos['tradingsymbol']: pos['quantity'] for pos in net_positions if pos['quantity'] != 0}
         return position_dict

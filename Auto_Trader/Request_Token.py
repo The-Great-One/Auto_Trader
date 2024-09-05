@@ -3,7 +3,7 @@ import re
 import onetimepass as otp
 from urllib.parse import urlparse, parse_qs
 from kiteconnect import KiteConnect
-from my_secrets import *
+from Auto_Trader.my_secrets import *
 
 def get_request_token(credentials={
     "api_key": API_KEY,

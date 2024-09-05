@@ -6,4 +6,6 @@ __pycache__/
 *.json
 Deprecated/
 *.lock
-my_secrets.py
+Auto_Trader/my_secrets.py
+venv/
+intermediary_files/

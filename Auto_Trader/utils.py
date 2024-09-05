@@ -4,8 +4,8 @@ import pandas as pd
 import json
 import numpy as np
 import ta
-from my_secrets import API_KEY, API_SECRET
-from Request_Token import get_request_token
+from Auto_Trader.my_secrets import API_KEY, API_SECRET
+from Auto_Trader.Request_Token import get_request_token
 from functools import lru_cache
 
 
@@ -74,7 +74,7 @@ def build_access_token():
             "access_token": data["access_token"],
             "date": datetime.now().strftime("%Y-%m-%d"),
         }
-        with open("access_token.json", "w") as json_file:
+        with open("intermediary_files/access_token.json", "w") as json_file:
             json.dump(session_data, json_file, indent=4)
         print("Session Expired..Creating New.")
         return data["access_token"]
@@ -91,7 +91,7 @@ def read_session_data():
         str: The valid access token, or None if a new one needs to be created.
     """
     try:
-        with open("access_token.json", "r") as json_file:
+        with open("intermediary_files/access_token.json", "r") as json_file:
             session_data = json.load(json_file)
         access_token = session_data.get("access_token")
         session_date = session_data.get("date")
@@ -128,7 +128,7 @@ def fetch_instruments_list(kite=kite):
         # Filter out holdings with quantity greater than 0
         holdings = holdings[holdings["quantity"] > 0]
         
-        holdings.to_csv("Holdings.csv", index=False)
+        holdings.to_csv("intermediary_files/Holdings.csv", index=False)
         
         # Filter for NSE stocks only
         nse_stocks = [

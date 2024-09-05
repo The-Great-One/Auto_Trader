@@ -17,7 +17,7 @@ def load_historical_data(symbol):
     pd.DataFrame: DataFrame containing the historical data, or None if loading fails.
     """
     try:
-        df = pd.read_csv(f"Hist_Data/{symbol}.csv")
+        df = pd.read_csv(f"intermediary_files/Hist_Data/{symbol}.csv")
         return df
     except Exception as e:
         print(f"Error loading {symbol}.csv: {e}")
@@ -74,7 +74,7 @@ def buy_or_sell(df):
         raise KeyError("The DataFrame does not have the required columns: 'Close' or 'Volume'.")
 
     # Calculate key indicators
-    df['RSI'] = np.floor(ta.momentum.RSIIndicator(df['Close'], window=14).rsi())
+    df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
     macd_indicator = ta.trend.MACD(close=df['Close'], window_fast=9, window_slow=23, window_sign=9)
     df['MACD'] = np.floor(macd_indicator.macd())
     df['MACD_Signal'] = np.floor(macd_indicator.macd_signal())
@@ -160,7 +160,7 @@ def Rule_1(data):
     list: A list of dictionaries containing the buy/sell decisions for each stock.
     """
     # Load the instruments DataFrame once
-    instruments_df = pd.read_csv("Instruments.csv")
+    instruments_df = pd.read_csv("intermediary_files/Instruments.csv")
     data = pd.DataFrame(data=data)[["last_price", "volume_traded", "instrument_token"]]
     data = pd.merge(
         data,
