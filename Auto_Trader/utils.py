@@ -30,7 +30,6 @@ def is_Market_Open():
     Returns:
         bool: True if the market is open, False otherwise.
     """
-    return True
     now = datetime.now()
     current_time = now.time()
     current_day = now.weekday()
