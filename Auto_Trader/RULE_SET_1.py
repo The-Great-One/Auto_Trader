@@ -107,7 +107,7 @@ def buy_or_sell(df):
 
     # Sell Signal
     df['Sell'] = (
-        (df['RSI'] >= 75) |
+        (df['RSI'] >= 73) |
         (df['RSI'] <= 50) |
         (df['MACD'] < df['MACD_Signal']) |
         (df['MACD_Hist'] < 0) |
