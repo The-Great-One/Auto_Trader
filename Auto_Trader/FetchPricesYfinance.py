@@ -123,7 +123,7 @@ def download_historical_quotes(df):
     if 'Symbol' not in df.columns:
         raise ValueError("Missing 'Symbol' Column")
 
-    os.makedirs('Hist_Data', exist_ok=True)
+    os.makedirs('intermediary_files/Hist_Data', exist_ok=True)
 
     ray.init(ignore_reinit_error=True)
 

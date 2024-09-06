@@ -3,6 +3,7 @@ import pandas as pd
 from .utils import fetch_instruments_list, get_instrument_token
 from .StrongFundamentalsStockList import goodStocks
 from .FetchPricesYfinance import download_historical_quotes
+import sys
 
 def create_master():
     """
@@ -15,7 +16,7 @@ def create_master():
     # Fetch instrument master list and good stocks list
     instrument_master = fetch_instruments_list()
     ticker_tape_list = goodStocks()
-    
+        
     holdings = pd.read_csv("intermediary_files/Holdings.csv")
 
     # Rename columns in holdings to match those in merged_df
@@ -36,10 +37,10 @@ def create_master():
     download_historical_quotes(df=mapped_df)
 
     # Fetch all files from the Hist_Data directory
-    files = glob.glob('Hist_Data/*')
+    files = glob.glob('intermediary_files/Hist_Data/*')
 
     # Extract file names (symbols) without extensions and directory path
-    fetched_symbols = [file.split('/')[1].split('.')[0] for file in files]
+    fetched_symbols = [file.split('/')[2].split('.')[0] for file in files]
 
     # Create DataFrame from fetched symbols
     fetched_data = pd.DataFrame(fetched_symbols, columns=["Symbol"])
@@ -49,6 +50,10 @@ def create_master():
 
     # Save the final DataFrame to a CSV file
     merged_df.to_csv("intermediary_files/Instruments.csv", index=False)
-
-    # Return the list of instrument tokens
-    return merged_df["instrument_token"].to_list()
+    
+    if merged_df["instrument_token"].to_list():
+        # Return the list of instrument tokens
+        return merged_df["instrument_token"].to_list()
+    else:
+        print("Error Building Master")
+        sys.exit()
