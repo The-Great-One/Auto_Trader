@@ -1,28 +1,32 @@
-from urllib import response
 from kiteconnect import KiteTicker
 from Auto_Trader.my_secrets import *
 from Auto_Trader.utils import read_session_data
 from queue import Queue
 
-
 def run_ticker(sub_tokens, q):
-    
     global queue
     queue = q
-    # Initialize KiteTicker
     kws = KiteTicker(api_key=API_KEY, access_token=read_session_data())
-    
 
     def on_ticks(ws, ticks):
-        addtoqueue(ticks)  # Enqueue ticks for processing
+        addtoqueue(queue, ticks)  # Enqueue ticks for processing
 
     def on_connect(ws, response):
-        ws.subscribe(sub_tokens)
-        ws.set_mode(ws.MODE_QUOTE, sub_tokens)
+        if sub_tokens:
+            ws.subscribe(sub_tokens)
+            ws.set_mode(ws.MODE_QUOTE, sub_tokens)
+        else:
+            print("No subscription tokens provided.")
 
     def on_close(ws, code, reason):
-        ws.stop()
-
+        print(f"WebSocket closed with code: {code}, reason: {reason}")
+        try:
+            ws.stop()
+        except Exception as e:
+            print(f"Error stopping WebSocket: {e}")
+        # Optionally reconnect
+        print("Attempting to reconnect...")
+        kws.connect()
 
     kws.on_ticks = on_ticks
     kws.on_connect = on_connect
@@ -30,7 +34,5 @@ def run_ticker(sub_tokens, q):
 
     kws.connect()
 
-
-    
-def addtoqueue(ticks):
-    queue.put(ticks)
+def addtoqueue(q, ticks):
+    q.put(ticks)
