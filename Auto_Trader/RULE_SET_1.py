@@ -67,7 +67,7 @@ def buy_or_sell(df):
     Parameters:
     df (pd.DataFrame): DataFrame containing stock data with at least 'Close' and 'Volume' columns.
 
-    Returns:
+    Returns:    
     str: "BUY", "SELL", or "HOLD" based on the computed indicators.
     """
     if "Close" not in df.columns or "Volume" not in df.columns:
@@ -107,8 +107,8 @@ def buy_or_sell(df):
 
     # Sell Signal
     df['Sell'] = (
-        (df['RSI'] >= 73) |
-        (df['RSI'] <= 50) |
+        (df['RSI'] >= 72) |
+        (df['RSI'] <= 55) |
         (df['MACD'] < df['MACD_Signal']) |
         (df['MACD_Hist'] < 0) |
         (df['Close'] < df['EMA10'])
