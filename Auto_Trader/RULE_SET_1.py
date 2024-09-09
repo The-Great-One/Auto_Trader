@@ -1,6 +1,5 @@
 import pandas as pd
 import ta
-import numpy as np
 from functools import lru_cache
 from multiprocessing import Pool, cpu_count
 
@@ -90,29 +89,21 @@ def buy_or_sell(df):
     df.ffill(inplace=True)
     df.bfill(inplace=True)
 
-   # Buy Signal
+   # Buy signal
     df['Buy'] = (
-        (df['RSI'] >= 60) & (df['RSI'] <= 65) &
-        (df['MACD'] >= df['MACD_Signal']) &
-        (df['MACD_Hist'] >= 0) &
-        (df['Close'] >= df['EMA20']) &
-        (df['Close'] >= df['EMA50']) &
-        (df['Close'] >= df['EMA100']) &
-        (df['Close'] >= df['EMA200']) &
-        (df['RSI'] > df['RSI'].shift(1)) &
-        (df['RSI'].shift(1) > df['RSI'].shift(2)) &
-        (df['RSI'].shift(2) > df['RSI'].shift(3)) &
-        (df['Volume'] > 1.05 * df["Volume_MA20"])
+        (df['EMA10'] > df['EMA20']) & 
+        (df['RSI'] > 60) & (df['RSI'] <= 70) &
+        (df['MACD_Hist'] > 0) &
+        (df['Volume'] > 1.0 * df['Volume_MA20'])
     )
 
-    # Sell Signal
+    # Sell signal
     df['Sell'] = (
-        (df['RSI'] >= 72) |
-        (df['RSI'] <= 55) |
-        (df['MACD'] < df['MACD_Signal']) |
-        (df['MACD_Hist'] < 0) |
-        (df['Close'] < df['EMA10'])
-    )   
+        (df['EMA10'] < df['EMA20']) &
+        (df['RSI'] < 55) &
+        (df['MACD_Hist'] < -1) &  # Loosen MACD_Hist threshold for quicker reaction
+        (df['Volume'] > 1.3 * df['Volume_MA20'])  # Loosen volume condition for more exits
+    )
 
 
     last_row = df.tail(1)
