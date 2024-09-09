@@ -1,3 +1,4 @@
+from re import sub
 from kiteconnect import KiteTicker
 from Auto_Trader.my_secrets import *
 from Auto_Trader.utils import read_session_data
@@ -7,12 +8,13 @@ def run_ticker(sub_tokens, q):
     global queue
     queue = q
     kws = KiteTicker(api_key=API_KEY, access_token=read_session_data())
-
+    
     def on_ticks(ws, ticks):
         addtoqueue(queue, ticks)  # Enqueue ticks for processing
 
     def on_connect(ws, response):
         if sub_tokens:
+            print("Starting Ticker")
             ws.subscribe(sub_tokens)
             ws.set_mode(ws.MODE_QUOTE, sub_tokens)
         else:
