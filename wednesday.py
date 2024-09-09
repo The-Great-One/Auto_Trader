@@ -42,7 +42,7 @@ def monitor_market():
                 processes = []
 
         # Adjust sleep time based on market status
-        sleep_time = 60 if market_status_cache else 600  # Check every minute when market is open, every 10 minutes otherwise
+        sleep_time = 60 if market_status_cache else 60  # Check every minute when market is open, every 10 minutes otherwise
         time.sleep(sleep_time)
 
 if __name__ == '__main__':
