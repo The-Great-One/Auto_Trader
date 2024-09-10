@@ -16,20 +16,22 @@ from kiteconnect.exceptions import (
     DataException,
     NetworkException,
 )
+from Auto_Trader.TelegramLink import send_to_channel
 
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
 kite.set_access_token(read_session_data())
 
-def trigger(symbol, exchange, trans_quantity, order_type):
+def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
     """
-    Places a market order for the specified symbol.
+    Places a market order for the specified symbol and sends a notification.
 
     Args:
         symbol (str): The trading symbol of the stock.
         exchange (str): The exchange on which the stock is listed ("NSE" or "BSE").
         trans_quantity (int): The number of shares to trade.
         order_type (str): "BUY" or "SELL" to indicate the type of order.
+        close_price (float, optional): The closing price of the stock (for buy orders).
 
     Returns:
         None
@@ -50,10 +52,21 @@ def trigger(symbol, exchange, trans_quantity, order_type):
             product=kite.PRODUCT_CNC,
             validity=kite.VALIDITY_DAY
         )
+
+        # Send message with order details
+        message = f"""
+        Symbol: {symbol}
+        Quantity: {trans_quantity}
+        Close Price: {close_price if close_price else 'N/A'}
+        Type: {'BUY' if order_type == 'BUY' else 'SELL'}
+        """
+        send_to_channel(message)
+
         if transaction_type == kite.TRANSACTION_TYPE_BUY:
             print(f"Bought: {symbol} (Order ID: {order_id})")
         else:
             print(f"Sold: {symbol} (Order ID: {order_id})")
+
     except NetworkException as ne:
         print(f"Network error while placing order for {symbol}: {ne}")
     except TokenException as te:
@@ -70,6 +83,7 @@ def trigger(symbol, exchange, trans_quantity, order_type):
         print(f"General error for {symbol}: {ge}")
     except Exception as e:
         print(f"Unexpected error while placing order for {symbol}: {e}")
+
 
 def get_positions():
     """
@@ -239,7 +253,7 @@ def handle_decisions(decisions):
                     continue
 
                 print(f"Submitting buy order for {symbol} with quantity {quantity}.")
-                futures.append(executor.submit(trigger, symbol, exchange, quantity, "BUY"))
+                futures.append(executor.submit(trigger, symbol, exchange, quantity, "BUY", close_price))
 
             except NetworkException as ne:
                 print(f"Network error while retrieving funds: {ne}")
