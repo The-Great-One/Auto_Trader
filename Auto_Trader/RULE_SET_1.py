@@ -2,7 +2,63 @@ import pandas as pd
 import ta
 from functools import lru_cache
 from multiprocessing import Pool, cpu_count
+import json
+import os
 
+PROFIT_TRACKER_FILE = 'intermediary_files/profit_tracker.json'
+
+def load_profit_tracker():
+    """
+    Load the profit tracker JSON file. If the file is corrupted or does not exist,
+    start with an empty tracker.
+    
+    Returns:
+    dict: Dictionary with symbols as keys and their maximum profit_percent.
+    """
+    if os.path.exists(PROFIT_TRACKER_FILE):
+        try:
+            with open(PROFIT_TRACKER_FILE, 'r') as file:
+                return json.load(file)
+        except json.JSONDecodeError as e:
+            print(f"Error reading {PROFIT_TRACKER_FILE}: {e}")
+            print("Starting with an empty profit tracker.")
+            return {}
+    return {}
+
+def save_profit_tracker(tracker):
+    """
+    Append to the profit tracker JSON file safely by merging existing and new data.
+    First, load the existing data, merge with the new data, then save it.
+    
+    Parameters:
+    tracker (dict): Dictionary with symbols as keys and their maximum profit_percent.
+    """
+    # Load existing data
+    existing_data = load_profit_tracker()
+    
+    # Update existing data with new tracker entries
+    existing_data.update(tracker)
+    
+    # Write to a temporary file first
+    temp_file = PROFIT_TRACKER_FILE + '.tmp'
+    
+    try:
+        with open(temp_file, 'w') as file:
+            json.dump(existing_data, file)
+        
+        # Once the temp file is written, rename it to the actual file
+        os.replace(temp_file, PROFIT_TRACKER_FILE)  # Atomic rename
+        print(f"Profit tracker updated successfully to {PROFIT_TRACKER_FILE}.")
+        
+    except Exception as e:
+        print(f"Error saving profit tracker: {e}")
+        
+        # Clean up the temp file if something went wrong
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+# Initialize or load the existing profit tracker
+profit_tracker = load_profit_tracker()
 
 @lru_cache(maxsize=None)
 def load_historical_data(symbol):
@@ -59,15 +115,30 @@ def preprocess_data(row_df, symbol):
     return df
 
 
-def buy_or_sell(df):
+def update_profit_tracker(symbol, current_profit_percent):
     """
-    Determine whether to buy, sell, or hold based on technical indicators.
+    Update the profit tracker JSON with the new profit percentage if it's greater than the existing one.
+    
+    Parameters:
+    symbol (str): The stock symbol.
+    current_profit_percent (float): The current profit percentage.
+    """
+    if symbol not in profit_tracker or profit_tracker[symbol] < current_profit_percent:
+        profit_tracker[symbol] = current_profit_percent
+        save_profit_tracker(profit_tracker)
+
+
+def buy_or_sell(df, average_price, symbol):
+    """
+    Determine whether to buy, sell, or hold based on technical indicators and trailing stop loss.
 
     Parameters:
     df (pd.DataFrame): DataFrame containing stock data with at least 'Close' and 'Volume' columns.
+    average_price (float): The average purchase price for the stock.
+    symbol (str): The stock symbol.
 
     Returns:    
-    str: "BUY", "SELL", or "HOLD" based on the computed indicators.
+    str: "BUY", "SELL", or "HOLD" based on the computed indicators and trailing stop loss.
     """
     if "Close" not in df.columns or "Volume" not in df.columns:
         raise KeyError("The DataFrame does not have the required columns: 'Close' or 'Volume'.")
@@ -85,11 +156,22 @@ def buy_or_sell(df):
     df["EMA200"] = ta.trend.EMAIndicator(close=df["Close"], window=200).ema_indicator() 
     df['Volume_MA20'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
 
-    # Ensure NaNs are filled forward/backward
-    df.ffill(inplace=True)
-    df.bfill(inplace=True)
+    # Calculate profit_percent
+    df['profit_percent'] = ((df['Close'] - average_price) / average_price) * 100
+    
+    # Handle null profit_percent
+    df['profit_percent'].fillna(0, inplace=True)
 
-   # Buy signal
+    # Update profit tracker
+    current_profit_percent = df['profit_percent'].iloc[-1]
+    update_profit_tracker(symbol, current_profit_percent)
+
+    # Trailing stop-loss condition: Trigger sell if profit drops by 3% from peak
+    trailing_stop_threshold = profit_tracker[symbol] * 0.97 if symbol in profit_tracker else None
+    if trailing_stop_threshold and current_profit_percent <= trailing_stop_threshold:
+        return "SELL"
+
+    # Buy signal
     df['Buy'] = (
         (df['EMA10'] > df['EMA20']) & 
         (df['RSI'] > 60) & (df['RSI'] <= 70) &
@@ -104,7 +186,6 @@ def buy_or_sell(df):
         (df['MACD_Hist'] < -1) &  # Loosen MACD_Hist threshold for quicker reaction
         (df['Volume'] > 1.3 * df['Volume_MA20'])  # Loosen volume condition for more exits
     )
-
 
     last_row = df.tail(1)
 
@@ -134,7 +215,7 @@ def process_single_stock(row):
     
     df = preprocess_data(row_df, row["Symbol"])
     if df is not None:
-        decision = buy_or_sell(df)
+        decision = buy_or_sell(df, row["average_price"], row["Symbol"])
         if decision != "HOLD":
             return {"Symbol": row["Symbol"], "Decision": decision, "Exchange": row["exchange"], "Close": row["last_price"]}
     return None

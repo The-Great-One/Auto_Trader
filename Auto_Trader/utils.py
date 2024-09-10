@@ -123,7 +123,7 @@ def fetch_instruments_list(kite=kite):
         # Fetch instruments and holdings
         instruments = kite.instruments()
         holdings = kite.holdings()
-        holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "quantity"]]
+        holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]
         
         # Filter out holdings with quantity greater than 0
         holdings = holdings[holdings["quantity"] > 0]
