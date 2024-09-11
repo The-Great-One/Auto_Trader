@@ -57,7 +57,7 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
         message = f"""
         Symbol: {symbol}
         Quantity: {trans_quantity}
-        Close Price: {close_price if close_price else 'N/A'}
+        Price: {close_price if close_price else 'N/A'}
         Type: {'BUY' if order_type == 'BUY' else 'SELL'}
         """
         send_to_channel(message)
