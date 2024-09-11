@@ -170,7 +170,7 @@ def buy_or_sell(df, average_price, symbol):
     if symbol in profit_tracker:
         peak_profit_percent = profit_tracker[symbol]
         trailing_stop_threshold = peak_profit_percent - 2  # Allow a 3% drop from the peak
-        if current_profit_percent <= trailing_stop_threshold:
+        if current_profit_percent <= trailing_stop_threshold or current_profit_percent <= -5:
             return "SELL"
 
     # Buy signal
