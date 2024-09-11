@@ -169,7 +169,7 @@ def buy_or_sell(df, average_price, symbol):
     # Trailing stop-loss condition: Trigger sell if profit drops by 3% from peak
     if symbol in profit_tracker:
         peak_profit_percent = profit_tracker[symbol]
-        trailing_stop_threshold = peak_profit_percent - 2  # Allow a 3% drop from the peak
+        trailing_stop_threshold = peak_profit_percent - 2  # Allow a 2% drop from the peak
         if current_profit_percent <= trailing_stop_threshold or current_profit_percent <= -5:
             return "SELL"
 
