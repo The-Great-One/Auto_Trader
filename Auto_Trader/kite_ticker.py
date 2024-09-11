@@ -3,6 +3,8 @@ from kiteconnect import KiteTicker
 from Auto_Trader.my_secrets import *
 from Auto_Trader.utils import read_session_data
 from queue import Queue
+from Auto_Trader.TelegramLink import send_to_channel
+import asyncio
 
 def run_ticker(sub_tokens, q):
     global queue
@@ -15,6 +17,7 @@ def run_ticker(sub_tokens, q):
     def on_connect(ws, response):
         if sub_tokens:
             print("Starting Ticker")
+            asyncio.run(send_to_channel("Starting Ticker"))
             ws.subscribe(sub_tokens)
             ws.set_mode(ws.MODE_QUOTE, sub_tokens)
         else:
