@@ -11,7 +11,7 @@ def goodStocks(debt_to_equity_threshold=1.5, eps_growth_threshold=3,
         filtered_list_df = ttp.get_equity_screener_data(
             filters=["epsGwth", "5yCagrPct", "mrktCapf", "pftMrg", "rtnAsts", "dbtEqt", "qcur"],
             sortby='mrktCapf',  # Sorting by market capitalization
-            number_of_records=20
+            number_of_records=2000
         )
         
         # Apply dynamic filtering conditions based on user-defined thresholds
