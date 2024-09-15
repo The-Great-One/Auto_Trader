@@ -1,7 +1,7 @@
 import time
 from datetime import datetime, timedelta
 from multiprocessing import Process, Queue
-from Auto_Trader import *
+from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater
 from Auto_Trader.TelegramLink import send_to_channel
 import asyncio
 
@@ -22,7 +22,6 @@ def monitor_market():
         if market_status_cache:
             if not processes:  # Start processes if the market is open and no processes are running
                 print("Market is open. Starting processes.")
-                asyncio.run(send_to_channel("Starting Ticker"))
                 
                 p1 = Process(target=run_ticker, args=(create_master(), q))
                 p2 = Process(target=Apply_Rules, args=(q,))

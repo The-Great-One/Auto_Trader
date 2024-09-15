@@ -1,5 +1,3 @@
-from datetime import datetime
-import uuid
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY
 from Auto_Trader.utils import read_session_data
@@ -42,7 +40,6 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
     transaction_type = kite.TRANSACTION_TYPE_BUY if order_type == "BUY" else kite.TRANSACTION_TYPE_SELL
 
     try:
-        print(f"Placing order for {symbol}...")
         order_id = kite.place_order(
             variety=kite.VARIETY_REGULAR,
             tradingsymbol=symbol,
@@ -127,15 +124,11 @@ def is_symbol_in_order_book(symbol):
     Returns:
         bool: True if the symbol is present in the order book, False otherwise.
     """
-    print(f"Checking if symbol {symbol} is in the order book...")
     try:
         orders = kite.orders()
-        print(f"Retrieved {len(orders)} orders from the order book.")
         for order in orders:
             if order['tradingsymbol'] == symbol and order['status'] in ['TRIGGER_PENDING', 'OPEN']:
-                print(f"Symbol {symbol} is already in the order book with status {order['status']}.")
                 return True
-        print(f"Symbol {symbol} is not in the order book.")
         return False
     except Exception as e:
         print(f"Error checking order book for {symbol}: {e}")
@@ -156,16 +149,13 @@ def should_place_buy_order(symbol):
     holdings = get_holdings()
     # Check if the symbol already has a position
     if symbol in positions:
-        print(f"Already have an open position for {symbol}. Skipping buy order.")
         return False
     
     if symbol in holdings:
-        print(f"Already holding {symbol}. Skipping buy order.")
         return False
     
     # Check if the symbol is already in the order book
     if is_symbol_in_order_book(symbol):
-        print(f"Symbol {symbol} is already in the order book. Skipping buy order.")
         return False
     
     return True
@@ -185,9 +175,7 @@ def handle_decisions(decisions):
     """
     holdings = pd.DataFrame(kite.holdings()).set_index("tradingsymbol")
     
-    print(f"Handling {len(decisions)} trading decisions.")
     symbols_held = list(holdings.index)
-    print(f"Symbols currently held: {symbols_held}")
 
     # Separate sell and buy decisions
     sell_decisions = [
@@ -196,30 +184,26 @@ def handle_decisions(decisions):
     buy_decisions = [
         decision for decision in decisions if decision["Decision"] == "BUY" and decision["Symbol"] not in symbols_held
     ]
-    print(f"Found {len(sell_decisions)} sell decisions and {len(buy_decisions)} buy decisions.")
 
     # Use ThreadPoolExecutor for parallel processing
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = []
 
         # First execute sell orders
-        print("Submitting sell orders...")
         for decision in sell_decisions:
             symbol = decision["Symbol"]
             exchange = decision["Exchange"]
+            close_price = decision["Close"]
             
             # Safely access the quantity for the symbol
             quantity = holdings.loc[symbol]["quantity"] if symbol in holdings.index else 0
             
             if quantity == 0:
-                print(f"No quantity found for {symbol}. Skipping sell order.")
                 continue
 
-            print(f"Submitting sell order for {symbol} with quantity {quantity}.")
-            futures.append(executor.submit(trigger, symbol, exchange, quantity, "SELL"))
+            futures.append(executor.submit(trigger, symbol, exchange, quantity, "SELL", close_price))
 
         # Ensure all sell orders are completed before proceeding
-        print("Waiting for sell orders to complete...")
         for future in as_completed(futures):
             try:
                 future.result()  # Handle any exceptions that might have occurred
@@ -230,12 +214,10 @@ def handle_decisions(decisions):
         futures.clear()
 
         # Then execute buy orders
-        print("Submitting buy orders...")
         for decision in buy_decisions:
             symbol = decision["Symbol"]
             exchange = decision["Exchange"]
             close_price = decision["Close"]
-            print(f"Processing buy decision for {symbol} at close price {close_price}.")
 
             try:
                 funds = kite.margins("equity")["available"]["live_balance"]
@@ -253,7 +235,6 @@ def handle_decisions(decisions):
                     print(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
 
-                print(f"Submitting buy order for {symbol} with quantity {quantity}.")
                 futures.append(executor.submit(trigger, symbol, exchange, quantity, "BUY", close_price))
 
             except NetworkException as ne:
@@ -270,7 +251,6 @@ def handle_decisions(decisions):
                 print(f"Unexpected error while processing buy decision for {symbol}: {e}")
 
         # Handle the completion of buy orders
-        print("Waiting for buy orders to complete...")
         for future in as_completed(futures):
             try:
                 future.result()  # Handle any exceptions that might have occurred

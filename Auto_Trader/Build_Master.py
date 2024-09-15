@@ -1,6 +1,6 @@
 import glob
 import pandas as pd
-from .utils import fetch_instruments_list, get_instrument_token
+from .utils import fetch_instruments_list, get_instrument_token, fetch_holdings
 from .StrongFundamentalsStockList import goodStocks
 from .FetchPricesYfinance import download_historical_quotes
 import sys
@@ -15,10 +15,9 @@ def create_master():
     """
     # Fetch instrument master list and good stocks list
     instrument_master = fetch_instruments_list()
+    holdings = fetch_holdings()
     ticker_tape_list = goodStocks()
         
-    holdings = pd.read_csv("intermediary_files/Holdings.csv")
-
     # Rename columns in holdings to match those in merged_df
     holdings.rename(columns={"tradingsymbol": "Symbol"}, inplace=True)
 

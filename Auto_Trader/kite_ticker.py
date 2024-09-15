@@ -17,7 +17,7 @@ def run_ticker(sub_tokens, q):
     def on_connect(ws, response):
         if sub_tokens:
             print("Starting Ticker")
-            asyncio.run(send_to_channel("Starting Ticker"))
+            # asyncio.run(send_to_channel("Starting Ticker"))
             ws.subscribe(sub_tokens)
             ws.set_mode(ws.MODE_QUOTE, sub_tokens)
         else:

@@ -1,4 +1,4 @@
-from Auto_Trader import *
+from Auto_Trader import datetime, time
 import subprocess
 
 def Updater():
