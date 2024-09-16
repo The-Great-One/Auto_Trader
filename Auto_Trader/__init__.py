@@ -1,6 +1,9 @@
 # Import Necessary Sub-Modules/Libraries
 
 import os
+
+os.makedirs("intermediary_files", exist_ok=True)
+
 import sys
 import time
 from datetime import datetime, timedelta
