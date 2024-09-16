@@ -258,7 +258,7 @@ def handle_decisions(decisions):
                 print(f"Error in executing buy order: {e}")
 
         # Rate limiting: Ensure we don't exceed the API limits
-        print("Sleeping for 0.1 seconds to respect rate limits.")
+        # print("Sleeping for 0.1 seconds to respect rate limits.")
         time.sleep(0.1)
 
-    print("Finished handling trading decisions.")
+    # print("Finished handling trading decisions.")
