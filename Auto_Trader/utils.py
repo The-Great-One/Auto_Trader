@@ -15,9 +15,8 @@ RULE_SETS = {
 }
 
 # Initialize the NSE market calendar
-nse_calendar = mcal.get_calendar('XNSE')
+nse_calendar = mcal.get_calendar('NSE')
 
-@lru_cache(maxsize=100)
 def build_access_token():
     """
     Generate a new access token and save it to a JSON file.
@@ -42,7 +41,6 @@ def build_access_token():
         print(f"Error in generating session: {e}")
         return None
 
-@lru_cache(maxsize=100)
 def read_session_data():
     """
     Read the access token from a JSON file and validate its date.
@@ -65,7 +63,6 @@ def read_session_data():
         print("Session data file not found or invalid. Creating a new session.")
         return build_access_token()
 
-@lru_cache(maxsize=100)
 def initialize_kite():
     """
     Initialize the KiteConnect object with a valid session.
@@ -103,10 +100,12 @@ def Indicators(df):
     df["EMA10"] = ta.trend.EMAIndicator(close=df["Close"], window=10).ema_indicator()
     df["EMA20"] = ta.trend.EMAIndicator(close=df["Close"], window=20).ema_indicator()
     df["EMA50"] = ta.trend.EMAIndicator(close=df["Close"], window=50).ema_indicator()
+    df["EMA12"] = ta.trend.EMAIndicator(close=df["Close"], window=12).ema_indicator()
+    df["EMA26"] = ta.trend.EMAIndicator(close=df["Close"], window=26).ema_indicator()
 
     # Calculate average volume over the past 20 days
-    df["Volume_MA20"] = df["Volume"].rolling(window=20).mean()
-
+    df['Volume_MA'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
+    
     # Ensure NaNs are filled forward/backward
     df.ffill(inplace=True)
     df.bfill(inplace=True)
@@ -117,8 +116,6 @@ def Indicators(df):
     # Return the last non-empty row with the relevant columns
     return df
 
-# Custom cache dictionary
-_historical_data_cache = {}
 
 def load_historical_data(symbol):
     """
@@ -130,16 +127,11 @@ def load_historical_data(symbol):
     Returns:
         pd.DataFrame or None: The historical data DataFrame, or None if loading fails.
     """
-    if symbol in _historical_data_cache:
-        print(f"Cache hit for {symbol}")
-        return _historical_data_cache[symbol]
     try:
         # Specify dtypes for more efficient memory usage
         df = pd.read_csv(
-            f"intermediary_files/Hist_Data/{symbol}.csv", 
-            dtype={"Close": "float32", "Volume": "int32"}
-        )
-        _historical_data_cache[symbol] = df
+    f"intermediary_files/Hist_Data/{symbol}.csv"
+    )
         return df
     except Exception as e:
         print(f"Error loading {symbol}.csv: {e}")
@@ -242,7 +234,8 @@ def apply_trading_rules(df, row):
             if decision in decisions:
                 decisions[decision] += 1
             else:
-                print(f"Unknown decision {decision} encountered.")
+                pass
+                # print(f"Unknown decision {decision} encountered.")
 
     # Print decisions for each stock (for debugging)
     # print(f"Decisions for {row['Symbol']}: {decisions}")
@@ -362,43 +355,45 @@ def get_market_schedule():
     schedule = nse_calendar.schedule(start_date=now.date(), end_date=now.date())
     return schedule if not schedule.empty else None
 
-def is_Market_Open():
+def is_market_open(schedule):
     """
     Check if the NSE market is currently open.
+    
+    Args:
+    schedule (pd.DataFrame): Market schedule for the day.
     
     Returns:
     bool: True if the market is open, False otherwise.
     """
-    schedule = get_market_schedule()
     if schedule is None:
         print("Market is closed today.")
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].time()
-    market_close = schedule.iloc[0]['market_close'].time()
-    current_time = now.time()
+    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata"))
+    market_close = schedule.iloc[0]['market_close'].astimezone(ZoneInfo("Asia/Kolkata"))
     
-    return market_open <= current_time <= market_close
+    return market_open <= now <= market_close
 
-def is_PreMarket_Open():
+def is_premarket_open(schedule):
     """
     Check if the NSE premarket is currently open.
+    
+    Args:
+    schedule (pd.DataFrame): Market schedule for the day.
     
     Returns:
     bool: True if the premarket is open, False otherwise.
     """
-    schedule = get_market_schedule()
     if schedule is None:
         print("Market is closed today.")
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].time()
-    premarket_open = (datetime.combine(now.date(), market_open) - timedelta(minutes=15)).time()
-    current_time = now.time()
+    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata"))
+    premarket_open = (market_open - timedelta(minutes=15))
     
-    return premarket_open <= current_time < market_open
+    return premarket_open <= now < market_open
 
 def get_instrument_token(good_stock_list_df, instruments_df):
     """
