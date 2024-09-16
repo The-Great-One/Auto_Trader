@@ -355,7 +355,7 @@ def get_market_schedule():
     schedule = nse_calendar.schedule(start_date=now.date(), end_date=now.date())
     return schedule if not schedule.empty else None
 
-def is_market_open(schedule):
+def is_Market_Open(schedule):
     """
     Check if the NSE market is currently open.
     
@@ -375,7 +375,7 @@ def is_market_open(schedule):
     
     return market_open <= now <= market_close
 
-def is_premarket_open(schedule):
+def is_PreMarket_Open(schedule):
     """
     Check if the NSE premarket is currently open.
     
