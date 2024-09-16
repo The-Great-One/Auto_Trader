@@ -44,9 +44,10 @@ def Apply_Rules(q):
 
                 if decisions:
                     handle_decisions(decisions=decisions)
-                    print(f"Handled decisions for {len(decisions)} stocks.")
+                    # print(f"Handled decisions for {len(decisions)} stocks.")
                 else:
-                    print("No trading decisions made in this iteration.")
+                    pass
+                    # print("No trading decisions made in this iteration.")
 
             except Exception as e:
                 print(f"An error occurred while processing data: {e}")
