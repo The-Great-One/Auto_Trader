@@ -98,7 +98,7 @@ def download_ticker_data(ticker, fetched_data_manager):
 
         if not data.empty:
             data = data.reset_index()[["Date", "Close", "Volume"]]
-            data = data.sort_values(by=["Date"], ascending=False)
+            data = data.sort_values(by=["Date"], ascending=True)
             
             if is_Market_Open() or is_PreMarket_Open():
                 today = datetime.today().date()
