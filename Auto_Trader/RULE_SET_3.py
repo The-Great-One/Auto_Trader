@@ -34,7 +34,7 @@ def buy_or_sell(df, row, holdings):
         max_profit_percent = ((day_high_price - average_price) / average_price) * 100
         
         
-        if max_profit_percent - profit_percent >= 3.0:
+        if max_profit_percent - profit_percent >= 5.0:
             return "SELL"
         else:
             return "HOLD"

@@ -8,14 +8,14 @@ import asyncio
 def monitor_market():
     processes = []
     q = Queue()
-    last_check_time = datetime.now() - timedelta(minutes=10)  # Initial check time in the past
+    last_check_time = datetime.now() - timedelta(minutes=1)  # Initial check time in the past
     market_status_cache = False  # Cache for market status
 
     while True:
         current_time = datetime.now()
         
         # Only call is_Market_Open() every 10 minutes or when the cache is outdated
-        if (current_time - last_check_time).total_seconds() > 600:  # 600 seconds = 10 minutes
+        if (current_time - last_check_time).total_seconds() > 60:  # 600 seconds = 10 minutes
             market_status_cache = is_Market_Open()
             last_check_time = current_time  # Update the last check time
 
