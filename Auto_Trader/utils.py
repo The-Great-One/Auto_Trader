@@ -4,13 +4,14 @@ from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import rule set modules
-from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3
+from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4
 
 # Map rule set names to their modules
 RULE_SETS = {
     'RULE_SET_1': RULE_SET_1,
     'RULE_SET_2': RULE_SET_2,
     'RULE_SET_3': RULE_SET_3,
+    'RULE_SET_4': RULE_SET_4,
     # Add new rule sets here
 }
 
