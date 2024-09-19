@@ -14,8 +14,8 @@ from kiteconnect.exceptions import (
     DataException,
     NetworkException,
 )
-from Auto_Trader.TelegramLink import send_to_channel
-import asyncio
+from .queue_manager import addtoqueue
+
 
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
@@ -49,6 +49,7 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
             order_type=kite.ORDER_TYPE_MARKET,
             product=kite.PRODUCT_CNC,
             validity=kite.VALIDITY_DAY
+            
         )
 
         # Send message with order details
@@ -58,7 +59,7 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
         Price: {close_price if close_price else 'N/A'}
         Type: {'BUY' if order_type == 'BUY' else 'SELL'}
         """
-        asyncio.run(send_to_channel(message))
+        addtoqueue(message)
 
         if transaction_type == kite.TRANSACTION_TYPE_BUY:
             print(f"Bought: {symbol} (Order ID: {order_id})")
