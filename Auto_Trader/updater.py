@@ -1,9 +1,8 @@
-from Auto_Trader import datetime, time
-import subprocess
-
+from Auto_Trader import datetime, time, subprocess
+from Auto_Trader.my_secrets import GITHUB_PAT
 def Updater():
     while True:
-        result = subprocess.run(["git", "pull", "--force", "https://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@github.com/The-Great-One/Auto_Trader.git", "main"], stdout=subprocess.PIPE)
+        result = subprocess.run(["git", "pull", "--force", f"https://{GITHUB_PAT}@github.com/The-Great-One/Auto_Trader.git", "main"], stdout=subprocess.PIPE)
         if "send" in str(result):
             print("Updated. Restarting!")
             subprocess.run(["systemctl", "restart", "auto_trade.service"])

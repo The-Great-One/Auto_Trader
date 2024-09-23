@@ -3,8 +3,7 @@ import Auto_Trader
 
 def buy_or_sell(df, row, holdings):
     """
-    Determine whether to sell based on Stop Loss and trailing stop-loss.
-    Remove from profit tracker when a stock is sold and no longer held.
+    Determine whether to sell based on trailing stop-loss of 3% from Day High.
     """
     # Fetch holdings and filter necessary columns
     holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]
@@ -14,7 +13,6 @@ def buy_or_sell(df, row, holdings):
         
         # Ensure there's data for the symbol
         if holdings_symbol_data.empty:
-            # print(f"No holdings found for {row['instrument_token']}")
             return
         
         # Extract average price from the holdings
@@ -34,7 +32,7 @@ def buy_or_sell(df, row, holdings):
         max_profit_percent = ((day_high_price - average_price) / average_price) * 100
         
         
-        if max_profit_percent - profit_percent >= 4.0:
+        if max_profit_percent - profit_percent >= 3.0:
             return "SELL"
         else:
             return "HOLD"

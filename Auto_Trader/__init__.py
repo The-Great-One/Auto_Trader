@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timedelta
 from functools import *
 from multiprocessing import Process, Queue
+import subprocess
 
 import pandas as pd
 import requests

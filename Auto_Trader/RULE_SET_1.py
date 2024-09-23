@@ -1,6 +1,3 @@
-import pandas as pd
-import numpy as np
-
 # Define global constants for periods
 EMA_SHORT_PERIOD = 10
 EMA_LONG_PERIOD = 20

@@ -2,7 +2,7 @@ from Fundamentals import Tickertape
 from functools import lru_cache
 
 @lru_cache(maxsize=10)  # Caching to optimize repeated data fetching
-def goodStocks(debt_to_equity_threshold=1, eps_growth_threshold=3, 
+def goodStocks(debt_to_equity_threshold=1.5, eps_growth_threshold=3, 
                profit_margin_threshold=8, current_ratio_threshold=1.5, cagr_threshold=5):
     ttp = Tickertape()
     

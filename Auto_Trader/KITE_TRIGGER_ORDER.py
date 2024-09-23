@@ -14,14 +14,11 @@ from kiteconnect.exceptions import (
     DataException,
     NetworkException,
 )
-from .queue_manager import addtoqueue
-
-
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
 kite.set_access_token(read_session_data())
 
-def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
+def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price=None):
     """
     Places a market order for the specified symbol and sends a notification.
 
@@ -40,6 +37,7 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
     transaction_type = kite.TRANSACTION_TYPE_BUY if order_type == "BUY" else kite.TRANSACTION_TYPE_SELL
 
     try:
+        
         order_id = kite.place_order(
             variety=kite.VARIETY_REGULAR,
             tradingsymbol=symbol,
@@ -59,7 +57,7 @@ def trigger(symbol, exchange, trans_quantity, order_type, close_price=None):
         Price: {close_price if close_price else 'N/A'}
         Type: {'BUY' if order_type == 'BUY' else 'SELL'}
         """
-        addtoqueue(message)
+        message_queue.put(message)
 
         if transaction_type == kite.TRANSACTION_TYPE_BUY:
             print(f"Bought: {symbol} (Order ID: {order_id})")
@@ -161,7 +159,7 @@ def should_place_buy_order(symbol):
     
     return True
 
-def handle_decisions(decisions):
+def handle_decisions(message_queue, decisions):
     """
     Processes a list of trading decisions, executing sell orders first to free up funds,
     and then executing buy orders if sufficient funds are available and the symbol is not
@@ -202,7 +200,7 @@ def handle_decisions(decisions):
             if quantity == 0:
                 continue
 
-            futures.append(executor.submit(trigger, symbol, exchange, quantity, "SELL", close_price))
+            futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "SELL", close_price))
 
         # Ensure all sell orders are completed before proceeding
         for future in as_completed(futures):
@@ -236,7 +234,7 @@ def handle_decisions(decisions):
                     print(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
 
-                futures.append(executor.submit(trigger, symbol, exchange, quantity, "BUY", close_price))
+                futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "BUY", close_price))
 
             except NetworkException as ne:
                 print(f"Network error while retrieving funds: {ne}")

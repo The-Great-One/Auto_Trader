@@ -3,8 +3,7 @@ import Auto_Trader
 
 def buy_or_sell(df, row, holdings):
     """
-    Determine whether to sell based on Stop Loss and trailing stop-loss.
-    Remove from profit tracker when a stock is sold and no longer held.
+    Determine whether to sell based on Stop Loss of -5%
     """
     holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]
     try:

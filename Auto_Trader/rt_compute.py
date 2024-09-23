@@ -3,7 +3,7 @@ import pandas as pd
 from Auto_Trader.KITE_TRIGGER_ORDER import handle_decisions
 from Auto_Trader.utils import process_stock_and_decide
 
-def Apply_Rules(q):
+def Apply_Rules(q, message_queue):
     """
     Continuously processes stock data from a queue, applies trading rules,
     and handles decisions to buy or sell stocks using multiprocessing.
@@ -43,11 +43,8 @@ def Apply_Rules(q):
                 decisions = [decision for decision in results if decision is not None]
 
                 if decisions:
-                    handle_decisions(decisions=decisions)
-                    # print(f"Handled decisions for {len(decisions)} stocks.")
+                    handle_decisions(message_queue, decisions=decisions)
                 else:
                     pass
-                    # print("No trading decisions made in this iteration.")
-
             except Exception as e:
                 print(f"An error occurred while processing data: {e}")

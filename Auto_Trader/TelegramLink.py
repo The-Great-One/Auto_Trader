@@ -2,7 +2,6 @@
 import asyncio
 from telegram import Bot
 from Auto_Trader.my_secrets import TG_TOKEN, CHANNEL
-from .queue_manager import message_queue  # Import the shared queue
 
 # Initialize the bot globally
 bot = Bot(token=TG_TOKEN)

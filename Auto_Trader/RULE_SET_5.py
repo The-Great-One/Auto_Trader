@@ -7,12 +7,12 @@ def buy_or_sell(df, row, holdings):
     df : pd.DataFrame
         The DataFrame containing the historical data, including necessary technical indicators.
     row : int
-        The index of the current row being evaluated.
+        The latest row for evaluation.
     holdings : dict
         A dictionary representing the current stock holdings.
 
     Returns:
-    --------
+    --------    
     str
         Returns 'BUY', 'SELL', or 'HOLD' signal based on technical indicator evaluation.
     """

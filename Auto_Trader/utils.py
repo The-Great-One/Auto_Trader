@@ -340,7 +340,6 @@ def fetch_instruments_list(kite=kite):
             instrument for instrument in instruments if instrument["instrument_type"] == "EQ"
         ]
         df = pd.DataFrame(nse_stocks)[["instrument_token", "tradingsymbol", "exchange"]]
-        # print("Instruments Fetched and Saved!")
         return df
 
     except Exception as e:
