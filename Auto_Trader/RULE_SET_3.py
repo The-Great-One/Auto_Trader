@@ -1,42 +1,33 @@
-from Auto_Trader import pd, time
-import Auto_Trader
+from Auto_Trader import pd
 
 def buy_or_sell(df, row, holdings):
     """
-    Determine whether to sell based on trailing stop-loss of 3% from Day High.
+    Determine whether to sell based on a trailing stop-loss of 3% from the day's high.
     """
-    # Fetch holdings and filter necessary columns
-    holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]
     try:
-        # Filter holdings for the specific instrument token
-        holdings_symbol_data = holdings[holdings["instrument_token"] == row["instrument_token"]]
+        # Convert holdings to a DataFrame and filter for the specific instrument token
+        holdings = pd.DataFrame(holdings)
+        holdings_symbol_data = holdings.loc[holdings["instrument_token"] == row["instrument_token"], ["average_price", "tradingsymbol"]]
         
-        # Ensure there's data for the symbol
+        # If no holdings for the instrument token, return HOLD
         if holdings_symbol_data.empty:
-            return
+            return "HOLD"
         
-        # Extract average price from the holdings
+        # Extract relevant data
         average_price = holdings_symbol_data['average_price'].iloc[-1]
-        
-        # Extract last closing price from the dataframe
         last_price = df['Close'].iloc[-1]
-        day_high_price = row["ohlc"]["high"]
+        day_high_price = row.get("ohlc", {}).get("high")
         
-        # Avoid divide-by-zero error
-        if average_price == 0:
-            print(f"Error: Average price is zero for {holdings_symbol_data['tradingsymbol'].iloc[-1]}")
-            return
+        # Check if required data is valid
+        if average_price == 0 or day_high_price is None:
+            return "HOLD"
         
-        # Calculate profit percentage
-        profit_percent = ((last_price - average_price) / average_price) * 100
-        max_profit_percent = ((day_high_price - average_price) / average_price) * 100
-        
-        
-        if max_profit_percent - profit_percent >= 3.0:
+        # Check trailing stop-loss: if the current price falls 3% or more from the day's high, return SELL
+        if (day_high_price - last_price) / day_high_price * 100 >= 3.0:
             return "SELL"
         else:
             return "HOLD"
         
-    
     except Exception as e:
         print(f"Error processing {row['instrument_token']}: {str(e)}")
+        return "HOLD"
