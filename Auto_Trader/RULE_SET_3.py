@@ -15,7 +15,7 @@ def buy_or_sell(df, row, holdings):
         
         # Extract relevant data
         average_price = holdings_symbol_data['average_price'].iloc[-1]
-        last_price = df['Close'].iloc[-1]
+        last_price = row["last_price"]
         day_high_price = row.get("ohlc", {}).get("high")
         
         # Check if required data is valid
