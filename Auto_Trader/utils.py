@@ -1,10 +1,10 @@
-from Auto_Trader import RULE_SET_3, RULE_SET_5, mcal, lru_cache, KiteConnect, json, datetime, ta, pd, retry, ZoneInfo, timedelta
+from Auto_Trader import RULE_SET_3, RULE_SET_5, RULE_SET_6, mcal, lru_cache, KiteConnect, json, datetime, ta, pd, retry, ZoneInfo, timedelta
 from Auto_Trader.my_secrets import API_KEY, API_SECRET
 from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import rule set modules
-from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5
+from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6
 
 # Map rule set names to their modules
 RULE_SETS = {
@@ -13,6 +13,7 @@ RULE_SETS = {
     'RULE_SET_3': RULE_SET_3,
     'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
+    'RULE_SET_6': RULE_SET_6,
     # Add new rule sets here
 }
 
