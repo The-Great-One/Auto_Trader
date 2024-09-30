@@ -20,7 +20,7 @@ def buy_or_sell(df, row, holdings):
     or (df["RSI"].iloc[-1] >= 76)  # RSI above 76, indicating an overbought condition where profit-taking is safer
     or ((df["RSI"].shift(1).iloc[-1] - df["RSI"].iloc[-1]) >= 3)  # A slight RSI drop (2 points) indicating early weakening momentum
     or (df["MACD_Hist"].iloc[-1] < 0)  # MACD histogram turns negative, indicating loss of bullish momentum
-    or (df["MACD"].iloc[-1] < df["Signal_Line"].iloc[-1])  # MACD line crosses below the signal line, further confirming weakening momentum
+    or (df["MACD"].iloc[-1] < df["MACD_Signal"].iloc[-1])  # MACD line crosses below the signal line, further confirming weakening momentum
     ):
         return "SELL"
     else:
