@@ -374,7 +374,7 @@ def is_Market_Open(schedule=get_market_schedule()):
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata")) - timedelta(minutes=5)
+    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata")) - timedelta(minutes=10)
     market_close = schedule.iloc[0]['market_close'].astimezone(ZoneInfo("Asia/Kolkata"))
     
     return market_open <= now <= market_close
