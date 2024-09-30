@@ -32,9 +32,9 @@ def buy_or_sell(df, row, holdings):
     ):
         return "BUY"
 
-    # Sell signal conditions
+    #Sell Signal conditions
     elif (
-        ((df['RSI'].iloc[-1] < 60) or (df['RSI'].iloc[-1] > 75)) and
+        ((df['RSI'].iloc[-1] <= 60) or (df['RSI'].iloc[-1] >= 70)) and
         (df['RSI'].iloc[-1] <= df['RSI'].shift(1).iloc[-1]) and
         (df['RSI'].shift(1).iloc[-1] <= df['RSI'].shift(2).iloc[-1]) and
         (df['RSI'].shift(2).iloc[-1] <= df['RSI'].shift(3).iloc[-1]) and
@@ -46,6 +46,7 @@ def buy_or_sell(df, row, holdings):
         (df["Close"].iloc[-1] <= df["EMA200"].iloc[-1])
     ):
         return "SELL"
+
 
     # Default to HOLD if no conditions are met
     else:
