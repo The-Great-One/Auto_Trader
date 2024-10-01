@@ -221,7 +221,7 @@ def handle_decisions(message_queue, decisions):
             try:
                 funds = kite.margins("equity")["available"]["live_balance"]
                 print(f"Available funds: {funds}")
-                if funds <= 11000:
+                if funds <= 20000:
                     print("Insufficient funds to place more buy orders. Stopping buy order processing.")
                     break
 
@@ -229,7 +229,7 @@ def handle_decisions(message_queue, decisions):
                 if not should_place_buy_order(symbol):
                     continue
 
-                quantity = floor(11000 / close_price)
+                quantity = floor(20000 / close_price)
                 if quantity <= 0:
                     print(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
