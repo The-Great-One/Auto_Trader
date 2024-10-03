@@ -73,10 +73,14 @@ def initialize_kite():
     Returns:
         KiteConnect: An instance of KiteConnect with a valid session.
     """
-    kite = KiteConnect(api_key=API_KEY)
-    access_token = read_session_data()
-    kite.set_access_token(access_token)
-    return kite
+    try:
+        kite = KiteConnect(api_key=API_KEY)
+        access_token = read_session_data()
+        kite.set_access_token(access_token)
+        return kite
+    except:
+        build_access_token()
+        return initialize_kite()
 
 def Indicators(df):
     """
@@ -374,7 +378,7 @@ def is_Market_Open(schedule=get_market_schedule()):
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata")) - timedelta(minutes=10)
+    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata")) - timedelta(minutes=15)
     market_close = schedule.iloc[0]['market_close'].astimezone(ZoneInfo("Asia/Kolkata"))
     
     return market_open <= now <= market_close

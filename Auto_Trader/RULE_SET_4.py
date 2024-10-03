@@ -5,8 +5,8 @@ def buy_or_sell(df, row, holdings):
 
     if (
     (df["EMA10"].iloc[-1] > df["EMA20"].iloc[-1])  # EMA10 is greater than EMA20, confirming an uptrend
-    and (df["RSI"].iloc[-1] >= 60)  # RSI above 60 to capture the upward momentum earlier
-    and (df["RSI"].iloc[-1] <= 65)  # RSI less than 70 to avoid overbought conditions
+    and (df["RSI"].iloc[-1] >= 62)  # RSI above 62 to capture the upward momentum.
+    and (df["RSI"].iloc[-1] <= 66)  # RSI less than 70 to avoid overbought conditions
     and (df["RSI"].shift(1).iloc[-1] < df["RSI"].iloc[-1])  # Previous RSI is lower, indicating increasing momentum
     and (df["MACD_Hist"].iloc[-1] >= 5)  # MACD histogram indicating positive momentum
     and (df["MACD_Hist"].shift(1).iloc[-1] > 0)  # MACD histogram is increasing
