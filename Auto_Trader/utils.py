@@ -4,7 +4,7 @@ from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import rule set modules
-from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6
+from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7
 
 # Map rule set names to their modules
 RULE_SETS = {
@@ -14,6 +14,7 @@ RULE_SETS = {
     'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
     'RULE_SET_6': RULE_SET_6,
+    'RULE_SET_7': RULE_SET_7,
     # Add new rule sets here
 }
 
@@ -100,29 +101,43 @@ def Indicators(df):
 
     # Calculate key indicators
     df["RSI"] = round(ta.momentum.RSIIndicator(df["Close"], window=14).rsi(), 2)
+    
     macd_indicator = ta.trend.MACD(close=df["Close"], window_fast=9, window_slow=23, window_sign=9)
     df["MACD"] = macd_indicator.macd()
     df["MACD_Signal"] = macd_indicator.macd_signal()
     df["MACD_Hist"] = macd_indicator.macd_diff()
+    
+    # Calculate EMAs
+    df["EMA9"] = ta.trend.EMAIndicator(close=df["Close"], window=9).ema_indicator()
     df["EMA10"] = ta.trend.EMAIndicator(close=df["Close"], window=10).ema_indicator()
     df["EMA20"] = ta.trend.EMAIndicator(close=df["Close"], window=20).ema_indicator()
+    df["EMA21"] = ta.trend.EMAIndicator(close=df["Close"], window=21).ema_indicator()
     df["EMA50"] = ta.trend.EMAIndicator(close=df["Close"], window=50).ema_indicator()
     df["EMA100"] = ta.trend.EMAIndicator(close=df["Close"], window=100).ema_indicator()
     df["EMA200"] = ta.trend.EMAIndicator(close=df["Close"], window=200).ema_indicator()
     df["EMA12"] = ta.trend.EMAIndicator(close=df["Close"], window=12).ema_indicator()
     df["EMA26"] = ta.trend.EMAIndicator(close=df["Close"], window=26).ema_indicator()
-
+    
     # Calculate average volume over the past 20 days
     df['Volume_MA'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
     
+    # Calculate average volume over the past 20 days
+    df['AvgVolume'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
+    
+    # Volume confirmation: Is today's volume 20% higher than the 20-day moving average of volume?
+    df['VolumeConfirmed'] = df['Volume'] > (1.2 * df['AvgVolume'])
+    
+    # Calculate ATR for dynamic stop-loss
+    df['ATR'] = ta.volatility.AverageTrueRange(df['High'], df['Low'], df['Close'], window=14).average_true_range()
+
     # Ensure NaNs are filled forward/backward
     df.ffill(inplace=True)
     df.bfill(inplace=True)
+    
+    # Reset the index to access 'Date' as a column if necessary
+    df = df.reset_index(drop=False)
 
-    # Reset the index to access 'Date' as a column
-    df = df.reset_index()
-
-    # Return the last non-empty row with the relevant columns
+    # Return the DataFrame with the relevant columns
     return df
 
 
