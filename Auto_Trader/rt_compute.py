@@ -1,5 +1,6 @@
 from multiprocessing import Pool, cpu_count
 import pandas as pd
+import sys
 from Auto_Trader.KITE_TRIGGER_ORDER import handle_decisions
 from Auto_Trader.utils import process_stock_and_decide
 
@@ -48,3 +49,4 @@ def Apply_Rules(q, message_queue):
                     pass
             except Exception as e:
                 print(f"An error occurred while processing data: {e}")
+                sys.exit(1)
