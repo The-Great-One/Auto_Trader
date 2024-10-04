@@ -33,7 +33,7 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
         None
     """
     print(f"Triggering {'BUY' if order_type == 'BUY' else 'SELL'} order for {symbol} on {exchange} with quantity {trans_quantity}.")
-    exchange = "NSE" if exchange == "NSE" else "BSE"
+    trigg_exchange = kite.EXCHANGE_NSE if exchange == "NSE" else kite.EXCHANGE_BSE
     transaction_type = kite.TRANSACTION_TYPE_BUY if order_type == "BUY" else kite.TRANSACTION_TYPE_SELL
 
     try:
@@ -41,7 +41,7 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
         order_id = kite.place_order(
             variety=kite.VARIETY_REGULAR,
             tradingsymbol=symbol,
-            exchange=kite.EXCHANGE_NSE,
+            exchange=trigg_exchange,
             transaction_type=transaction_type,
             quantity=trans_quantity,
             order_type=kite.ORDER_TYPE_MARKET,
