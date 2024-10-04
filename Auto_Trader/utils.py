@@ -59,6 +59,7 @@ def read_session_data():
         session_date = session_data.get("date")
 
         if str(datetime.now().date()) == session_date:
+            kite.set_access_token(access_token)
             return access_token
         else:
             return build_access_token()
