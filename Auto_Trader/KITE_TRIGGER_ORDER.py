@@ -18,7 +18,7 @@ from kiteconnect.exceptions import (
 kite = KiteConnect(api_key=API_KEY)
 kite.set_access_token(read_session_data())
 
-def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price=None):
+def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price):
     """
     Places a market order for the specified symbol and sends a notification.
 
@@ -44,7 +44,8 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
             exchange=trigg_exchange,
             transaction_type=transaction_type,
             quantity=trans_quantity,
-            order_type=kite.ORDER_TYPE_MARKET,
+            order_type=kite.ORDER_TYPE_LIMIT,
+            price=close_price,
             product=kite.PRODUCT_CNC,
             validity=kite.VALIDITY_DAY
             
