@@ -324,7 +324,10 @@ def fetch_holdings(kite=kite):
     try:
         # Fetch holdings
         holdings = kite.holdings()
-        holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]
+        holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"]]
+        
+        #Merge Holdings and t1_quantity
+        holdings['quantity'] = holdings['quantity'] + holdings['t1_quantity']
         
         # Filter out holdings with quantity greater than 0
         holdings = holdings[holdings["quantity"] > 0]
