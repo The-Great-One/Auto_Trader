@@ -7,12 +7,13 @@ MACD_FAST_PERIOD = 12
 MACD_SLOW_PERIOD = 26
 MACD_SIGNAL_PERIOD = 9
 VOLUME_MA_PERIOD = 20
-RSI_THRESHOLD = 60
-MACD_HIST_THRESHOLD = 5
-COOLDOWN_PERIOD = 5
-VOLUME_MULTIPLIER = 1.5
+RSI_THRESHOLD = 65  # Lowered to allow more opportunities while maintaining accuracy
+MACD_HIST_THRESHOLD = 15  # Kept high to ensure strong momentum
+COOLDOWN_PERIOD = 3  # Reduced cooldown period to allow faster re-entries
+VOLUME_MULTIPLIER = 2.0  # Reduced to allow more opportunities
 
-def check_ema_crossover(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=3):
+
+def check_ema_crossover(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=7):
     """
     Check if EMA10 has crossed above EMA20 and stayed above for 'period' consecutive periods.
     """
@@ -26,9 +27,10 @@ def check_ema_crossover(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_
     stayed_above = (ema_short[-period:] > ema_long[-period:]).all()
     return crossover and stayed_above
 
-def check_rsi_trend(df, period=5, rsi_threshold=RSI_THRESHOLD):
+
+def check_rsi_trend(df, period=7, rsi_threshold=RSI_THRESHOLD):
     """
-    Check if RSI has been rising for 'period' periods and crossed above the given threshold (default: 60).
+    Check if RSI has been rising for 'period' periods and crossed above the given threshold (default: 65).
     """
     rsi = df['RSI']
     
@@ -40,7 +42,8 @@ def check_rsi_trend(df, period=5, rsi_threshold=RSI_THRESHOLD):
     has_been_rising = (rsi_diff[1:] > 0).all()
     return crossed_above_threshold and has_been_rising
 
-def check_macd_trend(df, period=3, macd_hist_threshold=MACD_HIST_THRESHOLD):
+
+def check_macd_trend(df, period=5, macd_hist_threshold=MACD_HIST_THRESHOLD):
     """
     Check if MACD line has crossed above the signal line and MACD Histogram is greater than the specified threshold.
     """
@@ -55,7 +58,8 @@ def check_macd_trend(df, period=3, macd_hist_threshold=MACD_HIST_THRESHOLD):
     hist_above_threshold = (hist.iloc[-period:] > macd_hist_threshold).all()
     return macd_cross and hist_above_threshold
 
-def check_volume_trend(df, period=3, volume_multiplier=VOLUME_MULTIPLIER):
+
+def check_volume_trend(df, period=5, volume_multiplier=VOLUME_MULTIPLIER):
     """
     Check if Volume is significantly above its 20-period moving average (volume spike).
     """
@@ -67,6 +71,7 @@ def check_volume_trend(df, period=3, volume_multiplier=VOLUME_MULTIPLIER):
     
     volume_spike = (volume.iloc[-period:] > volume_multiplier * volume_ma.iloc[-period:]).all()
     return volume_spike
+
 
 def buy_signal(df):
     """
@@ -80,7 +85,8 @@ def buy_signal(df):
     # All conditions must be met
     return ema_signal and rsi_signal and macd_signal and volume_signal
 
-def check_ema_crossunder(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=3):
+
+def check_ema_crossunder(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=2):
     """
     Check if EMA10 has crossed below EMA20 and stayed below for 'period' consecutive periods.
     """
@@ -94,9 +100,10 @@ def check_ema_crossunder(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG
     stayed_below = (ema_short[-period:] < ema_long[-period:]).all()
     return crossunder and stayed_below
 
-def check_rsi_downtrend(df, period=5, rsi_threshold=50):
+
+def check_rsi_downtrend(df, period=3, rsi_threshold=55):
     """
-    Check if RSI has been falling for 'period' periods and crossed below the given threshold (default: 50).
+    Check if RSI has crossed below the given threshold (default: 55).
     """
     rsi = df['RSI']
     
@@ -104,50 +111,34 @@ def check_rsi_downtrend(df, period=5, rsi_threshold=50):
         return False
     
     crossed_below_threshold = (rsi.iloc[-period - 1] > rsi_threshold) and (rsi.iloc[-period] <= rsi_threshold)
-    rsi_diff = rsi[-period:].diff()
-    has_been_falling = (rsi_diff[1:] < 0).all()
-    return crossed_below_threshold and has_been_falling
+    return crossed_below_threshold
+
 
 def check_macd_downtrend(df, period=3, macd_hist_threshold=-5):
     """
-    Check if MACD line has crossed below the signal line and MACD Histogram is below the negative threshold.
+    Check if MACD line has crossed below the signal line.
     """
     macd = df['MACD']
     signal = df['MACD_Signal']
-    hist = df['MACD_Hist']
     
     if len(df) < period + 1:
         return False
     
     macd_cross = (macd.iloc[-period - 1] >= signal.iloc[-period - 1]) and (macd.iloc[-period] < signal.iloc[-period])
-    hist_below_threshold = (hist.iloc[-period:] < macd_hist_threshold).all()
-    return macd_cross and hist_below_threshold
+    return macd_cross
 
-def check_volume_downtrend(df, period=3, volume_multiplier=VOLUME_MULTIPLIER):
-    """
-    Check if Volume is above its 20-period moving average and has been increasing (indicating strong selling pressure).
-    """
-    volume = df['Volume']
-    volume_ma = df['Volume_MA']
-    
-    if len(df) < period + 1:
-        return False
-    
-    volume_above_ma = (volume.iloc[-period:] > volume_ma.iloc[-period:]).all()
-    volume_diff = volume[-period:].diff()
-    volume_increasing = (volume_diff[1:] > 0).all()
-    return volume_above_ma and volume_increasing
 
 def sell_signal(df):
     """
-    Determine if all sell conditions are met.
+    Determine if any sell condition is met.
     """
     ema_signal = check_ema_crossunder(df)
     rsi_signal = check_rsi_downtrend(df)
     macd_signal = check_macd_downtrend(df)
-    volume_signal = check_volume_downtrend(df)
     
-    return ema_signal and rsi_signal and macd_signal and volume_signal
+    # Any condition being met is enough to trigger a sell
+    return ema_signal or rsi_signal or macd_signal
+
 
 def buy_or_sell(df, row, holdings, last_trade=None, cooldown_period=COOLDOWN_PERIOD):
     """
@@ -156,6 +147,7 @@ def buy_or_sell(df, row, holdings, last_trade=None, cooldown_period=COOLDOWN_PER
     if last_trade and (row['date'] - last_trade).days < cooldown_period:
         return "HOLD"
     
+    # Determine buy or sell signals
     if buy_signal(df):
         return "BUY"
     elif sell_signal(df):

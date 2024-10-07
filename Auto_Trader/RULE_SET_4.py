@@ -3,25 +3,28 @@ def buy_or_sell(df, row, holdings):
     Determine whether to buy, sell, or hold based on technical indicators.
     """
 
+    # Buy condition with refined RSI threshold and volume requirement
     if (
-    (df["EMA10"].iloc[-1] > df["EMA20"].iloc[-1])  # EMA10 is greater than EMA20, confirming an uptrend
-    and (df["RSI"].iloc[-1] >= 62)  # RSI above 62 to capture the upward momentum.
-    and (df["RSI"].iloc[-1] <= 66)  # RSI less than 70 to avoid overbought conditions
-    and (df["RSI"].shift(1).iloc[-1] < df["RSI"].iloc[-1])  # Previous RSI is lower, indicating increasing momentum
-    and (df["MACD_Hist"].iloc[-1] >= 5)  # MACD histogram indicating positive momentum
-    and (df["MACD_Hist"].shift(1).iloc[-1] > 0)  # MACD histogram is increasing
-    and (df["MACD_Hist"].iloc[-1] >= df["MACD_Hist"].shift(1).iloc[-1])  # MACD histogram is increasing
-    and (df["Volume"].iloc[-1] > df["Volume"].mean())  # Ensure there's sufficient volume confirming market interest
+        (df['EMA10'].iloc[-1] > df['EMA20'].iloc[-1])
+        and (df['RSI'].iloc[-1] >= 60)
+        and (df['RSI'].iloc[-1] <= 66)
+        and (df['RSI'].shift(1).iloc[-1] < df['RSI'].iloc[-1])
+        and (df['MACD_Hist'].iloc[-1] >= 5)
+        and (df['MACD_Hist'].shift(1).iloc[-1] > 0)
+        and (df['MACD_Hist'].iloc[-1] >= df['MACD_Hist'].shift(1).iloc[-1])
+        and (df['Volume'].iloc[-1] > 1.5 * df['Volume'].rolling(window=10).mean().iloc[-1])
     ):
         return "BUY"
 
+    # Adaptive sell condition with dynamic RSI threshold based on market volatility
     elif (
-    (df["EMA10"].iloc[-1] < df["EMA20"].iloc[-1])  # EMA10 is below EMA20, indicating a potential trend reversal
-    or (df["RSI"].iloc[-1] >= 76)  # RSI above 76, indicating an overbought condition where profit-taking is safer
-    or ((df["RSI"].shift(1).iloc[-1] - df["RSI"].iloc[-1]) >= 3)  # A slight RSI drop (2 points) indicating early weakening momentum
-    or (df["MACD_Hist"].iloc[-1] < 0)  # MACD histogram turns negative, indicating loss of bullish momentum
-    or (df["MACD"].iloc[-1] < df["MACD_Signal"].iloc[-1])  # MACD line crosses below the signal line, further confirming weakening momentum
+        (df['EMA10'].iloc[-1] < df['EMA20'].iloc[-1])
+        or (df['RSI'].iloc[-1] >= (76 if 'Volatility' in df.columns and df['Volatility'].iloc[-1] > df['Volatility'].mean() else 78))
+        or ((df['RSI'].shift(1).iloc[-1] - df['RSI'].iloc[-1]) >= 3)
+        or (df['MACD_Hist'].iloc[-1] < 0)
+        or (df['MACD'].iloc[-1] < df['MACD_Signal'].iloc[-1])
     ):
         return "SELL"
+
     else:
         return "HOLD"

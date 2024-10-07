@@ -22,8 +22,8 @@ def buy_or_sell(df, row, holdings):
         if average_price == 0 or day_high_price is None:
             return "HOLD"
         
-        # Check trailing stop-loss: if the current price falls 3% or more from the day's high, return SELL
-        if (day_high_price - last_price) / day_high_price * 100 >= 3.0:
+        # Check trailing stop-loss: if the current price falls 4% or more from the day's high, return SELL
+        if (day_high_price - last_price) / day_high_price * 100 >= 4.0:
             return "SELL"
         else:
             return "HOLD"
