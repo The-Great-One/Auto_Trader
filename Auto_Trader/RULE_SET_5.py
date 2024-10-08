@@ -37,7 +37,7 @@ def buy_or_sell(df, row, holdings):
 
     # Sell signal conditions (tightened to lock in profits)
     sell_condition = (
-        (latest_data['RSI'] >= 65) or  # Sell when RSI is in overbought region
+        (latest_data['RSI'] >= 75) or  # Sell when RSI is in overbought region
         (latest_data['RSI'] < previous_data['RSI'] and latest_data['RSI'] > 50) or  # RSI declining from high levels
         (latest_data['MACD'] < latest_data['MACD_Signal']) or  # MACD bearish crossover
         (latest_data['MACD_Hist'] < 0) or  # MACD histogram turning negative
