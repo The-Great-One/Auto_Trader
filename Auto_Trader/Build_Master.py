@@ -1,9 +1,12 @@
 import glob
 import pandas as pd
 from .utils import fetch_instruments_list, get_instrument_token, fetch_holdings
+from Auto_Trader import logging
 from .StrongFundamentalsStockList import goodStocks
 from .FetchPricesYfinance import download_historical_quotes
 import sys
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 def create_master():
     """
@@ -54,5 +57,5 @@ def create_master():
         # Return the list of instrument tokens
         return merged_df["instrument_token"].to_list()
     else:
-        print("Error Building Master")
+        logger.error("Error Building Master")
         sys.exit()

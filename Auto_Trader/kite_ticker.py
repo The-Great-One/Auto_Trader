@@ -5,6 +5,9 @@ from Auto_Trader.utils import read_session_data
 from queue import Queue
 from Auto_Trader.TelegramLink import send_to_channel
 import asyncio
+import logging
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 def run_ticker(sub_tokens, q):
     global queue
@@ -16,21 +19,21 @@ def run_ticker(sub_tokens, q):
 
     def on_connect(ws, response):
         if sub_tokens:
-            print("Starting Ticker")
+            logger.info("Starting Ticker")
             # asyncio.run(send_to_channel("Starting Ticker"))
             ws.subscribe(sub_tokens)
             ws.set_mode(ws.MODE_QUOTE, sub_tokens)
         else:
-            print("No subscription tokens provided.")
+            logger.error("No subscription tokens provided.")
 
     def on_close(ws, code, reason):
-        print(f"WebSocket closed with code: {code}, reason: {reason}")
+        logger.warning(f"WebSocket closed with code: {code}, reason: {reason}")
         try:
             ws.stop()
         except Exception as e:
-            print(f"Error stopping WebSocket: {e}")
+            logger.error(f"Error stopping WebSocket: {e}")
         # Optionally reconnect
-        print("Attempting to reconnect...")
+        logger.warning("Attempting to reconnect...")
         kws.connect()
 
     kws.on_ticks = on_ticks

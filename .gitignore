@@ -10,3 +10,4 @@ Auto_Trader/my_secrets.py
 venv/
 intermediary_files/
 tests/
+log/

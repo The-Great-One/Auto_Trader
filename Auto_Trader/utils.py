@@ -1,10 +1,12 @@
-from Auto_Trader import RULE_SET_3, RULE_SET_5, RULE_SET_6, mcal, lru_cache, KiteConnect, json, datetime, ta, pd, retry, ZoneInfo, timedelta
+from Auto_Trader import mcal, KiteConnect, json, datetime, ta, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os
 from Auto_Trader.my_secrets import API_KEY, API_SECRET
 from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import rule set modules
 from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 # Map rule set names to their modules
 RULE_SETS = {
@@ -29,6 +31,7 @@ def build_access_token():
         str: The new access token.
     """
     try:
+        logger.warning("Session Expired..Creating New.")
         kite = KiteConnect(api_key=API_KEY)
         data = kite.generate_session(
             request_token=get_request_token(), api_secret=API_SECRET
@@ -37,12 +40,17 @@ def build_access_token():
             "access_token": data["access_token"],
             "date": datetime.now().strftime("%Y-%m-%d"),
         }
+        if os.path.isdir('intermediary_files'):
+            shutil.rmtree("intermediary_files")
+            
+        os.makedirs("intermediary_files", exist_ok=True)
+        
         with open("intermediary_files/access_token.json", "w") as json_file:
             json.dump(session_data, json_file, indent=4)
-        print("Session Expired..Creating New.")
         return data["access_token"]
     except Exception as e:
-        print(f"Error in generating session: {e}")
+        logger.error(f"Error in generating session: {e}")
+        sys.exit()
         return None
 
 def read_session_data():
@@ -64,7 +72,7 @@ def read_session_data():
             return build_access_token()
 
     except (FileNotFoundError, json.JSONDecodeError):
-        print("Session data file not found or invalid. Creating a new session.")
+        logger.warning("Session data file not found or invalid. Creating a new session.")
         return build_access_token()
 
 def initialize_kite():
@@ -158,7 +166,7 @@ def load_historical_data(symbol):
     )
         return df
     except Exception as e:
-        print(f"Error loading {symbol}.csv: {e}")
+        logger.error(f"Error loading {symbol}.csv: {e}")
         return None
 
 def preprocess_data(row_df, symbol):
@@ -180,7 +188,7 @@ def preprocess_data(row_df, symbol):
 
     required_columns = {"Date", "Close", "Volume"}
     if not required_columns.issubset(df.columns):
-        print(f"{symbol}.csv is missing required columns.")
+        logger.error(f"{symbol}.csv is missing required columns.")
         return None
 
     # Convert 'Date' to datetime and set as index
@@ -195,7 +203,7 @@ def preprocess_data(row_df, symbol):
     df = Indicators(df)
 
     if df.empty:
-        print(f"No data available for {symbol} after preprocessing.")
+        logger.error(f"No data available for {symbol} after preprocessing.")
         return None
 
     return df
@@ -240,10 +248,10 @@ def apply_trading_rules(df, row):
             holdings = pd.read_csv("intermediary_files/Holdings.csv")
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
-            # print(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
+            logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
             return decision
         except Exception as e:
-            print(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}")
+            logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}")
             return "HOLD"
 
     # Use ThreadPoolExecutor to parallelize rule application
@@ -255,26 +263,27 @@ def apply_trading_rules(df, row):
         # Collect results as they complete
         for future in as_completed(futures):
             decision = future.result()
+            rule_set_name = futures[future]  # Get the corresponding rule set name
             if decision in decisions:
                 decisions[decision] += 1
             else:
+                # Log the specific rule set that returned an unknown decision
+                logger.error(f"Rule {rule_set_name} returned an unknown decision: {decision}")
                 pass
-                # print(f"Unknown decision {decision} encountered.")
 
     # Print decisions for each stock (for debugging)
-    # print(f"Decisions for {row['Symbol']}: {decisions}")
+    logger.debug(f"Decisions for {row['Symbol']}: {decisions}")
 
     # Prioritize decisions: SELL > BUY > HOLD
     if decisions["SELL"] > 0:
-        # print(f"Final decision for {row['Symbol']}: SELL")
+        logger.info(f"Final decision for {row['Symbol']}: SELL")
         return "SELL"
     elif decisions["BUY"] > 0:
-        # print(f"Final decision for {row['Symbol']}: BUY")
+        logger.info(f"Final decision for {row['Symbol']}: BUY")
         return "BUY"
     else:
-        # print(f"Final decision for {row['Symbol']}: HOLD")
+        logger.info(f"Final decision for {row['Symbol']}: HOLD")
         return "HOLD"
-
 
 
 def process_stock_and_decide(row):
@@ -302,7 +311,7 @@ def process_stock_and_decide(row):
                 }
     except Exception as e:
         # Log exceptions with stock symbol for easier debugging
-        print(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}")
+        logger.error(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}")
     return None
 
 # Initialize Kite
@@ -334,11 +343,11 @@ def fetch_holdings(kite=kite):
         
         holdings.to_csv("intermediary_files/Holdings.csv", index=False)
         
-        # print("Holdings Fetched and Saved!")
+        logger.debug("Holdings Fetched and Saved!")
         return holdings
 
     except Exception as e:
-        print(f"Error in fetching holdings: {e}")
+        logger.error(f"Error in fetching holdings: {e}")
         raise  # Re-raise to trigger the retry decorator
     
 # Retry decorator, with exponential backoff and jitter
@@ -366,7 +375,7 @@ def fetch_instruments_list(kite=kite):
         return df
 
     except Exception as e:
-        print(f"Error in fetching instruments: {e}")
+        logger.error(f"Error in fetching instruments: {e}")
         raise  # Re-raise to trigger the retry decorator
 
     
@@ -392,7 +401,7 @@ def is_Market_Open(schedule=get_market_schedule()):
     bool: True if the market is open, False otherwise.
     """
     if schedule is None:
-        print("Market is closed today.")
+        logger.info("Market is closed today.")
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
@@ -412,7 +421,7 @@ def is_PreMarket_Open(schedule=get_market_schedule()):
     bool: True if the premarket is open, False otherwise.
     """
     if schedule is None:
-        print("Market is closed today.")
+        logger.info("Market is closed today.")
         return False
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
