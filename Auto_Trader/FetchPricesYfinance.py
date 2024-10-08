@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import yfinance as yf
-import glob
 import ray
 from tqdm import tqdm
 from retry import retry
@@ -43,16 +42,13 @@ class FetchedDataManager:
         self.fetched_data[ticker] = today
         self.save_fetched_data()
 
-
 @ray.remote
 @retry(tries=3, delay=2)
 def download_ticker_data(ticker, fetched_data_manager):
     # Check if already fetched today
     if ray.get(fetched_data_manager.is_fetched.remote(ticker)):
-        print(f"Skipping {ticker}, already fetched today.")
-        return
+        return True  # Skip fetching as it's already done today
 
-    print(f"Processing {ticker}...")
     ticker_ns = ticker + ".NS"
     ticker_bs = ticker + ".BO"
 
@@ -63,11 +59,9 @@ def download_ticker_data(ticker, fetched_data_manager):
             data = yf.download(ticker_bs, threads=20, progress=False, period="max")
 
         if data.empty:
-            print(f"No data found for {ticker_bs}, trying NSEDownload")
             data = stocks.get_data(stock_symbol=ticker, start_date=str(datetime.now().date() - relativedelta(months=3)), end_date=str(datetime.now().date()))
 
             if not data.empty:
-                print(f"Data fetched from NSEDownload for {ticker}")
                 rename_dict = {
                     'Date': 'Date',
                     'Open Price': 'Open',
@@ -80,11 +74,9 @@ def download_ticker_data(ticker, fetched_data_manager):
                 data = data.rename(columns=rename_dict)
 
         if data.empty:
-            print(f"No data found for {ticker}, trying jugaad_data")
             data = stock_df(symbol=ticker, from_date=datetime.now().date() - relativedelta(months=3), to_date=datetime.now().date(), series="EQ")
 
             if not data.empty:
-                print(f"Data fetched from jugaad_data for {ticker}")
                 rename_dict = {
                     'DATE': 'Date',
                     'OPEN': 'Open',
@@ -109,18 +101,14 @@ def download_ticker_data(ticker, fetched_data_manager):
 
             # Mark as fetched today
             ray.get(fetched_data_manager.mark_fetched.remote(ticker))
-
-        else:
-            print(f"No data found for {ticker} using either symbol.")
+            return True  # Return success
 
     except Exception as e:
-        pass
+        return False  # Return failure if there's any other exception
 
 
 def download_historical_quotes(df):
     fetched_data_manager = FetchedDataManager.remote()
-
-    today = str(datetime.now().date())
 
     if 'Symbol' not in df.columns:
         raise ValueError("Missing 'Symbol' Column")
@@ -130,12 +118,17 @@ def download_historical_quotes(df):
     ray.init(ignore_reinit_error=True)
 
     tickers = df['Symbol'].tolist()
-    batch_size = 10
-    batched_tickers = [tickers[i:i + batch_size] for i in range(0, len(tickers), batch_size)]
 
-    for batch in batched_tickers:
-        result_ids = [download_ticker_data.remote(ticker, fetched_data_manager) for ticker in batch]
-        for _ in tqdm(ray.get(result_ids), total=len(result_ids), desc="Processing batch"):
-            pass
+    # Single progress bar for all tickers
+    with tqdm(total=len(tickers), desc="Downloading tickers") as pbar:
+        batch_size = 10
+        batched_tickers = [tickers[i:i + batch_size] for i in range(0, len(tickers), batch_size)]
+
+        for batch in batched_tickers:
+            result_ids = [download_ticker_data.remote(ticker, fetched_data_manager) for ticker in batch]
+            results = ray.get(result_ids)
+            for result in results:
+                if result:  # Update progress only if download was successful
+                    pbar.update(1)
 
     ray.shutdown()
