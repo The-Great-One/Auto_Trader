@@ -3,6 +3,9 @@ import pandas as pd
 import sys
 from Auto_Trader.KITE_TRIGGER_ORDER import handle_decisions
 from Auto_Trader.utils import process_stock_and_decide
+import logging
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 def Apply_Rules(q, message_queue):
     """
@@ -15,9 +18,8 @@ def Apply_Rules(q, message_queue):
     # Read instruments data once, outside the loop
     try:
         instruments_df = pd.read_csv("intermediary_files/Instruments.csv")
-        print("Loaded instruments data.")
     except Exception as e:
-        print(f"Failed to read Instruments.csv: {e}")
+        logger.error(f"Failed to read Instruments.csv: {e}")
         return
 
     # Initialize multiprocessing pool
@@ -27,7 +29,7 @@ def Apply_Rules(q, message_queue):
             try:
                 data = q.get()
                 if data is None:
-                    print("Received shutdown signal. Exiting Apply_Rules.")
+                    logger.warning("Received shutdown signal. Exiting Apply_Rules.")
                     break  # Exit the loop if None is received (signal to stop)
 
                 data_df = pd.DataFrame(data)[["last_price", "volume_traded", "instrument_token", "ohlc"]]
@@ -48,5 +50,5 @@ def Apply_Rules(q, message_queue):
                 else:
                     pass
             except Exception as e:
-                print(f"An error occurred while processing data: {e}")
+                logger.error(f"An error occurred while processing data: {e}")
                 sys.exit(1)

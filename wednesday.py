@@ -1,17 +1,19 @@
 import time
 import sys
 from multiprocessing import Queue, Process
-from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater
+from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater, logging
 from Auto_Trader.TelegramLink import telegram_main
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 def monitor_market():
     processes = []
     q = Queue()  # Queue for Orders Placements
     message_queue = Queue()  # Queue for Telegram Messages
-
+    
     def start_processes():
         """Starts all necessary processes."""
-        print("Market is open. Starting processes.")
+        logger.info("Market is open. Starting processes.")
         message_queue.put("Market is open. Starting processes.")
 
         # Start the worker processes
@@ -29,7 +31,7 @@ def monitor_market():
 
     def stop_processes(processes):
         """Stops all running processes."""
-        print("Market is closed. Stopping processes.")
+        logger.info("Market is closed. Stopping processes.")
         message_queue.put("Market is closed. Stopping processes.")
 
         for p in processes:
@@ -52,7 +54,7 @@ def monitor_market():
             time.sleep(60)  # Sleep for 60 seconds before checking again
 
         except Exception as e:
-            print(f"Error occurred: {e}")
+            logger.error(f"Error occurred: {e}")
             message_queue.put(f"Error occurred: {e}")
             if processes:
                 processes = stop_processes(processes)
@@ -62,5 +64,5 @@ if __name__ == '__main__':
     try:
         monitor_market()
     except KeyboardInterrupt:
-        print("Monitor stopped by user.")
+        logger.error("Monitor stopped by user.")
         sys.exit(0)  # Exit cleanly if interrupted by the user

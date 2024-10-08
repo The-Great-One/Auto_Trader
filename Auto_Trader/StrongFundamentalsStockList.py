@@ -1,5 +1,8 @@
 from Fundamentals import Tickertape
 from functools import lru_cache
+import logging
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 @lru_cache(maxsize=10)  # Caching to optimize repeated data fetching
 def goodStocks(debt_to_equity_threshold=1.5, eps_growth_threshold=3, 
@@ -33,5 +36,5 @@ def goodStocks(debt_to_equity_threshold=1.5, eps_growth_threshold=3,
         return filtered_list_df[['Symbol']]
     
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         raise e

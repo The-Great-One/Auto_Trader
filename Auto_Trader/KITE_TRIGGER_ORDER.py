@@ -14,9 +14,13 @@ from kiteconnect.exceptions import (
     DataException,
     NetworkException,
 )
+import logging
+
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
 kite.set_access_token(read_session_data())
+
+logger = logging.getLogger("Auto_Trade_Logger")
 
 def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price):
     """
@@ -32,12 +36,11 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
     Returns:
         None
     """
-    print(f"Triggering {'BUY' if order_type == 'BUY' else 'SELL'} order for {symbol} on {exchange} with quantity {trans_quantity}.")
+    logger.info(f"Triggering {'BUY' if order_type == 'BUY' else 'SELL'} order for {symbol} on {exchange} with quantity {trans_quantity}.")
     trigg_exchange = kite.EXCHANGE_NSE if exchange == "NSE" else kite.EXCHANGE_BSE
     transaction_type = kite.TRANSACTION_TYPE_BUY if order_type == "BUY" else kite.TRANSACTION_TYPE_SELL
 
     try:
-        
         order_id = kite.place_order(
             variety=kite.VARIETY_REGULAR,
             tradingsymbol=symbol,
@@ -61,26 +64,26 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
         message_queue.put(message)
 
         if transaction_type == kite.TRANSACTION_TYPE_BUY:
-            print(f"Bought: {symbol} (Order ID: {order_id})")
+            logger.info(f"Bought: {symbol} (Order ID: {order_id})")
         else:
-            print(f"Sold: {symbol} (Order ID: {order_id})")
+            logger.info(f"Sold: {symbol} (Order ID: {order_id})")
 
     except NetworkException as ne:
-        print(f"Network error while placing order for {symbol}: {ne}")
+        logger.error(f"Network error while placing order for {symbol}: {ne}")
     except TokenException as te:
-        print(f"Authentication error while placing order for {symbol}: {te}")
+        logger.error(f"Authentication error while placing order for {symbol}: {te}")
     except OrderException as oe:
-        print(f"Order placement failed for {symbol}: {oe}")
+        logger.error(f"Order placement failed for {symbol}: {oe}")
     except PermissionException as pe:
-        print(f"Permission error for {symbol}: {pe}")
+        logger.error(f"Permission error for {symbol}: {pe}")
     except InputException as ie:
-        print(f"Input error for {symbol}: {ie}")
+        logger.error(f"Input error for {symbol}: {ie}")
     except DataException as de:
-        print(f"Data error for {symbol}: {de}")
+        logger.error(f"Data error for {symbol}: {de}")
     except GeneralException as ge:
-        print(f"General error for {symbol}: {ge}")
+        logger.error(f"General error for {symbol}: {ge}")
     except Exception as e:
-        print(f"Unexpected error while placing order for {symbol}: {e}")
+        logger.error(f"Unexpected error while placing order for {symbol}: {e}")
 
 
 def get_positions():
@@ -96,7 +99,7 @@ def get_positions():
         position_dict = {pos['tradingsymbol']: pos['quantity'] for pos in net_positions if pos['quantity'] != 0}
         return position_dict
     except Exception as e:
-        print(f"Error retrieving positions: {e}")
+        logger.error(f"Error retrieving positions: {e}")
         return {}
 
 def get_holdings():
@@ -111,7 +114,7 @@ def get_holdings():
         holdings_dict = {pos['tradingsymbol']: pos['quantity'] for pos in holdings if pos['quantity'] != 0}
         return holdings_dict
     except Exception as e:
-        print(f"Error retrieving positions: {e}")
+        logger.error(f"Error retrieving positions: {e}")
         return {}
     
 def is_symbol_in_order_book(symbol):
@@ -131,7 +134,7 @@ def is_symbol_in_order_book(symbol):
                 return True
         return False
     except Exception as e:
-        print(f"Error checking order book for {symbol}: {e}")
+        logger.error(f"Error checking order book for {symbol}: {e}")
         return False
 
 
@@ -208,7 +211,7 @@ def handle_decisions(message_queue, decisions):
             try:
                 future.result()  # Handle any exceptions that might have occurred
             except Exception as e:
-                print(f"Error in executing sell order: {e}")
+                logger.error(f"Error in executing sell order: {e}")
 
         # Clear the futures list for buy orders
         futures.clear()
@@ -221,9 +224,9 @@ def handle_decisions(message_queue, decisions):
 
             try:
                 funds = kite.margins("equity")["available"]["live_balance"]
-                print(f"Available funds: {funds}")
+                logger.info(f"Available funds: {funds}")
                 if funds <= 20000:
-                    print("Insufficient funds to place more buy orders. Stopping buy order processing.")
+                    logger.warning("Insufficient funds to place more buy orders. Stopping buy order processing.")
                     break
 
                 # Check if a buy order should be placed
@@ -232,33 +235,30 @@ def handle_decisions(message_queue, decisions):
 
                 quantity = floor(20000 / close_price)
                 if quantity <= 0:
-                    print(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
+                    logger.warning(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
 
                 futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "BUY", close_price))
 
             except NetworkException as ne:
-                print(f"Network error while retrieving funds: {ne}")
+                logger.error(f"Network error while retrieving funds: {ne}")
             except TokenException as te:
-                print(f"Authentication error while retrieving funds: {te}")
+                logger.error(f"Authentication error while retrieving funds: {te}")
             except PermissionException as pe:
-                print(f"Permission error while retrieving funds: {pe}")
+                logger.error(f"Permission error while retrieving funds: {pe}")
             except DataException as de:
-                print(f"Data error while retrieving funds: {de}")
+                logger.error(f"Data error while retrieving funds: {de}")
             except GeneralException as ge:
-                print(f"General error while retrieving funds: {ge}")
+                logger.error(f"General error while retrieving funds: {ge}")
             except Exception as e:
-                print(f"Unexpected error while processing buy decision for {symbol}: {e}")
+                logger.error(f"Unexpected error while processing buy decision for {symbol}: {e}")
 
         # Handle the completion of buy orders
         for future in as_completed(futures):
             try:
                 future.result()  # Handle any exceptions that might have occurred
             except Exception as e:
-                print(f"Error in executing buy order: {e}")
+                logger.error(f"Error in executing buy order: {e}")
 
         # Rate limiting: Ensure we don't exceed the API limits
-        # print("Sleeping for 0.1 seconds to respect rate limits.")
         time.sleep(0.1)
-
-    # print("Finished handling trading decisions.")
