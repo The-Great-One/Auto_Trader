@@ -4,13 +4,20 @@ import onetimepass as otp
 from urllib.parse import urlparse, parse_qs
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import *
+import sys
+import logging
 
-def get_request_token(credentials={
-    "api_key": API_KEY,
-    "username": USER_NAME,
-    "password": PASS,
-    "totp_key": TOTP_KEY
-}) -> str:
+logger = logging.getLogger("Auto_Trade_Logger")
+
+
+def get_request_token(
+    credentials={
+        "api_key": API_KEY,
+        "username": USER_NAME,
+        "password": PASS,
+        "totp_key": TOTP_KEY,
+    }
+) -> str:
     """Use provided credentials and return request token.
     Args:
         credentials: Login credentials for Kite
@@ -29,11 +36,13 @@ def get_request_token(credentials={
         "user_id": credentials["username"],
         "password": credentials["password"],
     }
-    login_response = session.post("https://kite.zerodha.com/api/login", data=login_payload)
+    login_response = session.post(
+        "https://kite.zerodha.com/api/login", data=login_payload
+    )
 
     # Check if login was successful
     if login_response.status_code != 200 or "data" not in login_response.json():
-        raise Exception("Login failed, please check your credentials.")
+        logger.error("Login failed, please check your credentials.")
 
     # TOTP POST request
     totp_payload = {
@@ -43,11 +52,13 @@ def get_request_token(credentials={
         "twofa_type": "totp",
         "skip_session": True,
     }
-    totp_response = session.post("https://kite.zerodha.com/api/twofa", data=totp_payload)
+    totp_response = session.post(
+        "https://kite.zerodha.com/api/twofa", data=totp_payload
+    )
 
     # Check if TOTP verification was successful
     if totp_response.status_code != 200:
-        raise Exception("TOTP verification failed, please check your TOTP key.")
+        logger.error("TOTP verification failed, please check your TOTP key.")
 
     # Extract request token from the redirect URL
     try:
@@ -60,7 +71,12 @@ def get_request_token(credentials={
         if match:
             query_params = parse_qs(match.group())
         else:
-            raise Exception("Failed to extract request token.")
-
-    request_token = query_params["request_token"][0]
-    return request_token
+            logger.error("Failed to extract request token.")
+    try:
+        request_token = query_params["request_token"][0]
+        return request_token
+    except:
+        print(
+            "API not Authorized. Open this Link in your browser: https://kite.zerodha.com/connect/login?v=3&api_key={API_KEY}"
+        )
+        sys.exit(1)
