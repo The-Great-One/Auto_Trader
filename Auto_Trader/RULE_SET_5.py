@@ -20,6 +20,13 @@ def buy_or_sell(df, row, holdings):
     latest_data = df.iloc[-1]
     previous_data = df.shift(1).iloc[-1]
 
+    # Additional Close Conditions for Buy
+    buy_close_condition = (
+        (latest_data['Close'] > latest_data['SMA_20_Close']) and
+        (latest_data['Close'] >= latest_data['SMA_10_Close'] * 1.01) and
+        (latest_data['Close'] <= latest_data['SMA_10_Close'] * 1.08)
+    )
+    
     # Buy signal conditions (tightened to improve win rate)
     buy_condition = (
         (latest_data['MACD'] > latest_data['MACD_Signal']) and
@@ -43,7 +50,7 @@ def buy_or_sell(df, row, holdings):
     )
 
     # Determine the action based on conditions
-    if buy_condition:
+    if buy_condition and buy_close_condition:
         return "BUY"
     elif sell_condition:
         return "SELL"
