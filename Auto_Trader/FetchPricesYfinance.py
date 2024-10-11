@@ -94,14 +94,10 @@ def download_ticker_data(ticker, fetched_data_manager):
             
             if is_Market_Open() or is_PreMarket_Open():
                 today = datetime.today().date()
-                six_months_ago = datetime.today() - relativedelta(months=6)
-                data = data[data['Date'] >= six_months_ago]
                 data = data[data['Date'] != str(today)]
                 data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
             else:
                 # Filter data for the last 6 months
-                six_months_ago = datetime.today() - relativedelta(months=6)
-                data = data[data['Date'] >= six_months_ago]
                 data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
 
             # Mark as fetched today

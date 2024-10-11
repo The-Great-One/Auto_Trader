@@ -4,6 +4,7 @@ import sys
 from Auto_Trader.KITE_TRIGGER_ORDER import handle_decisions
 from Auto_Trader.utils import process_stock_and_decide
 import logging
+import traceback
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -19,7 +20,7 @@ def Apply_Rules(q, message_queue):
     try:
         instruments_df = pd.read_csv("intermediary_files/Instruments.csv")
     except Exception as e:
-        logger.error(f"Failed to read Instruments.csv: {e}")
+        logger.error(f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}")
         return
 
     # Initialize multiprocessing pool
@@ -50,5 +51,5 @@ def Apply_Rules(q, message_queue):
                 else:
                     pass
             except Exception as e:
-                logger.error(f"An error occurred while processing data: {e}")
+                logger.error(f"An error occurred while processing data: {e}, Traceback: {traceback.format_exc()}")
                 sys.exit(1)

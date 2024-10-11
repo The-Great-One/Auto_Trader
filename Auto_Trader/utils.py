@@ -1,4 +1,4 @@
-from Auto_Trader import mcal, KiteConnect, json, datetime, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os, np, talib
+from Auto_Trader import mcal, KiteConnect, json, datetime, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os, np, talib, traceback
 from Auto_Trader.my_secrets import API_KEY, API_SECRET
 from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,7 +64,7 @@ def build_access_token():
             json.dump(session_data, json_file, indent=4)
         return data["access_token"]
     except Exception as e:
-        logger.error(f"Error in generating session: {e}")
+        logger.error(f"Error in generating session: {e}, Traceback: {traceback.format_exc()}")
         sys.exit()
         return None
 
@@ -243,7 +243,7 @@ def load_historical_data(symbol):
     )
         return df
     except Exception as e:
-        logger.error(f"Error loading {symbol}.csv: {e}")
+        logger.error(f"Error loading {symbol}.csv: {e}, Traceback: {traceback.format_exc()}")
         return None
 
 def preprocess_data(row_df, symbol):
@@ -328,7 +328,7 @@ def apply_trading_rules(df, row):
             logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
             return decision
         except Exception as e:
-            logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}")
+            logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
             return "HOLD"
 
     # Use ThreadPoolExecutor to parallelize rule application
@@ -388,7 +388,7 @@ def process_stock_and_decide(row):
                 }
     except Exception as e:
         # Log exceptions with stock symbol for easier debugging
-        logger.error(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}")
+        logger.error(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}, Traceback: {traceback.format_exc()}")
     return None
 
 # Initialize Kite
@@ -432,7 +432,7 @@ def fetch_holdings(kite=kite):
             return holdings
 
     except Exception as e:
-        logger.error(f"Error in fetching holdings: {e}")
+        logger.error(f"Error in fetching holdings: {e}, Traceback: {traceback.format_exc()}")
         raise  # Re-raise to trigger the retry decorator
     
 # Retry decorator, with exponential backoff and jitter
@@ -460,7 +460,7 @@ def fetch_instruments_list(kite=kite):
         return df
 
     except Exception as e:
-        logger.error(f"Error in fetching instruments: {e}")
+        logger.error(f"Error in fetching instruments: {e}, Traceback: {traceback.format_exc()}")
         raise  # Re-raise to trigger the retry decorator
 
     

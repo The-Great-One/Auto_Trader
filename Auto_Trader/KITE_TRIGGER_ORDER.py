@@ -15,6 +15,7 @@ from kiteconnect.exceptions import (
     NetworkException,
 )
 import logging
+import traceback
 
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
@@ -99,7 +100,7 @@ def get_positions():
         position_dict = {pos['tradingsymbol']: pos['quantity'] for pos in net_positions if pos['quantity'] != 0}
         return position_dict
     except Exception as e:
-        logger.error(f"Error retrieving positions: {e}")
+        logger.error(f"Error retrieving positions: {e}, Traceback: {traceback.format_exc()}")
         return {}
 
 def get_holdings():
@@ -114,7 +115,7 @@ def get_holdings():
         holdings_dict = {pos['tradingsymbol']: pos['quantity'] for pos in holdings if pos['quantity'] != 0}
         return holdings_dict
     except Exception as e:
-        logger.error(f"Error retrieving positions: {e}")
+        logger.error(f"Error retrieving positions: {e}, Traceback: {traceback.format_exc()}")
         return {}
     
 def is_symbol_in_order_book(symbol):
@@ -134,7 +135,7 @@ def is_symbol_in_order_book(symbol):
                 return True
         return False
     except Exception as e:
-        logger.error(f"Error checking order book for {symbol}: {e}")
+        logger.error(f"Error checking order book for {symbol}: {e}, Traceback: {traceback.format_exc()}")
         return False
 
 
@@ -215,7 +216,7 @@ def handle_decisions(message_queue, decisions):
             try:
                 future.result()  # Handle any exceptions that might have occurred
             except Exception as e:
-                logger.error(f"Error in executing sell order: {e}")
+                logger.error(f"Error in executing sell order: {e}, Traceback: {traceback.format_exc()}")
 
         # Clear the futures list for buy orders
         futures.clear()
@@ -262,7 +263,7 @@ def handle_decisions(message_queue, decisions):
             try:
                 future.result()  # Handle any exceptions that might have occurred
             except Exception as e:
-                logger.error(f"Error in executing buy order: {e}")
+                logger.error(f"Error in executing buy order: {e}, Traceback: {traceback.format_exc()}")
 
         # Rate limiting: Ensure we don't exceed the API limits
         time.sleep(0.1)

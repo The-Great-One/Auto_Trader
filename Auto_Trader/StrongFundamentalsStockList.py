@@ -1,6 +1,7 @@
 from Fundamentals import Tickertape
 from functools import lru_cache
 import logging
+import traceback
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -36,5 +37,5 @@ def goodStocks(debt_to_equity_threshold=1.5, eps_growth_threshold=3,
         return filtered_list_df[['Symbol']]
     
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}, Traceback: {traceback.format_exc()}")
         raise e

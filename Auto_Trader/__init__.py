@@ -10,6 +10,7 @@ import logging
 from logging.handlers import *
 import shutil
 import talib
+import traceback
 
 import pandas as pd
 import requests
