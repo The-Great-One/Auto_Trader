@@ -5,7 +5,7 @@ logger = logging.getLogger("Auto_Trade_Logger")
 
 def buy_or_sell(df, row, holdings):
     """
-    Determine whether to sell based on Stop Loss of -5%.
+    Determine whether to sell based on Stop Loss of -5% (NetChange -5% from Purchase Price).
     Returns "SELL" if the stop loss is triggered, otherwise "HOLD".
     """
     holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity"]]

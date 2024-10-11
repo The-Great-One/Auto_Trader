@@ -4,7 +4,7 @@ logger = logging.getLogger("Auto_Trade_Logger")
 
 def buy_or_sell(df, row, holdings):
     """
-    Determine whether to sell based on a trailing stop-loss of 3% from the day's high.
+    Determine whether to sell based on a trailing stop-loss of 4% from the day's high.
     """
     try:
         # Convert holdings to a DataFrame and filter for the specific instrument token
