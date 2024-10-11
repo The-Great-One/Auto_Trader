@@ -18,7 +18,7 @@ def buy_or_sell(df, row, holdings):
     """
     # Extract the latest row of data for convenience
     latest_data = df.iloc[-1]
-    previous_data = df.iloc[-2]
+    previous_data = df.shift(1).iloc[-1]
 
     # Buy signal conditions (tightened to improve win rate)
     buy_condition = (
@@ -32,7 +32,7 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Close'] > latest_data['EMA50']) and
         (latest_data['Close'] > latest_data['EMA100']) and
         (latest_data['Close'] > latest_data['EMA200']) and
-        (latest_data['Volume'] > df['SMA_20_Volume'])  # Volume confirmation for strong trend
+        (latest_data['Volume'] > df['SMA_20_Volume']).any()  # Volume confirmation for strong trend
     )
 
     # Sell signal conditions (tightened to lock in profits)
