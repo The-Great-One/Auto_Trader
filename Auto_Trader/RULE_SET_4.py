@@ -3,6 +3,13 @@ def buy_or_sell(df, row, holdings):
     Determine whether to buy, sell, or hold based on technical indicators.
     """
 
+    # Additional Close Conditions for Buy
+    buy_close_condition = (
+        (df['Close'].iloc[-1] > df['SMA_20_Close'].iloc[-1]) and
+        (df['Close'].iloc[-1] >= df['SMA_10_Close'].iloc[-1] * 1.01) and
+        (df['Close'].iloc[-1] <= df['SMA_10_Close'].iloc[-1] * 1.08)
+    )
+    
     # Buy condition with refined RSI threshold and volume requirement
     if (
         (df['EMA10'].iloc[-1] > df['EMA20'].iloc[-1])
@@ -12,7 +19,7 @@ def buy_or_sell(df, row, holdings):
         and (df['MACD_Hist'].iloc[-1] >= 5)
         and (df['MACD_Hist'].iloc[-1] >= df['MACD_Hist'].shift(1).iloc[-1])
         and (df['Volume'].iloc[-1] > 1.5 * df['SMA_20_Volume'].iloc[-1])
-    ):
+    ) and buy_close_condition:
         return "BUY"
 
     # Sell condition with RSI threshold or MACD trigger

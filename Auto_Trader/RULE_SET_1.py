@@ -77,13 +77,21 @@ def buy_signal(df):
     """
     Determine if all buy conditions are met with updated RSI and MACD conditions.
     """
+    
+    # Additional Close Conditions for Buy
+    buy_close_condition = (
+        (df['Close'].iloc[-1] > df['SMA_20_Close'].iloc[-1]) and
+        (df['Close'].iloc[-1] >= df['SMA_10_Close'].iloc[-1] * 1.01) and
+        (df['Close'].iloc[-1] <= df['SMA_10_Close'].iloc[-1] * 1.08)
+    )
+    
     ema_signal = check_ema_crossover(df)
     rsi_signal = check_rsi_trend(df, rsi_threshold=RSI_THRESHOLD)
     macd_signal = check_macd_trend(df, macd_hist_threshold=MACD_HIST_THRESHOLD)
     volume_signal = check_volume_trend(df)
     
     # All conditions must be met
-    return ema_signal and rsi_signal and macd_signal and volume_signal
+    return ema_signal and rsi_signal and macd_signal and volume_signal and buy_close_condition
 
 
 def check_ema_crossunder(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=2):
