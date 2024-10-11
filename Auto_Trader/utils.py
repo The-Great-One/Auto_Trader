@@ -8,18 +8,28 @@ from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-# Map rule set names to their modules
-RULE_SETS = {
-    'RULE_SET_1': RULE_SET_1,
-    'RULE_SET_2': RULE_SET_2,
-    'RULE_SET_3': RULE_SET_3,
-    'RULE_SET_4': RULE_SET_4,
-    'RULE_SET_5': RULE_SET_5,
-    'RULE_SET_6': RULE_SET_6,
-    'RULE_SET_7': RULE_SET_7,
-    'RULE_SET_8': RULE_SET_8,
-    # Add new rule sets here
+# Default rule set values
+DEFAULT_RULE_SETS = {
+    'RULE_SET_1': 'RULE_SET_1',
+    'RULE_SET_2': 'RULE_SET_2',
+    'RULE_SET_3': 'RULE_SET_3',
+    'RULE_SET_4': 'RULE_SET_4',
+    'RULE_SET_5': 'RULE_SET_5',
+    'RULE_SET_6': 'RULE_SET_6',
+    'RULE_SET_7': 'RULE_SET_7',
+    'RULE_SET_8': 'RULE_SET_8',
+    # Add more default rule sets as needed
 }
+
+# Check if any RULE_SET environment variables are set
+env_rules_present = any(os.getenv(key) is not None for key in DEFAULT_RULE_SETS)
+
+if env_rules_present:
+    # If at least one environment variable is set, use only the ones that are set
+    RULE_SETS = {key: os.getenv(key) for key in DEFAULT_RULE_SETS if os.getenv(key) is not None}
+else:
+    # If no environment variables are set, use the default rule sets
+    RULE_SETS = DEFAULT_RULE_SETS
 
 # Initialize the NSE market calendar
 nse_calendar = mcal.get_calendar('NSE')
