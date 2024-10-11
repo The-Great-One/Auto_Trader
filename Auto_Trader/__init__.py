@@ -9,6 +9,7 @@ import subprocess
 import logging
 from logging.handlers import *
 import shutil
+import talib
 
 import pandas as pd
 import requests
@@ -17,7 +18,6 @@ from kiteconnect import KiteConnect
 import pandas as pd
 import json
 import numpy as np
-import ta
 import pandas_market_calendars as mcal
 from functools import lru_cache
 from retry import retry
