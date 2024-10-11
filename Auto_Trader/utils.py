@@ -1,10 +1,10 @@
-from Auto_Trader import mcal, KiteConnect, json, datetime, ta, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os
+from Auto_Trader import mcal, KiteConnect, json, datetime, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os, np, talib
 from Auto_Trader.my_secrets import API_KEY, API_SECRET
 from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import rule set modules
-from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7
+from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -17,6 +17,7 @@ RULE_SETS = {
     'RULE_SET_5': RULE_SET_5,
     'RULE_SET_6': RULE_SET_6,
     'RULE_SET_7': RULE_SET_7,
+    'RULE_SET_8': RULE_SET_8,
     # Add new rule sets here
 }
 
@@ -91,59 +92,121 @@ def initialize_kite():
         build_access_token()
         return initialize_kite()
 
-def Indicators(df):
+def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2):
     """
-    Calculate key financial indicators such as RSI, MACD, and EMA for a DataFrame of stock prices.
-    
-    Args:
-        df (pd.DataFrame): DataFrame containing stock data with 'Close' and 'Volume' columns.
-    
+    Vectorized Supertrend calculation using TA-Lib for ATR.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        The DataFrame containing historical stock data with 'High', 'Low', and 'Close' columns.
+    atr : pd.Series
+        The Average True Range values already calculated.
+    period : int
+        The look-back period for calculating the ATR (default is 10).
+    multiplier : float
+        The multiplier for the ATR to create the Supertrend bands (default is 2).
+
     Returns:
-        pd.DataFrame: DataFrame with additional indicator columns.
-    
-    Raises:
-        KeyError: If 'Close' or 'Volume' columns are not present in the DataFrame.
+    --------
+    pd.DataFrame
+        The DataFrame with additional columns for Supertrend values and direction.
     """
+    hl2 = (df['High'] + df['Low']) / 2
+    upper_band = hl2 + (multiplier * atr)
+    lower_band = hl2 - (multiplier * atr)
+
+    # Vectorized calculation of Supertrend
+    supertrend = np.where(df['Close'] > upper_band.shift(1), lower_band,
+                          np.where(df['Close'] < lower_band.shift(1), upper_band, np.nan))
+
+    # Forward fill to maintain trend direction
+    supertrend = pd.Series(supertrend).fillna(method='ffill').values
+
+    # Determine the trend direction
+    direction = np.where(df['Close'] > supertrend, True, False)
+
+    # Return the DataFrame with the relevant columns using .assign()
+    return df.assign(Supertrend=supertrend, Supertrend_Direction=direction)
+
+def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14):
+    """
+        Calculate key financial indicators using TA-Lib for a DataFrame of stock prices, optimized for performance.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing stock data with 'Close', 'High', 'Low', and 'Volume' columns.
+            rsi_period (int): Time period for RSI calculation.
+            macd_fast (int): Fast period for MACD calculation.
+            macd_slow (int): Slow period for MACD calculation.
+            macd_signal (int): Signal period for MACD calculation.
+            atr_period (int): Time period for ATR calculation.
+
+        Returns:
+            pd.DataFrame: DataFrame with additional indicator columns.
+        """
     if "Close" not in df.columns or "Volume" not in df.columns:
         raise KeyError("The DataFrame does not have the required columns: 'Close' or 'Volume'.")
 
-    # Calculate key indicators
-    df["RSI"] = round(ta.momentum.RSIIndicator(df["Close"], window=14).rsi(), 2)
-    
-    macd_indicator = ta.trend.MACD(close=df["Close"], window_fast=9, window_slow=23, window_sign=9)
-    df["MACD"] = macd_indicator.macd()
-    df["MACD_Signal"] = macd_indicator.macd_signal()
-    df["MACD_Hist"] = macd_indicator.macd_diff()
-    
-    # Calculate EMAs
-    df["EMA9"] = ta.trend.EMAIndicator(close=df["Close"], window=9).ema_indicator()
-    df["EMA10"] = ta.trend.EMAIndicator(close=df["Close"], window=10).ema_indicator()
-    df["EMA20"] = ta.trend.EMAIndicator(close=df["Close"], window=20).ema_indicator()
-    df["EMA21"] = ta.trend.EMAIndicator(close=df["Close"], window=21).ema_indicator()
-    df["EMA50"] = ta.trend.EMAIndicator(close=df["Close"], window=50).ema_indicator()
-    df["EMA100"] = ta.trend.EMAIndicator(close=df["Close"], window=100).ema_indicator()
-    df["EMA200"] = ta.trend.EMAIndicator(close=df["Close"], window=200).ema_indicator()
-    df["EMA12"] = ta.trend.EMAIndicator(close=df["Close"], window=12).ema_indicator()
-    df["EMA26"] = ta.trend.EMAIndicator(close=df["Close"], window=26).ema_indicator()
-    
-    # Calculate average volume over the past 20 days
-    df['Volume_MA'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
-    
-    # Calculate average volume over the past 20 days
-    df['AvgVolume'] = ta.trend.SMAIndicator(df['Volume'], window=20).sma_indicator()
-    
-    # Volume confirmation: Is today's volume 20% higher than the 20-day moving average of volume?
-    df['VolumeConfirmed'] = df['Volume'] > (1.2 * df['AvgVolume'])
-    
-    # Calculate ATR for dynamic stop-loss
-    df['ATR'] = ta.volatility.AverageTrueRange(df['High'], df['Low'], df['Close'], window=14).average_true_range()
+    # Calculate RSI
+    rsi = talib.RSI(df["Close"], timeperiod=rsi_period)
 
-    # Ensure NaNs are filled forward/backward
-    df.ffill(inplace=True)
-    df.bfill(inplace=True)
-    
-    # Reset the index to access 'Date' as a column if necessary
-    df = df.reset_index(drop=False)
+    # Calculate MACD
+    macd, macd_signal, macd_hist = talib.MACD(df["Close"], fastperiod=macd_fast, slowperiod=macd_slow, signalperiod=macd_signal)
+
+    # Calculate EMAs for different periods
+    ema_values = {f"EMA{period}": talib.EMA(df["Close"], timeperiod=period) for period in [5, 9, 10, 13, 20, 21, 50, 100, 200, 12, 26]}
+    ema20_low = talib.EMA(df["Low"], timeperiod=20)  # EMA based on the Low prices
+
+    # Calculate ATR
+    atr = talib.ATR(df['High'], df['Low'], df['Close'], timeperiod=atr_period)
+
+    # Calculate Supertrend using the optimized function
+    df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2)
+
+    # Calculate SMAs
+    sma_10_close = talib.SMA(df['Close'], timeperiod=10)
+    sma_20_close = talib.SMA(df['Close'], timeperiod=20)
+    sma_200_close = talib.SMA(df['Close'], timeperiod=200)
+    sma_20_high = talib.SMA(df['High'], timeperiod=20)
+    sma_20_volume = talib.SMA(df['Volume'], timeperiod=20)
+    sma_200_volume = talib.SMA(df['Volume'], timeperiod=200)
+
+    # Weekly SMAs
+    weekly_sma_20 = talib.SMA(df['Close'], timeperiod=20 * 5)
+    weekly_sma_200 = talib.SMA(df['Close'], timeperiod=200 * 5)
+
+    # Shifting Weekly SMA for the last 4 weeks
+    weekly_sma_200_1w = weekly_sma_200.shift(5)
+    weekly_sma_200_2w = weekly_sma_200.shift(10)
+    weekly_sma_200_3w = weekly_sma_200.shift(15)
+    weekly_sma_200_4w = weekly_sma_200.shift(20)
+
+    # Volume confirmation
+    volume_confirmed = df['Volume'] > (1.2 * sma_20_volume)
+
+    # Assign calculated indicators to the DataFrame using .assign()
+    df = df.assign(
+        RSI=rsi,
+        MACD=macd,
+        MACD_Signal=macd_signal,
+        MACD_Hist=macd_hist,
+        ATR=atr,
+        SMA_10_Close=sma_10_close,
+        SMA_20_Close=sma_20_close,
+        SMA_200_Close=sma_200_close,
+        SMA_20_High=sma_20_high,
+        SMA_20_Volume=sma_20_volume,
+        SMA_200_Volume=sma_200_volume,
+        Weekly_SMA_20=weekly_sma_20,
+        Weekly_SMA_200=weekly_sma_200,
+        Weekly_SMA_200_1w=weekly_sma_200_1w,
+        Weekly_SMA_200_2w=weekly_sma_200_2w,
+        Weekly_SMA_200_3w=weekly_sma_200_3w,
+        Weekly_SMA_200_4w=weekly_sma_200_4w,
+        EMA20_LOW=ema20_low,
+        VolumeConfirmed=volume_confirmed,
+        **ema_values  # Spread the EMA dictionary to add each EMA column
+    )
 
     # Return the DataFrame with the relevant columns
     return df
