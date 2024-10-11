@@ -26,7 +26,11 @@ env_rules_present = any(os.getenv(key) is not None for key in DEFAULT_RULE_SETS)
 
 if env_rules_present:
     # If at least one environment variable is set, use only the ones that are set
-    RULE_SETS = {key: os.getenv(key) for key in DEFAULT_RULE_SETS if os.getenv(key) is not None}
+    RULE_SETS = {
+        key: DEFAULT_RULE_SETS[key]
+        for key in DEFAULT_RULE_SETS
+        if os.getenv(key) is not None
+    }
 else:
     # If no environment variables are set, use the default rule sets
     RULE_SETS = DEFAULT_RULE_SETS
