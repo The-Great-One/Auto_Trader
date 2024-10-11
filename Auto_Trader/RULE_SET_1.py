@@ -8,9 +8,9 @@ MACD_SLOW_PERIOD = 26
 MACD_SIGNAL_PERIOD = 9
 VOLUME_MA_PERIOD = 20
 RSI_THRESHOLD = 65  # Lowered to allow more opportunities while maintaining accuracy
-MACD_HIST_THRESHOLD = 15  # Kept high to ensure strong momentum
+MACD_HIST_THRESHOLD = 7  # Kept high to ensure strong momentum
 COOLDOWN_PERIOD = 3  # Reduced cooldown period to allow faster re-entries
-VOLUME_MULTIPLIER = 2.0  # Reduced to allow more opportunities
+VOLUME_MULTIPLIER = 1.5  # Reduced to allow more opportunities
 
 
 def check_ema_crossover(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_PERIOD, period=7):
@@ -28,7 +28,7 @@ def check_ema_crossover(df, short_period=EMA_SHORT_PERIOD, long_period=EMA_LONG_
     return crossover and stayed_above
 
 
-def check_rsi_trend(df, period=7, rsi_threshold=RSI_THRESHOLD):
+def check_rsi_trend(df, period=3, rsi_threshold=RSI_THRESHOLD):
     """
     Check if RSI has been rising for 'period' periods and crossed above the given threshold (default: 65).
     """
@@ -43,7 +43,7 @@ def check_rsi_trend(df, period=7, rsi_threshold=RSI_THRESHOLD):
     return crossed_above_threshold and has_been_rising
 
 
-def check_macd_trend(df, period=5, macd_hist_threshold=MACD_HIST_THRESHOLD):
+def check_macd_trend(df, period=2, macd_hist_threshold=MACD_HIST_THRESHOLD):
     """
     Check if MACD line has crossed above the signal line and MACD Histogram is greater than the specified threshold.
     """
@@ -64,7 +64,7 @@ def check_volume_trend(df, period=5, volume_multiplier=VOLUME_MULTIPLIER):
     Check if Volume is significantly above its 20-period moving average (volume spike).
     """
     volume = df['Volume']
-    volume_ma = df['Volume_MA']
+    volume_ma = df['SMA_20_Volume']
     
     if len(df) < period + 1:
         return False
