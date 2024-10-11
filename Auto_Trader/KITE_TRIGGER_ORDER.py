@@ -176,7 +176,11 @@ def handle_decisions(message_queue, decisions):
     Returns:
         None
     """
-    holdings = pd.DataFrame(kite.holdings()).set_index("tradingsymbol")
+    holdings = kite.holdings()
+    if holdings:
+        holdings = pd.DataFrame(holdings).set_index("tradingsymbol")
+    else:
+        holdings = pd.DataFrame(columns=["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"])
     
     symbols_held = list(holdings.index)
 
