@@ -6,6 +6,7 @@ from queue import Queue
 from Auto_Trader.TelegramLink import send_to_channel
 import asyncio
 import logging
+import traceback
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -30,7 +31,7 @@ def run_ticker(sub_tokens, q):
         try:
             ws.stop()
         except Exception as e:
-            logger.error(f"Error stopping WebSocket: {e}")
+            logger.error(f"Error stopping WebSocket: {e}, Traceback: {traceback.format_exc()}")
         # Optionally reconnect
         logger.warning("Attempting to reconnect...")
         kws.connect()

@@ -1,4 +1,4 @@
-from Auto_Trader import pd, logging
+from Auto_Trader import pd, logging, traceback
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -31,5 +31,5 @@ def buy_or_sell(df, row, holdings):
             return "HOLD"
         
     except Exception as e:
-        logger.error(f"Error processing {row['instrument_token']}: {str(e)}")
+        logger.error(f"Error processing {row['instrument_token']}: {str(e)}, Traceback: {traceback.format_exc()}")
         return "HOLD"

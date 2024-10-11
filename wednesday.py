@@ -1,7 +1,7 @@
 import time
 import sys
 from multiprocessing import Queue, Process
-from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater, logging
+from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater, logging, traceback
 from Auto_Trader.TelegramLink import telegram_main
 
 logger = logging.getLogger("Auto_Trade_Logger")
@@ -54,8 +54,8 @@ def monitor_market():
             time.sleep(60)  # Sleep for 60 seconds before checking again
 
         except Exception as e:
-            logger.error(f"Error occurred: {e}")
-            message_queue.put(f"Error occurred: {e}")
+            logger.error(f"Error occurred: {e}, Traceback: {traceback.format_exc()}")
+            message_queue.put(f"Error occurred: {e}, Traceback: {traceback.format_exc()}")
             if processes:
                 processes = stop_processes(processes)
             sys.exit(1)  # Exit with an error code to indicate failure
