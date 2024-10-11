@@ -410,18 +410,26 @@ def fetch_holdings(kite=kite):
     try:
         # Fetch holdings
         holdings = kite.holdings()
-        holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"]]
-        
-        #Merge Holdings and t1_quantity
-        holdings['quantity'] = holdings['quantity'] + holdings['t1_quantity']
-        
-        # Filter out holdings with quantity greater than 0
-        holdings = holdings[holdings["quantity"] > 0]
-        
-        holdings.to_csv("intermediary_files/Holdings.csv", index=False)
-        
-        logger.debug("Holdings Fetched and Saved!")
-        return holdings
+        if holdings:
+            holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"]]
+            
+            # Merge Holdings and t1_quantity
+            holdings['quantity'] = holdings['quantity'] + holdings['t1_quantity']
+            
+            # Filter out holdings with quantity greater than 0
+            holdings = holdings[holdings["quantity"] > 0]
+            
+            # Save holdings to CSV
+            holdings.to_csv("intermediary_files/Holdings.csv", index=False)
+            
+            logger.debug("Holdings fetched and saved!")
+            return holdings
+        else:
+            # Initialize an empty DataFrame with the expected columns
+            holdings = pd.DataFrame(columns=["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"])
+            holdings.to_csv("intermediary_files/Holdings.csv", index=False)
+            logger.debug("No holdings found, returning an empty DataFrame.")
+            return holdings
 
     except Exception as e:
         logger.error(f"Error in fetching holdings: {e}")
