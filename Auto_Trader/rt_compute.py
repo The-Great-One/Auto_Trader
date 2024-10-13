@@ -51,6 +51,14 @@ def Apply_Rules(q, message_queue):
                 # Handle the decisions
                 if decisions:
                     handle_decisions(message_queue, decisions=decisions)
+                
+                # Empty the queue to discard any stale data
+                try:
+                    while True:
+                        q.get_nowait()  # Keep removing until the queue is empty
+                except queue.Empty:
+                    pass  # The queue is empty, proceed to next tick
+
             except queue.Empty:
                 # If the queue is empty, log a message and continue
                 logger.info("No new data in the queue. Waiting for next tick.")
