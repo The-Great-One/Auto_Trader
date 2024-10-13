@@ -2,6 +2,8 @@ from Auto_Trader import mcal, KiteConnect, json, datetime, pd, retry, ZoneInfo, 
 from Auto_Trader.my_secrets import API_KEY, API_SECRET
 from Auto_Trader.Request_Token import get_request_token
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
+import multiprocessing
 
 # Import rule set modules
 from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8
@@ -178,12 +180,12 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2)
 
     # Calculate SMAs
-    sma_10_close = talib.SMA(df['Close'], timeperiod=10)
-    sma_20_close = talib.SMA(df['Close'], timeperiod=20)
-    sma_200_close = talib.SMA(df['Close'], timeperiod=200)
-    sma_20_high = talib.SMA(df['High'], timeperiod=20)
-    sma_20_volume = talib.SMA(df['Volume'], timeperiod=20)
-    sma_200_volume = talib.SMA(df['Volume'], timeperiod=200)
+    sma_10_close = df['Close'].rolling(window=10).mean()
+    sma_20_close = df['Close'].rolling(window=20).mean()
+    sma_200_close = df['Close'].rolling(window=200).mean()
+    sma_20_high = df['High'].rolling(window=20).mean()
+    sma_20_volume =df['Volume'].rolling(window=20).mean()
+    sma_200_volume = df['Volume'].rolling(window=200).mean()
 
     # Weekly SMAs
     weekly_sma_20 = talib.SMA(df['Close'], timeperiod=20 * 5)
@@ -225,26 +227,22 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     # Return the DataFrame with the relevant columns
     return df
 
+historical_data_cache = {}
 
 def load_historical_data(symbol):
-    """
-    Load historical data for a given symbol and cache the result.
-
-    Parameters:
-        symbol (str): The stock symbol.
-
-    Returns:
-        pd.DataFrame or None: The historical data DataFrame, or None if loading fails.
-    """
+    if symbol in historical_data_cache:
+        return historical_data_cache[symbol]
+    
     try:
-        # Specify dtypes for more efficient memory usage
-        df = pd.read_csv(
-    f"intermediary_files/Hist_Data/{symbol}.csv"
-    )
+        df = pd.read_feather(f"intermediary_files/Hist_Data/{symbol}.feather")
+        df['Volume'] = df['Volume'].astype('int32')
+        df['Close'] = df['Close'].astype('float32')
+        historical_data_cache[symbol] = df  # Cache the data
         return df
     except Exception as e:
-        logger.error(f"Error loading {symbol}.csv: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(f"Error loading {symbol}.feather: {e}")
         return None
+
 
 def preprocess_data(row_df, symbol):
     """
@@ -265,7 +263,7 @@ def preprocess_data(row_df, symbol):
 
     required_columns = {"Date", "Close", "Volume"}
     if not required_columns.issubset(df.columns):
-        logger.error(f"{symbol}.csv is missing required columns.")
+        logger.error(f"{symbol}.feather is missing required columns.")
         return None
 
     # Convert 'Date' to datetime and set as index
@@ -322,17 +320,18 @@ def apply_trading_rules(df, row):
 
     def apply_rule(rule_set_name, rule_set_module):
         try:
-            holdings = pd.read_csv("intermediary_files/Holdings.csv")
+            holdings = pd.read_feather("intermediary_files/Holdings.feather")
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
-            logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
+            logger.debug(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
             return decision
         except Exception as e:
             logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
             return "HOLD"
-
+        
+    num_cores = multiprocessing.cpu_count()
     # Use ThreadPoolExecutor to parallelize rule application
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=num_cores) as executor:
         # Submit all rules to the executor and process them concurrently
         futures = {executor.submit(apply_rule, rule_set_name, rule_set_module): rule_set_name
                    for rule_set_name, rule_set_module in RULE_SETS.items()}
@@ -353,13 +352,13 @@ def apply_trading_rules(df, row):
 
     # Prioritize decisions: SELL > BUY > HOLD
     if decisions["SELL"] > 0:
-        logger.info(f"Final decision for {row['Symbol']}: SELL")
+        # logger.info(f"Final decision for {row['Symbol']}: SELL")
         return "SELL"
     elif decisions["BUY"] > 0:
-        logger.info(f"Final decision for {row['Symbol']}: BUY")
+        # logger.info(f"Final decision for {row['Symbol']}: BUY")
         return "BUY"
     else:
-        logger.info(f"Final decision for {row['Symbol']}: HOLD")
+        # logger.info(f"Final decision for {row['Symbol']}: HOLD")
         return "HOLD"
 
 
@@ -420,14 +419,14 @@ def fetch_holdings(kite=kite):
             holdings = holdings[holdings["quantity"] > 0]
             
             # Save holdings to CSV
-            holdings.to_csv("intermediary_files/Holdings.csv", index=False)
+            holdings.to_feather("intermediary_files/Holdings.feather")
             
             logger.debug("Holdings fetched and saved!")
             return holdings
         else:
             # Initialize an empty DataFrame with the expected columns
             holdings = pd.DataFrame(columns=["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"])
-            holdings.to_csv("intermediary_files/Holdings.csv", index=False)
+            holdings.to_feather("intermediary_files/Holdings.feather")
             logger.debug("No holdings found, returning an empty DataFrame.")
             return holdings
 
@@ -485,6 +484,7 @@ def is_Market_Open(schedule=get_market_schedule()):
     Returns:
     bool: True if the market is open, False otherwise.
     """
+    return True
     if schedule is None:
         logger.info("Market is closed today.")
         return False
@@ -548,3 +548,16 @@ def get_instrument_token(good_stock_list_df, instruments_df):
     ]
 
     return final_nse_prioritized_df
+
+# Use LRU Cache for loading instruments data
+@lru_cache(maxsize=None)
+def load_instruments_data():
+    """
+    Load instrument data from CSV file with LRU caching to avoid re-reading the file.
+    """
+    try:
+        instruments_df = pd.read_feather("intermediary_files/Instruments.feather")
+        return instruments_df.set_index("instrument_token").to_dict(orient="index")
+    except Exception as e:
+        logger.error(f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}")
+        sys.exit(1)  # Exit if we cannot load instruments data

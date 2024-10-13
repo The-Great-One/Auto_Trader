@@ -36,7 +36,7 @@ def buy_or_sell(df, row, holdings):
             logger.info(f"Stop loss triggered for {holdings_symbol_data['tradingsymbol'].iloc[-1]}. Returning SELL.")
             return "SELL"
         else:
-            logger.info(f"Profit percentage is {profit_percent:.2f}% for {holdings_symbol_data['tradingsymbol'].iloc[-1]}. Returning HOLD.")
+            logger.debug(f"Profit percentage is {profit_percent:.2f}% for {holdings_symbol_data['tradingsymbol'].iloc[-1]}. Returning HOLD.")
             return "HOLD"
         
     except Exception as e:

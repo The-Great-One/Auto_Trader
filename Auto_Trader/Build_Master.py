@@ -79,7 +79,7 @@ def create_master():
         try:
             merged_df = pd.merge(fetched_data, mapped_df, on='Symbol', how='inner')
             # Save the final DataFrame to a CSV file
-            merged_df.to_csv("intermediary_files/Instruments.csv", index=False)
+            merged_df.to_feather("intermediary_files/Instruments.feather")
             logger.info("Merged fetched data with mapped data and saved to Instruments.csv.")
         except Exception as e:
             logger.error(f"Error merging data and saving CSV: {str(e)}\n{traceback.format_exc()}")
