@@ -53,10 +53,10 @@ def download_ticker_data(ticker, fetched_data_manager):
     ticker_bs = ticker + ".BO"
 
     try:
-        data = yf.download(ticker_ns, threads=20, progress=False, period="max")
+        data = yf.download(ticker_ns, threads=20, progress=False, period="6mo")
 
         if data.empty:
-            data = yf.download(ticker_bs, threads=20, progress=False, period="max")
+            data = yf.download(ticker_bs, threads=20, progress=False, period="6mo")
 
         if data.empty:
             data = stocks.get_data(stock_symbol=ticker, start_date=str(datetime.now().date() - relativedelta(months=3)), end_date=str(datetime.now().date()))
@@ -91,14 +91,13 @@ def download_ticker_data(ticker, fetched_data_manager):
         if not data.empty:
             data = data.reset_index()[["Date", "High", "Low", "Close", "Volume"]]
             data = data.sort_values(by=["Date"], ascending=True)
-            
+
             if is_Market_Open() or is_PreMarket_Open():
                 today = datetime.today().date()
                 data = data[data['Date'] != str(today)]
-                data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
+                data.to_feather(f"intermediary_files/Hist_Data/{ticker}.feather")
             else:
-                # Filter data for the last 6 months
-                data.to_csv(f"intermediary_files/Hist_Data/{ticker}.csv", index=False)
+                data.to_feather(f"intermediary_files/Hist_Data/{ticker}.feather")
 
             # Mark as fetched today
             ray.get(fetched_data_manager.mark_fetched.remote(ticker))

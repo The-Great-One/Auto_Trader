@@ -2,9 +2,10 @@ from multiprocessing import Pool, cpu_count
 import pandas as pd
 import sys
 from Auto_Trader.KITE_TRIGGER_ORDER import handle_decisions
-from Auto_Trader.utils import process_stock_and_decide
+from Auto_Trader.utils import process_stock_and_decide, load_instruments_data
 import logging
 import traceback
+import queue  # Import Python's queue module for handling empty exceptions
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -14,42 +15,50 @@ def Apply_Rules(q, message_queue):
     and handles decisions to buy or sell stocks using multiprocessing.
 
     Parameters:
-        q (multiprocessing.Queue): A queue containing stock data dictionaries.
+        q (multiprocessing.Queue): A queue containing stock data dictionaries for all stocks in a tick.
     """
-    # Read instruments data once, outside the loop
-    try:
-        instruments_df = pd.read_csv("intermediary_files/Instruments.csv")
-    except Exception as e:
-        logger.error(f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}")
-        return
-
-    # Initialize multiprocessing pool
-    cpu_cores = max(cpu_count() - 1, 1)
+    cpu_cores = cpu_count()  # Use all cores
+    
+    # Convert instruments_df to a dictionary where key is instrument_token
+    instruments_dict = load_instruments_data()
+    
     with Pool(processes=cpu_cores) as pool:
         while True:
             try:
-                data = q.get()
+                # Get data from queue
+                data = q.get(timeout=1)  # Assume data is a list of dictionaries
                 if data is None:
                     logger.warning("Received shutdown signal. Exiting Apply_Rules.")
                     break  # Exit the loop if None is received (signal to stop)
 
-                data_df = pd.DataFrame(data)[["last_price", "volume_traded", "instrument_token", "ohlc"]]
-                data_df = pd.merge(data_df, instruments_df, on="instrument_token", how="inner")
-                data_df['Date'] = pd.Timestamp.today().strftime('%Y-%m-%d')
-                
-                # Convert DataFrame rows to dictionaries for pickling
-                rows = data_df.to_dict(orient='records')
+                # Process the data by enriching it with instruments data
+                for stock_data in data:
+                    instrument_token = stock_data.get("instrument_token")
+                    
+                    # Merge instruments data into stock data
+                    instrument_data = instruments_dict.get(instrument_token, {})
+                    stock_data.update(instrument_data)  # Add instrument details to stock data
+                    
+                    # Add today's date
+                    stock_data['Date'] = pd.Timestamp.today().strftime('%Y-%m-%d')
 
-                # Use pool.map to process stocks in parallel
-                results = pool.map(process_stock_and_decide, rows)
+                # Use pool.map to process each stock in parallel
+                results = pool.map(process_stock_and_decide, data)  # data is now a list of enriched dicts
 
                 # Filter out None results
                 decisions = [decision for decision in results if decision is not None]
 
+                # Handle the decisions
                 if decisions:
                     handle_decisions(message_queue, decisions=decisions)
-                else:
-                    pass
+            except queue.Empty:
+                # If the queue is empty, log a message and continue
+                logger.info("No new data in the queue. Waiting for next tick.")
+                continue
             except Exception as e:
-                logger.error(f"An error occurred while processing data: {e}, Traceback: {traceback.format_exc()}")
-                sys.exit(1)
+                if isinstance(e, KeyboardInterrupt):
+                    logger.info("Manual interrupt detected. Exiting gracefully.")
+                    break
+                else:
+                    logger.error(f"An error occurred while processing data: {e}, Traceback: {traceback.format_exc()}")
+                    sys.exit(1)

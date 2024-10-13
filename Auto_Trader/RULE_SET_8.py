@@ -1,5 +1,4 @@
 import pandas as pd
-import ta
 
 def buy_or_sell(df, row, holdings):
     """
