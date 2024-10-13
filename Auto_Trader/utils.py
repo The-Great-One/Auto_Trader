@@ -484,7 +484,6 @@ def is_Market_Open(schedule=get_market_schedule()):
     Returns:
     bool: True if the market is open, False otherwise.
     """
-    return True
     if schedule is None:
         logger.info("Market is closed today.")
         return False
