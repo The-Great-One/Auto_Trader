@@ -20,7 +20,7 @@ def buy_or_sell(df, row, holdings):
     """
     # Extract the latest row of data for convenience
     latest_data = df.iloc[-1]
-    previous_data = df.iloc[-2]
+    previous_data = df.shift(1).iloc[-1]
 
    # --- Buy Conditions ---
     # Liquidity and Bracket Conditions for Buy
