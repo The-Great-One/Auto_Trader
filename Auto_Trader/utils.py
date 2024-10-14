@@ -227,12 +227,9 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     # Return the DataFrame with the relevant columns
     return df
 
-
 def load_historical_data(symbol):
     try:
         df = pd.read_feather(f"intermediary_files/Hist_Data/{symbol}.feather")
-        df['Volume'] = df['Volume'].astype('int32')
-        df['Close'] = df['Close'].astype('float32')
         return df
     except Exception as e:
         logger.error(f"Error loading {symbol}.feather: {e}")
@@ -259,6 +256,7 @@ def preprocess_data(row_df, symbol):
     required_columns = {"Date", "Close", "Volume"}
     if not required_columns.issubset(df.columns):
         logger.error(f"{symbol}.feather is missing required columns.")
+        logger.error(f"{symbol}.feather has {df.columns}")
         return None
 
     # Convert 'Date' to datetime and set as index
