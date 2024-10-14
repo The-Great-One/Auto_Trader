@@ -26,7 +26,7 @@ def Apply_Rules(q, message_queue):
         while True:
             try:
                 # Get data from queue
-                data = q.get(timeout=1)  # Assume data is a list of dictionaries
+                data = q.get()  # Assume data is a list of dictionaries
                 if data is None:
                     logger.warning("Received shutdown signal. Exiting Apply_Rules.")
                     break  # Exit the loop if None is received (signal to stop)

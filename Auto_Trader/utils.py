@@ -169,6 +169,9 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     # Calculate MACD
     macd, macd_signal, macd_hist = talib.MACD(df["Close"], fastperiod=macd_fast, slowperiod=macd_slow, signalperiod=macd_signal)
 
+    # Calculate MACD for rule 8 (fastperiod=23, slowperiod=9, signalperiod=9)
+    macd_rule_8, macd_rule_8_signal, macd_rule_8_hist = talib.MACD(df["Close"], fastperiod=23, slowperiod=9, signalperiod=9)
+
     # Calculate EMAs for different periods
     ema_values = {f"EMA{period}": talib.EMA(df["Close"], timeperiod=period) for period in [5, 9, 10, 13, 20, 21, 50, 100, 200, 12, 26]}
     ema20_low = talib.EMA(df["Low"], timeperiod=20)  # EMA based on the Low prices
@@ -221,7 +224,10 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
         Weekly_SMA_200_4w=weekly_sma_200_4w,
         EMA20_LOW=ema20_low,
         VolumeConfirmed=volume_confirmed,
-        **ema_values  # Spread the EMA dictionary to add each EMA column
+        **ema_values,  # Spread the EMA dictionary to add each EMA column
+        MACD_Rule_8=macd_rule_8,
+        MACD_Rule_8_Signal=macd_rule_8_signal,
+        MACD_Rule_8_Hist=macd_rule_8_hist
     )
 
     # Return the DataFrame with the relevant columns
@@ -316,7 +322,7 @@ def apply_trading_rules(df, row):
             holdings = pd.read_feather("intermediary_files/Holdings.feather")
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
-            logger.debug(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
+            logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
             return decision
         except Exception as e:
             logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
@@ -341,7 +347,7 @@ def apply_trading_rules(df, row):
                 pass
 
     # Print decisions for each stock (for debugging)
-    logger.debug(f"Decisions for {row['Symbol']}: {decisions}")
+    logger.info(f"Decisions for {row['Symbol']}: {decisions}")
 
     # Prioritize decisions: SELL > BUY > HOLD
     if decisions["SELL"] > 0:
