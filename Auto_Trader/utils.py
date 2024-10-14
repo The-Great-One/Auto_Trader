@@ -227,17 +227,12 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     # Return the DataFrame with the relevant columns
     return df
 
-historical_data_cache = {}
 
 def load_historical_data(symbol):
-    if symbol in historical_data_cache:
-        return historical_data_cache[symbol]
-    
     try:
         df = pd.read_feather(f"intermediary_files/Hist_Data/{symbol}.feather")
         df['Volume'] = df['Volume'].astype('int32')
         df['Close'] = df['Close'].astype('float32')
-        historical_data_cache[symbol] = df  # Cache the data
         return df
     except Exception as e:
         logger.error(f"Error loading {symbol}.feather: {e}")
