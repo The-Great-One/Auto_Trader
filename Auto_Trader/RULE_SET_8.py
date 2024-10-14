@@ -1,5 +1,3 @@
-import pandas as pd
-
 def buy_or_sell(df, row, holdings):
     """
     Determines whether to generate a 'BUY', 'SELL', or 'HOLD' signal based on technical indicators.
@@ -42,9 +40,9 @@ def buy_or_sell(df, row, holdings):
 
     # MACD Conditions for Buy
     buy_macd_condition = (
-        (latest_data['MACD'] > 0) and
-        (latest_data['MACD_Signal'] > 0) and
-        (previous_data['MACD'] <= previous_data['MACD_Signal'] and latest_data['MACD'] > latest_data['MACD_Signal'])
+        (latest_data['MACD_Rule_8'] > 0) and
+        (latest_data['MACD_Rule_8_Signal'] > 0) and
+        (previous_data['MACD_Rule_8'] <= previous_data['MACD_Rule_8_Signal'] and latest_data['MACD_Rule_8'] > latest_data['MACD_Rule_8_Signal'])
     )
 
     # Additional Close Conditions for Buy

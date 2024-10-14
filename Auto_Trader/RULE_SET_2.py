@@ -15,7 +15,7 @@ def buy_or_sell(df, row, holdings):
         
         # Ensure there's data for the symbol
         if holdings_symbol_data.empty:
-            logger.debug(f"No holdings data for instrument_token {row['instrument_token']}. Returning HOLD.")
+            logger.info(f"No holdings data for instrument_token {row['instrument_token']}. Returning HOLD.")
             return "HOLD"
         
         # Extract average price from the holdings
