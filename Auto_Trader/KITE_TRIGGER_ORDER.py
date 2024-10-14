@@ -16,6 +16,7 @@ from kiteconnect.exceptions import (
 )
 import logging
 import traceback
+import os
 
 # Initialize KiteConnect
 kite = KiteConnect(api_key=API_KEY)
@@ -228,17 +229,23 @@ def handle_decisions(message_queue, decisions):
             close_price = decision["Close"]
 
             try:
+                # Fetch the fund allocation from an environment variable, with a default value of 20000
+                fund_allocation = int(os.environ.get('FUND_ALLOCATION', 20000))
+
+                # Retrieve available funds
                 funds = kite.margins("equity")["available"]["live_balance"]
                 logger.info(f"Available funds: {funds}")
-                if funds <= 20000:
-                    logger.warning("Insufficient funds to place more buy orders. Stopping buy order processing.")
+                
+                if funds <= fund_allocation:
+                    logger.warning(f"Insufficient funds to place more buy orders. Stopping buy order processing.")
                     break
 
                 # Check if a buy order should be placed
                 if not should_place_buy_order(symbol):
                     continue
 
-                quantity = floor(20000 / close_price)
+                # Calculate the quantity of shares to buy based on the fund allocation and stock's close price
+                quantity = floor(fund_allocation / close_price)
                 if quantity <= 0:
                     logger.warning(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
