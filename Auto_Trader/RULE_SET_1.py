@@ -9,7 +9,6 @@ MACD_SIGNAL_PERIOD = 9
 VOLUME_MA_PERIOD = 20
 RSI_THRESHOLD = 65  # Lowered to allow more opportunities while maintaining accuracy
 MACD_HIST_THRESHOLD = 7  # Kept high to ensure strong momentum
-COOLDOWN_PERIOD = 3  # Reduced cooldown period to allow faster re-entries
 VOLUME_MULTIPLIER = 1.5  # Reduced to allow more opportunities
 
 
@@ -148,12 +147,10 @@ def sell_signal(df):
     return ema_signal or rsi_signal or macd_signal
 
 
-def buy_or_sell(df, row, holdings, last_trade=None, cooldown_period=COOLDOWN_PERIOD):
+def buy_or_sell(df, row, holdings):
     """
-    Determine whether to buy, sell, or hold based on the improved trading rules and cooldown period.
+    Determine whether to buy, sell, or hold based on the improved trading rules.
     """
-    if last_trade and (row['date'] - last_trade).days < cooldown_period:
-        return "HOLD"
     
     # Determine buy or sell signals
     if buy_signal(df):
