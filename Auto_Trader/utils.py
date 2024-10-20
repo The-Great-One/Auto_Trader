@@ -13,6 +13,8 @@ logger = logging.getLogger("Auto_Trade_Logger")
 # Default rule set values
 DEFAULT_RULE_SETS = {
     'RULE_SET_1': RULE_SET_1,
+    'RULE_SET_2': RULE_SET_2,
+    'RULE_SET_3': RULE_SET_3,
     'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
     'RULE_SET_6': RULE_SET_6,
@@ -106,7 +108,7 @@ def initialize_kite():
         build_access_token()
         return initialize_kite()
 
-def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2):
+def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2, sup_col_name="Supertrend", sup_dir_name="Supertrend_Direction"):
     """
     Vectorized Supertrend calculation using TA-Lib for ATR.
 
@@ -140,8 +142,11 @@ def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2):
     # Determine the trend direction
     direction = np.where(df['Close'] > supertrend, True, False)
 
-    # Return the DataFrame with the relevant columns using .assign()
-    return df.assign(Supertrend=supertrend, Supertrend_Direction=direction)
+    # Assigning new columns
+    df[sup_col_name] = supertrend
+    df[sup_dir_name] = direction
+
+    return df
 
 def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14):
     """
@@ -179,10 +184,14 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
 
     # Calculate Supertrend using the optimized function
     df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2)
+    
+    #Calculate Supertrend for Rule-8
+    df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=3, sup_col_name="Supertrend_Rule_8_Exit", sup_dir_name="Supertrend_Direction_Rule_8_Exit")
 
     # Calculate SMAs
     sma_10_close = df['Close'].rolling(window=10).mean()
     sma_20_close = df['Close'].rolling(window=20).mean()
+    sma_20_low = df['Low'].rolling(window=20).mean()
     sma_200_close = df['Close'].rolling(window=200).mean()
     sma_20_high = df['High'].rolling(window=20).mean()
     sma_20_volume =df['Volume'].rolling(window=20).mean()
@@ -209,6 +218,7 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
         MACD_Hist=macd_hist,
         ATR=atr,
         SMA_10_Close=sma_10_close,
+        SMA_20_Low=sma_20_low,
         SMA_20_Close=sma_20_close,
         SMA_200_Close=sma_200_close,
         SMA_20_High=sma_20_high,
