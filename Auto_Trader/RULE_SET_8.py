@@ -72,7 +72,7 @@ def buy_or_sell(df, row, holdings):
     )
 
     # SMA Volume Condition for Sell
-    sell_sma_volume_condition = latest_data['SMA_20_Volume'] > latest_data['SMA_200_Volume']
+    # sell_sma_volume_condition = latest_data['SMA_20_Volume'] > latest_data['SMA_200_Volume']
 
     # "Pass any" Conditions for Sell
     sell_any_condition = (
@@ -83,7 +83,7 @@ def buy_or_sell(df, row, holdings):
     )
 
     # Final Sell Condition
-    sell_condition = sell_liquidity_condition and sell_sma_volume_condition and sell_any_condition
+    sell_condition = sell_liquidity_condition and sell_any_condition #and sell_sma_volume_condition
 
     # Determine the action
     if buy_condition:
