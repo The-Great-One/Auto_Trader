@@ -43,16 +43,16 @@ def buy_or_sell(df, row, holdings):
     )
 
     # Sell signal conditions (tightened to lock in profits)
-    sell_condition = (
-        (latest_data['MACD'] < latest_data['MACD_Signal']) or  # MACD bearish crossover
-        (latest_data['MACD_Hist'] < 0) or  # MACD histogram turning negative
-        (latest_data['Close'] < latest_data['EMA20_LOW'])  # Price falling below EMA20 Low
-    )
+    # sell_condition = (
+    #     (latest_data['MACD'] < latest_data['MACD_Signal']) or  # MACD bearish crossover
+    #     (latest_data['MACD_Hist'] < 0) or  # MACD histogram turning negative
+    #     (latest_data['Close'] < latest_data['EMA20_LOW'])  # Price falling below EMA20 Low
+    # )
 
     # Determine the action based on conditions
     if buy_condition and buy_close_condition:
         return "BUY"
-    elif sell_condition:
-        return "SELL"
+    # elif sell_condition:
+    #     return "SELL"
     else:
         return "HOLD"
