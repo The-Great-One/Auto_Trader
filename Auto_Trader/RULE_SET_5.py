@@ -33,7 +33,7 @@ def buy_or_sell(df, row, holdings):
         (previous_data['MACD'] <= previous_data['MACD_Signal']) and  # MACD crossover Just Now
         (latest_data['MACD_Hist'] > 0) and
         (latest_data['MACD'] > 0) and
-        (latest_data['RSI'] >= 59) and  # Reduced RSI threshold for earlier entry
+        (latest_data['RSI'] >= 60) and  # Reduced RSI threshold for earlier entry
         (latest_data['RSI'] <= 70) and  # Avoid overbought conditions
         (latest_data['Close'] > latest_data['EMA20']) and
         (latest_data['Close'] > latest_data['EMA50']) and
