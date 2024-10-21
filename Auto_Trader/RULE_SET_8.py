@@ -66,7 +66,7 @@ def buy_or_sell(df, row, holdings):
     # --- Sell Conditions ---
     # Liquidity and Bracket Conditions for Sell
     sell_liquidity_condition = (
-        (latest_data['Close'] * latest_data['Volume'] > 5000000) and
+        (latest_data['Close'] * latest_data['Volume'] > 350_000_000) and
         (latest_data['Close'] * latest_data['Volume'] >
          latest_data['SMA_20_Close'] * latest_data['SMA_20_Volume'])
     )
@@ -79,7 +79,7 @@ def buy_or_sell(df, row, holdings):
         (previous_data['Close'] >= previous_data['SMA_20_Close'] and latest_data['Close'] < latest_data['SMA_20_Low']) or
         (previous_data['RSI'] >= 40 and latest_data['RSI'] < 40) or
         (previous_data['Close'] >= previous_data['Supertrend_Rule_8_Exit'] and latest_data['Close'] < latest_data['Supertrend_Rule_8_Exit']) or
-        (latest_data['Close'] >= latest_data['SMA_10_Close'] * 1.12)
+        (latest_data['Close'] >= latest_data['SMA_10_Close'] * 1.14)
     )
 
     # Final Sell Condition
