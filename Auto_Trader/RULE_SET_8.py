@@ -66,7 +66,7 @@ def buy_or_sell(df, row, holdings):
     # --- Sell Conditions ---
     # Liquidity and Bracket Conditions for Sell
     sell_liquidity_condition = (
-        (latest_data['Close'] * latest_data['Volume'] > 350_000_000) and
+        (latest_data['Close'] * latest_data['Volume'] > 350_000_000) and # Turn-Over > ₹35Cr
         (latest_data['Close'] * latest_data['Volume'] >
          latest_data['SMA_20_Close'] * latest_data['SMA_20_Volume'])
     )
