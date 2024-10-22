@@ -27,10 +27,15 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Close'] <= latest_data['SMA_10_Close'] * 1.08)
     )
     
+    # Define a MACD crossover in the last 3 days
+    macd_crossover_last_3_days = (
+        ((df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)))  # MACD crosses above Signal
+        .tail(3)  # Look at the last 3 days
+        .any()  # Check if crossover happened on any of the last 3 days
+    )
+
     # Buy signal conditions (tightened to improve win rate)
     buy_condition = (
-        (latest_data['MACD'] > latest_data['MACD_Signal']) and
-        (previous_data['MACD'] <= previous_data['MACD_Signal']) and  # MACD crossover Just Now
         (latest_data['MACD_Hist'] > 0) and
         (latest_data['MACD'] > 0) and
         (latest_data['RSI'] >= 60) and  # Reduced RSI threshold for earlier entry
@@ -39,8 +44,9 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Close'] > latest_data['EMA50']) and
         (latest_data['Close'] > latest_data['EMA100']) and
         (latest_data['Close'] > latest_data['EMA200']) and
-        (latest_data['Volume'] > df['SMA_20_Volume']).any()  # Volume confirmation for strong trend
+        (latest_data['Volume'] > df['SMA_20_Volume'].iloc[-1])  # Volume confirmation for strong trend
     )
+
 
     # Sell signal conditions (tightened to lock in profits)
     # sell_condition = (
@@ -50,7 +56,7 @@ def buy_or_sell(df, row, holdings):
     # )
 
     # Determine the action based on conditions
-    if buy_condition and buy_close_condition:
+    if buy_condition and buy_close_condition and macd_crossover_last_3_days:
         return "BUY"
     # elif sell_condition:
     #     return "SELL"
