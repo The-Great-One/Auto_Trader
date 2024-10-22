@@ -12,7 +12,7 @@ def buy_or_sell(df, row, holdings):
     
     # Define a MACD crossover in the last 3 days
     macd_crossover_last_3_days = (
-        ((df['MACD'] > df['Signal']) & (df['MACD'].shift(1) <= df['Signal'].shift(1)))  # MACD crosses above Signal
+        ((df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)))  # MACD crosses above MACD_Signal
         .tail(3)  # Look at the last 3 days
         .any()  # Check if crossover happened on any of the last 3 days
     )
