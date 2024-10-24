@@ -54,12 +54,13 @@ def buy_or_sell(df, row, holdings):
 
     # "Pass any" Conditions for Buy
     buy_any_condition = (
-        (previous_data['Close'] < previous_data['SMA_20_High'] and latest_data['Close'] > latest_data['SMA_20_High']) or
+        ((previous_data['Close'] < previous_data['SMA_20_High'] and latest_data['Close'] > latest_data['SMA_20_High']) or
         (previous_data['RSI'] <= 60 and latest_data['RSI'] >= 60) or
         (previous_data['Close'] < previous_data['Supertrend'] and latest_data['Close'] > latest_data['Supertrend']) or
-        (previous_data['EMA5'] <= previous_data['EMA13'] and latest_data['EMA5'] > latest_data['EMA13'])
+        (previous_data['EMA5'] <= previous_data['EMA13'] and latest_data['EMA5'] > latest_data['EMA13'])) and 
+        (latest_data['Close'] > previous_data['Close'])
     )
-
+    
     # Final Buy Condition
     buy_condition = buy_liquidity_condition and buy_sma_condition and buy_macd_condition and buy_close_condition and buy_any_condition
 
