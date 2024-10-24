@@ -79,7 +79,7 @@ def buy_or_sell(df, row, holdings):
         # (previous_data['Close'] >= previous_data['SMA_20_Close'] and latest_data['Close'] < latest_data['SMA_20_Low']) or
         # (previous_data['RSI'] >= 40 and latest_data['RSI'] < 40) or
         (previous_data['Close'] >= previous_data['Supertrend_Rule_8_Exit'] and latest_data['Close'] < latest_data['Supertrend_Rule_8_Exit']) or
-        (latest_data['Close'] >= latest_data['SMA_10_Close'] * 1.14)
+        ((latest_data['Close'] >= latest_data['SMA_10_Close'] * 1.14) and latest_data['Close'] > previous_data['Close'])
     )
 
     # Final Sell Condition
