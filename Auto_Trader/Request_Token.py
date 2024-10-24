@@ -6,6 +6,7 @@ from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import *
 import sys
 import logging
+import time
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -41,8 +42,9 @@ def get_request_token(
     )
 
     # Check if login was successful
-    if login_response.status_code != 200 or "data" not in login_response.json():
+    if login_response.status_code != 200 or "request_id" not in login_response.json():
         logger.error("Login failed, please check your credentials.")
+        time.sleep(5)
 
     # TOTP POST request
     totp_payload = {
