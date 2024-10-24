@@ -48,7 +48,7 @@ def buy_or_sell(df, row, holdings):
     # Additional Close Conditions for Buy
     buy_close_condition = (
         (latest_data['Close'] > latest_data['SMA_20_Close']) and
-        ((latest_data['Close'] >= latest_data['SMA_10_Close']) and (previous_data['Close'] >= previous_data['SMA_10_Close'])) and
+        ((latest_data['Close'] >= latest_data['SMA_10_Close']) and (previous_data['Close'] < previous_data['SMA_10_Close'])) and
         (latest_data['Close'] <= latest_data['SMA_10_Close'] * 1.04)
     )
 
