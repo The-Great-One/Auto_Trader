@@ -7,7 +7,7 @@ def buy_or_sell(df, row, holdings):
     buy_close_condition = (
         (df['Close'].iloc[-1] > df['SMA_20_Close'].iloc[-1]) and
         (df['Close'].iloc[-1] >= df['SMA_10_Close'].iloc[-1] * 1.01) and
-        (df['Close'].iloc[-1] <= df['SMA_10_Close'].iloc[-1] * 1.08)
+        (df['Close'].iloc[-1] <= df['SMA_10_Close'].iloc[-1] * 1.04)
     )
     
     # Define a MACD crossover in the last 3 days
