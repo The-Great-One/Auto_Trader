@@ -44,7 +44,6 @@ def get_request_token(
     # Check if login was successful
     if login_response.status_code != 200 or "request_id" not in login_response.json()["data"]:
         logger.error("Login failed, please check your credentials.")
-        print(login_response)
         time.sleep(60)
         sys.exit(1)
 
