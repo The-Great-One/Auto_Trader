@@ -80,6 +80,6 @@ def get_request_token(
         return request_token
     except:
         print(
-            "API not Authorized. Open this Link in your browser: https://kite.zerodha.com/connect/login?v=3&api_key={API_KEY}"
+            f"API not Authorized. Open this Link in your browser: https://kite.zerodha.com/connect/login?v=3&api_key={API_KEY}"
         )
         sys.exit(1)
