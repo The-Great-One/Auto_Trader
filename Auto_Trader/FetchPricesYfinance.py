@@ -89,7 +89,7 @@ def download_ticker_data(ticker, fetched_data_manager):
                 data = data.rename(columns=rename_dict)
 
         if not data.empty:
-            data = data.reset_index()[["Date", "High", "Low", "Close", "Volume"]]
+            data = data.reset_index()[["Date", "Open", "High", "Low", "Close", "Volume"]]
             data = data.sort_values(by=["Date"], ascending=True)
 
             if is_Market_Open() or is_PreMarket_Open():
