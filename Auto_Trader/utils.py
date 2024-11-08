@@ -57,8 +57,18 @@ def build_access_token():
             "access_token": data["access_token"],
             "date": datetime.now().strftime("%Y-%m-%d"),
         }
-        if os.path.isdir('intermediary_files'):
-            shutil.rmtree("intermediary_files")
+        # Check if the directory exists
+        if os.path.isdir("intermediary_files"):
+            # Loop through each item in intermediary_files
+            for item in os.listdir("intermediary_files"):
+                item_path = os.path.join("intermediary_files", item)
+                # Skip the file you want to keep
+                if item != "Holdings.json":
+                    # Remove files or directories
+                    if os.path.isfile(item_path):
+                        os.remove(item_path)
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
             
         os.makedirs("intermediary_files", exist_ok=True)
         
@@ -261,13 +271,13 @@ def preprocess_data(row_df, symbol):
     Returns:
         pd.DataFrame or None: The combined DataFrame, or None if preprocessing fails.
     """
-    append_df = row_df[["Date", "Close", "Volume"]].copy()
+    append_df = row_df[["Date", "Close", "Volume", "High", "Low"]].copy()
 
     df = load_historical_data(symbol)
     if df is None:
         return None
 
-    required_columns = {"Date", "Close", "Volume"}
+    required_columns = {"Date", "Close", "Volume", "High", "Low"}
     if not required_columns.issubset(df.columns):
         logger.error(f"{symbol}.feather is missing required columns.")
         logger.error(f"{symbol}.feather has {df.columns}")
@@ -304,7 +314,9 @@ def process_single_stock(row):
     row_df = pd.DataFrame([{
         'Date': row['Date'],
         'Close': row['last_price'],
-        'Volume': row['volume_traded']
+        'Volume': row['volume_traded'],
+        'High': row['ohlc']['high'],
+        "Low": row['ohlc']['low'],
     }])
 
     df = preprocess_data(row_df, row['Symbol'])
