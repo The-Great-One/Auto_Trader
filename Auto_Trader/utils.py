@@ -158,6 +158,34 @@ def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2, sup_c
 
     return df
 
+def calculate_fibonacci_levels(df):
+    """
+    Calculate Fibonacci retracement levels based on the most recent high and low in the DataFrame.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        The DataFrame containing historical stock data with 'High' and 'Low' columns.
+
+    Returns:
+    --------
+    dict
+        A dictionary containing Fibonacci retracement levels.
+    """
+    recent_high = df['High'].max()
+    recent_low = df['Low'].min()
+
+    fib_levels = {
+        '0%': recent_low,
+        '23.6%': recent_high - 0.236 * (recent_high - recent_low),
+        '38.2%': recent_high - 0.382 * (recent_high - recent_low),
+        '50%': recent_high - 0.5 * (recent_high - recent_low),
+        '61.8%': recent_high - 0.618 * (recent_high - recent_low),
+        '100%': recent_high
+    }
+
+    return fib_levels
+
 def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14):
     """
         Calculate key financial indicators using TA-Lib for a DataFrame of stock prices, optimized for performance.
@@ -195,6 +223,14 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
     # Calculate Supertrend using the optimized function
     df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2)
     
+    df['UpperBand'], df['MiddleBand'], df['LowerBand'] = talib.BBANDS(
+        df["Close"],
+        timeperiod=20,
+        nbdevup=2,
+        nbdevdn=2,
+        matype=0
+    )
+    
     #Calculate Supertrend for Rule-8
     df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=3, sup_col_name="Supertrend_Rule_8_Exit", sup_dir_name="Supertrend_Direction_Rule_8_Exit")
 
@@ -219,6 +255,9 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
 
     # Volume confirmation
     volume_confirmed = df['Volume'] > (1.2 * sma_20_volume)
+    
+    # Calculate Fibonacci levels based on the most recent high and low
+    fibonacci_levels = calculate_fibonacci_levels(df)
 
     # Assign calculated indicators to the DataFrame using .assign()
     df = df.assign(
@@ -245,7 +284,13 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
         **ema_values,  # Spread the EMA dictionary to add each EMA column
         MACD_Rule_8=macd_rule_8,
         MACD_Rule_8_Signal=macd_rule_8_signal,
-        MACD_Rule_8_Hist=macd_rule_8_hist
+        MACD_Rule_8_Hist=macd_rule_8_hist,
+        Fibonacci_0=fibonacci_levels['0%'],
+        Fibonacci_23_6=fibonacci_levels['23.6%'],
+        Fibonacci_38_2=fibonacci_levels['38.2%'],
+        Fibonacci_50=fibonacci_levels['50%'],
+        Fibonacci_61_8=fibonacci_levels['61.8%'],
+        Fibonacci_100=fibonacci_levels['100%']
     )
 
     # Return the DataFrame with the relevant columns
