@@ -1,5 +1,4 @@
 from Fundamentals import Tickertape
-from functools import lru_cache
 import logging
 import numpy as np
 import pandas as pd
@@ -8,7 +7,6 @@ import traceback
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-@lru_cache(maxsize=10)  # Caching to optimize repeated data fetching
 def goodStocks():
     ttp = Tickertape()
     
@@ -44,7 +42,7 @@ def goodStocks():
                 "qIncEbiK", # Last Quarter EBITDA
             ],
             sortby='mrktCapf',  # Sorting by market capitalization
-            number_of_records=10000  # Increased number to fetch more records
+            number_of_records=3  # Increased number to fetch more records
         )
 
         # Define market cap thresholds for categorizing stocks into large-cap, mid-cap, and small-cap categories.
