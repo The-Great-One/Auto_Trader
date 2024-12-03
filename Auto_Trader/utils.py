@@ -370,17 +370,18 @@ def process_single_stock(row):
 def apply_trading_rules(df, row):
     """
     Apply all trading rules from the RULE_SETS dictionary to the stock data
-    and return the strongest trading signal (e.g., SELL > BUY > HOLD).
+    and return the strongest trading signal (e.g., SELL > BUY > HOLD) along with contributing rules.
     
     Parameters:
         df (pd.DataFrame): The preprocessed stock data.
         row (dict): The current stock data row.
 
     Returns:
-        str: The strongest trading decision from the rule sets.
+        tuple: (str, dict) where str is the strongest trading decision, 
+               and dict contains rules contributing to each decision.
     """
-    # Initialize a dictionary to track the decisions
-    decisions = {"SELL": 0, "BUY": 0, "HOLD": 0}
+    # Initialize a dictionary to track the decisions and their contributing rules
+    decisions = {"SELL": [], "BUY": [], "HOLD": []}
 
     def apply_rule(rule_set_name, rule_set_module):
         try:
@@ -388,11 +389,11 @@ def apply_trading_rules(df, row):
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
             logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
-            return decision
+            return rule_set_name, decision
         except Exception as e:
             logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
-            return "HOLD"
-        
+            return rule_set_name, "HOLD"
+
     num_cores = multiprocessing.cpu_count()
     # Use ThreadPoolExecutor to parallelize rule application
     with ThreadPoolExecutor(max_workers=num_cores) as executor:
@@ -402,10 +403,9 @@ def apply_trading_rules(df, row):
 
         # Collect results as they complete
         for future in as_completed(futures):
-            decision = future.result()
-            rule_set_name = futures[future]  # Get the corresponding rule set name
+            rule_set_name, decision = future.result()
             if decision in decisions:
-                decisions[decision] += 1
+                decisions[decision].append(rule_set_name)
             else:
                 # Log the specific rule set that returned an unknown decision
                 logger.error(f"Rule {rule_set_name} returned an unknown decision: {decision}")
@@ -415,20 +415,16 @@ def apply_trading_rules(df, row):
     logger.info(f"Decisions for {row['Symbol']}: {decisions}")
 
     # Prioritize decisions: SELL > BUY > HOLD
-    if decisions["SELL"] > 0:
-        # logger.info(f"Final decision for {row['Symbol']}: SELL")
-        return "SELL"
-    elif decisions["BUY"] > 0:
-        # logger.info(f"Final decision for {row['Symbol']}: BUY")
-        return "BUY"
+    if decisions["SELL"]:
+        return "SELL", {"SELL": decisions["SELL"]}
+    elif decisions["BUY"]:
+        return "BUY", {"BUY": decisions["BUY"]}
     else:
-        # logger.info(f"Final decision for {row['Symbol']}: HOLD")
-        return "HOLD"
-
+        return "HOLD", {"HOLD": decisions["HOLD"]}
 
 def process_stock_and_decide(row):
     """
-    Processes a single stock and returns a decision dict if any.
+    Processes a single stock and returns a decision dict with contributing rules if any.
 
     Parameters:
         row (dict): A dictionary containing stock information.
@@ -441,11 +437,12 @@ def process_stock_and_decide(row):
         df = process_single_stock(row)
         if df is not None:
             # Apply the trading rules
-            decision = apply_trading_rules(df, row)
+            decision, contributing_rules = apply_trading_rules(df, row)
             if decision != "HOLD":
                 return {
                     "Symbol": row['Symbol'],
                     "Decision": decision,
+                    "ContributingRules": contributing_rules,
                     "Exchange": row['exchange'],
                     "Close": row['last_price']
                 }
@@ -453,6 +450,7 @@ def process_stock_and_decide(row):
         # Log exceptions with stock symbol for easier debugging
         logger.error(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}, Traceback: {traceback.format_exc()}")
     return None
+
 
 # Initialize Kite
 kite = initialize_kite()
@@ -478,14 +476,14 @@ def fetch_holdings(kite=kite):
             
             # Merge Holdings and t1_quantity
             holdings['quantity'] = holdings['quantity'] + holdings['t1_quantity']
-            
+                        
             # Filter out holdings with quantity greater than 0
             holdings = holdings[holdings["quantity"] > 0]
             
             # Save holdings to CSV
             holdings.to_feather("intermediary_files/Holdings.feather")
             
-            logger.debug("Holdings fetched and saved!")
+            logger.info(f"Number of Holdings: {len(holdings)}")
             return holdings
         else:
             # Initialize an empty DataFrame with the expected columns
