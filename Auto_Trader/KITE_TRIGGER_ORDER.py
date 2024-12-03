@@ -24,7 +24,7 @@ kite.set_access_token(read_session_data())
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price):
+def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_price, contributing_rules):
     """
     Places a market order for the specified symbol and sends a notification.
 
@@ -62,6 +62,7 @@ def trigger(message_queue, symbol, exchange, trans_quantity, order_type, close_p
         Quantity: {trans_quantity}
         Price: {close_price if close_price else 'N/A'}
         Type: {'BUY' if order_type == 'BUY' else 'SELL'}
+        Contributing Rules: {contributing_rules}
         """
         message_queue.put(message)
 
@@ -203,6 +204,7 @@ def handle_decisions(message_queue, decisions):
             symbol = decision["Symbol"]
             exchange = decision["Exchange"]
             close_price = decision["Close"]
+            contributing_rules = decision["ContributingRules"]
             
             # Safely access the quantity for the symbol
             quantity = holdings.loc[symbol]["quantity"] if symbol in holdings.index else 0
@@ -210,7 +212,7 @@ def handle_decisions(message_queue, decisions):
             if quantity == 0:
                 continue
 
-            futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "SELL", close_price))
+            futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "SELL", close_price, contributing_rules))
 
         # Ensure all sell orders are completed before proceeding
         for future in as_completed(futures):
