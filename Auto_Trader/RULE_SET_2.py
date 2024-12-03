@@ -66,7 +66,24 @@ def update_stop_loss_json(tradingsymbol, stop_loss):
         logger.error(f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}.")
     except Exception as e:
         logger.error(f"Error updating stop-loss in JSON: {str(e)}")
-        
+    
+def handle_sell(tradingsymbol):
+    """
+    Handles the cleanup for a sell event by removing the trading symbol
+    from the stop-loss JSON and then returning 'SELL'.
+    """
+    try:
+        # Load JSON data and remove the trading symbol
+        stop_loss_data = load_stop_loss_json()
+        if tradingsymbol in stop_loss_data:
+            del stop_loss_data[tradingsymbol]
+            with FileLock(LOCK_FILE_PATH).acquire(timeout=10):
+                with open(HOLDINGS_FILE_PATH, 'w') as json_file:
+                    json.dump(stop_loss_data, json_file, indent=4)
+        logger.info(f"Removed {tradingsymbol} from stop-loss JSON after selling.")
+    except Exception as e:
+        logger.error(f"Error while removing {tradingsymbol} from JSON: {str(e)}")
+    return "SELL"
 
 def buy_or_sell(df, row, holdings):
     """
@@ -116,7 +133,7 @@ def buy_or_sell(df, row, holdings):
 
         profit_percent = ((last_price - average_price) / average_price) * 100
         new_stop_loss = stop_loss
-
+        
         # 1. Handle Loss-Making Positions
         if last_price < average_price:
             # Set a looser initial stop-loss using ATR
@@ -128,7 +145,7 @@ def buy_or_sell(df, row, holdings):
                 new_stop_loss = max(new_stop_loss, last_price - (1.5 * last_atr))
             if last_rsi < 45:
                 logger.info(f"RSI below 45 for {tradingsymbol}. Exiting to prevent further losses.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
             if last_macd < last_macd_signal:
                 new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
             if talib.CDLENGULFING(df['Open'], df['High'], df['Low'], df['Close']).iloc[-1] != 0:
@@ -137,7 +154,7 @@ def buy_or_sell(df, row, holdings):
             # Check for Fibonacci support levels
             if last_price < fib_61_8:
                 logger.info(f"Price below 61.8% Fibonacci level for {tradingsymbol}. Exiting position.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
 
         # 2. Profit Percentage-Based Stop-Loss for Profitable Positions
         else:
@@ -149,6 +166,8 @@ def buy_or_sell(df, row, holdings):
                 new_stop_loss = max(last_price - (1.0 * last_atr), average_price * 1.07)
             elif profit_percent > 5:
                 new_stop_loss = max(last_price - (1.2 * last_atr), average_price * 1.05)
+            elif profit_percent > 0:
+                new_stop_loss = max(last_price - (1.5 * last_atr), average_price * 0.98)
 
             # 3. RSI-Based Adjustments for Profitable Positions
             if last_rsi > 75:
@@ -175,11 +194,15 @@ def buy_or_sell(df, row, holdings):
             # 6. Fibonacci Levels Confirmation
             if last_price < fib_38_2 and last_rsi < 50:
                 logger.info(f"Price below 38.2% Fibonacci level with RSI < 50 for {tradingsymbol}. Exiting position.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
             elif last_price < fib_61_8 and last_rsi < 45:
                 logger.info(f"Price below 61.8% Fibonacci level with RSI < 45 for {tradingsymbol}. Exiting position.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
 
+            # 6.5. Bollinger Bands Overextension Check
+            if last_price >= upper_band.iloc[-1] and last_rsi > 65:
+                new_stop_loss = max(new_stop_loss, last_price - (0.9 * last_atr))
+                
             # 7. Bollinger Bands Overextension Check
             if last_price >= upper_band.iloc[-1] and last_rsi > 70:
                 new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
@@ -187,10 +210,10 @@ def buy_or_sell(df, row, holdings):
             # 8. Moving Averages Confirmation (EMA 10 & EMA 50)
             if last_price < ema_10 and last_rsi < 55:
                 logger.info(f"Price below EMA 10 with RSI < 55 for {tradingsymbol}. Exiting position.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
             if last_price < ema_50 and relative_volume > 1.5:
                 logger.info(f"Price below EMA 50 with significant volume spike for {tradingsymbol}. Exiting position.")
-                return "SELL"
+                return handle_sell(tradingsymbol)
 
         # Save updated stop-loss if applicable
         if stop_loss is None or new_stop_loss > stop_loss:
@@ -199,9 +222,9 @@ def buy_or_sell(df, row, holdings):
         # Execute Sell if Stop-Loss is Hit
         if last_price <= new_stop_loss:
             logger.info(f"Stop-loss hit for {tradingsymbol}. Returning SELL.")
-            return "SELL"
+            return handle_sell(tradingsymbol)
         return "HOLD"
 
     except Exception as e:
-        logger.error(f"Error processing {row['instrument_token']}: {str(e)}")
+        logger.error(f"Error processing {row['instrument_token']}: Traceback: {traceback.format_exc()}")
         return "HOLD"
