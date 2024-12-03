@@ -26,6 +26,8 @@ def buy_or_sell(df, row, holdings):
         and (df['MACD_Hist'].iloc[-1] >= 5)  # MACD histogram is at least 5
         and (df['MACD_Hist'].iloc[-1] >= df['MACD_Hist'].shift(1).iloc[-1])  # MACD histogram is increasing
         and (df['Volume'].iloc[-1] > 1.5 * df['SMA_20_Volume'].iloc[-1])  # Volume is greater than 1.5x SMA_20 volume
+        and (df['MACD'].iloc[-1] >= 0)  # MACD is positive
+        and (df['MACD_Signal'].iloc[-1] >= 0)  # MACD is positive
         and macd_crossover_last_3_days  # Check if MACD crossover happened in the last 3 days
     ) and buy_close_condition:
         return "BUY"
