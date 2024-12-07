@@ -21,7 +21,7 @@ def buy_or_sell(df, row, holdings):
     if (
         (df['EMA10'].iloc[-1] > df['EMA20'].iloc[-1])  # EMA10 is above EMA20
         and (df['RSI'].iloc[-1] >= 60)  # RSI is at least 60
-        and (df['RSI'].iloc[-1] <= 66)  # RSI is no more than 66
+        and (df['RSI'].iloc[-1] <= 67)  # RSI is no more than 66
         and (df['RSI'].shift(1).iloc[-1] < df['RSI'].iloc[-1])  # RSI is increasing
         and (df['MACD_Hist'].iloc[-1] >= 5)  # MACD histogram is at least 5
         and (df['MACD_Hist'].iloc[-1] >= df['MACD_Hist'].shift(1).iloc[-1])  # MACD histogram is increasing
