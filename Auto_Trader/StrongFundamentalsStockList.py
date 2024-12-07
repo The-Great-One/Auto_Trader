@@ -53,10 +53,10 @@ def goodStocks():
         large_cap_stocks = filtered_list_df[
             (filtered_list_df['advancedRatios.mrktCapf'] > large_cap_threshold) &  # Market cap above large-cap threshold
             (filtered_list_df['advancedRatios.dbtEqt'] <= 1.5) &  # Debt-to-equity ratio <= 1.5
-            (filtered_list_df['advancedRatios.epsg'] >= 5) &  # Earnings per share growth >= 5
-            (filtered_list_df['advancedRatios.qIncTrevK'] >= 0) &  # Quarterly Revenue Growth >= 0
-            (filtered_list_df['advancedRatios.rvng'] >= 10) &  # 5-year revenue change >= 10%
-            (filtered_list_df['advancedRatios.aopm'] >= 12) &  # Average operating profit margin >= 12%
+            # (filtered_list_df['advancedRatios.epsg'] >= 5) &  # Earnings per share growth >= 5
+            # (filtered_list_df['advancedRatios.qIncTrevK'] >= 0) &  # Quarterly Revenue Growth >= 0
+            # (filtered_list_df['advancedRatios.rvng'] >= 10) &  # 5-year revenue change >= 10%
+            # (filtered_list_df['advancedRatios.aopm'] >= 12) &  # Average operating profit margin >= 12%
             (filtered_list_df['advancedRatios.5YrevChg'] >= 0) # 5 Year Revenue growth >= 0%
         ]
 
