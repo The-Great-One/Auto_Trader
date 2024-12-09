@@ -17,7 +17,7 @@ def monitor_market():
         message_queue.put("Market is open. Starting processes.")
 
         # Start the worker processes
-        p1 = Process(target=run_ticker, args=(create_master(), q))
+        p1 = Process(target=run_ticker, args=(create_master(message_queue), q))
         p2 = Process(target=Apply_Rules, args=(q, message_queue))
         p3 = Process(target=Updater)
         p4 = Process(target=telegram_main, args=(message_queue,))
