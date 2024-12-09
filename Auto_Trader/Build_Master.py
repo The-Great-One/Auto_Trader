@@ -9,7 +9,7 @@ import sys
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-def create_master():
+def create_master(message_queue):
     """
     Creates a master list of instruments with their respective tokens, downloads historical quotes,
     and saves the merged data to a CSV file.
@@ -87,6 +87,7 @@ def create_master():
 
         # Return the list of instrument tokens if available
         if merged_df["instrument_token"].to_list():
+            message_queue.put(f"Today's Stock Pool: {len(merged_df)}")
             return merged_df["instrument_token"].to_list()
         else:
             logger.error("Error: No instrument tokens found in the merged DataFrame.\n" + traceback.format_exc())
