@@ -252,7 +252,7 @@ def handle_decisions(message_queue, decisions):
                     logger.warning(f"Calculated quantity {quantity} for {symbol} is not positive. Skipping buy order.")
                     continue
 
-                futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "BUY", close_price))
+                futures.append(executor.submit(trigger, message_queue, symbol, exchange, quantity, "BUY", close_price, contributing_rules))
 
             except NetworkException as ne:
                 logger.error(f"Network error while retrieving funds: {ne}")
