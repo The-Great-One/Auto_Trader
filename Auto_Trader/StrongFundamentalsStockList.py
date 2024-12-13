@@ -66,9 +66,9 @@ def goodStocks():
             (filtered_list_df['advancedRatios.dbtEqt'] <= 2) &  # Debt-to-equity ratio <= 2
             (filtered_list_df['advancedRatios.qIncTrevK'] >= 0) &  # Quarterly Revenue Growth >= 0
             (filtered_list_df['advancedRatios.epsg'] >= 5) &  # EPS growth >= 5
-            (filtered_list_df['advancedRatios.aopm'] >= 10) &  # Operating profit margin >= 10%
-            (filtered_list_df['advancedRatios.rvng'] >= 12) & # Revenue growth >= 12%
-            (filtered_list_df['advancedRatios.5YrevChg'] >= 0) # 5 Year Revenue growth >= 0%
+            (filtered_list_df['advancedRatios.aopm'] >= 10) #&  # Operating profit margin >= 10%
+            # (filtered_list_df['advancedRatios.rvng'] >= 12) & # Revenue growth >= 12%
+            # (filtered_list_df['advancedRatios.5YrevChg'] >= 0) # 5 Year Revenue growth >= 0%
 
 
         ]
@@ -80,7 +80,7 @@ def goodStocks():
             (filtered_list_df['advancedRatios.qIncTrevK'] >= 0) &  # Quarterly Revenue Growth >= 0
             (filtered_list_df['advancedRatios.epsg'] >= 5) &  # EPS growth >= 5
             (filtered_list_df['advancedRatios.aopm'] >= 8) &  # Operating profit margin >= 8%
-            (filtered_list_df['advancedRatios.rvng'] >= 15) & # Revenue growth >= 15%
+            (filtered_list_df['advancedRatios.rvng'] >= 10) & # Revenue growth >= 15%
             (filtered_list_df['advancedRatios.5YrevChg'] >= 0)  # Revenue growth >= 0%
         ]
 
