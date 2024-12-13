@@ -1,7 +1,7 @@
 import glob
 import pandas as pd
 import traceback
-from .utils import fetch_instruments_list, get_instrument_token, fetch_holdings
+from .utils import fetch_instruments_list, get_instrument_token, fetch_holdings, cleanup_stop_loss_json
 from Auto_Trader import logging
 from .StrongFundamentalsStockList import goodStocks
 from .FetchPricesYfinance import download_historical_quotes
@@ -85,6 +85,9 @@ def create_master(message_queue):
             logger.error(f"Error merging data and saving CSV: {str(e)}\n{traceback.format_exc()}")
             sys.exit(1)
 
+        # Clean up all the SL Holdings
+        cleanup_stop_loss_json()
+        
         # Return the list of instrument tokens if available
         if merged_df["instrument_token"].to_list():
             message_queue.put(f"Today's Stock Pool: {len(merged_df)}")
