@@ -10,34 +10,25 @@ import talib
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-# Define the holdings file path and lock file path as constants
 HOLDINGS_FILE_PATH = 'intermediary_files/Holdings.json'
 LOCK_FILE_PATH = 'intermediary_files/Holdings.lock'
 
-def safe_float(value, default=None):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
 def load_stop_loss_json():
-    """
-    Load the stop-loss data from the JSON file. If the file is corrupted,
-    attempts to return an empty dictionary.
-    Ensures that all loaded values are floats.
-    """
     lock = FileLock(LOCK_FILE_PATH)
     try:
         with lock.acquire(timeout=10):
             if not os.path.exists(HOLDINGS_FILE_PATH):
                 return {}
-
             with open(HOLDINGS_FILE_PATH, 'r') as json_file:
                 try:
                     data = json.load(json_file)
-                    # Ensure all values are floats
-                    for k, v in data.items():
-                        data[k] = safe_float(v, default=None)
+                    # Ensure floats
+                    for k,v in data.items():
+                        try:
+                            data[k] = float(v)
+                        except (TypeError, ValueError):
+                            logger.warning(f"Non-numeric stop-loss value for {k}, setting to None.")
+                            data[k] = None
                     return data
                 except json.JSONDecodeError as e:
                     logger.error(f"JSONDecodeError: {e}. The JSON file may be corrupted.")
@@ -46,14 +37,10 @@ def load_stop_loss_json():
         logger.error(f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}.")
         return {}
     except Exception as e:
-        logger.error(f"Error loading stop-loss from JSON: {str(e)}")
+        logger.exception("Error loading stop-loss from JSON:")
         return {}
 
 def update_stop_loss_json(tradingsymbol, stop_loss):
-    """
-    Update the stop-loss for a specific trading symbol in the JSON file.
-    Rounds the stop-loss to 2 decimal places and ensures it's a float.
-    """
     lock = FileLock(LOCK_FILE_PATH)
     try:
         with lock.acquire(timeout=10):
@@ -66,29 +53,23 @@ def update_stop_loss_json(tradingsymbol, stop_loss):
                     except json.JSONDecodeError:
                         logger.error("Corrupted JSON file. Starting fresh.")
                         holdings_dict = {}
-
-            # Ensure floats and rounding
-            stop_loss = round(float(stop_loss), 2)
-
-            # Update the stop-loss for the trading symbol
+            try:
+                stop_loss = round(float(stop_loss), 2)
+            except (TypeError, ValueError):
+                logger.error(f"Invalid stop_loss value for {tradingsymbol}: {stop_loss}")
+                return
+            
             holdings_dict[tradingsymbol] = stop_loss
-
-            # Write the updated dictionary back to the JSON file
             with open(HOLDINGS_FILE_PATH, 'w') as json_file:
                 json.dump(holdings_dict, json_file, indent=4)
             logger.info(f"Updated stop-loss for {tradingsymbol} to {stop_loss:.2f} in JSON.")
     except Timeout:
         logger.error(f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}.")
     except Exception as e:
-        logger.error(f"Error updating stop-loss in JSON: {str(e)}")
+        logger.exception("Error updating stop-loss in JSON:")
 
 def handle_sell(tradingsymbol):
-    """
-    Handles the cleanup for a sell event by removing the trading symbol
-    from the stop-loss JSON and then returning 'SELL'.
-    """
     try:
-        # Load JSON data and remove the trading symbol
         stop_loss_data = load_stop_loss_json()
         if tradingsymbol in stop_loss_data:
             del stop_loss_data[tradingsymbol]
@@ -97,7 +78,7 @@ def handle_sell(tradingsymbol):
                     json.dump(stop_loss_data, json_file, indent=4)
         logger.info(f"Removed {tradingsymbol} from stop-loss JSON after selling.")
     except Exception as e:
-        logger.error(f"Error while removing {tradingsymbol} from JSON: {str(e)}")
+        logger.exception(f"Error while removing {tradingsymbol} from JSON:")
     return "SELL"
 
 def buy_or_sell(df, row, holdings):
@@ -106,58 +87,104 @@ def buy_or_sell(df, row, holdings):
     """
     try:
         instrument_token = row['instrument_token']
+    except KeyError as e:
+        logger.error("Row data does not contain 'instrument_token'. Returning HOLD.")
+        return "HOLD"
+    except Exception as e:
+        logger.exception("Unexpected error reading 'instrument_token' from row:")
+        return "HOLD"
+
+    try:
         holdings_symbol_data = holdings[holdings["instrument_token"] == instrument_token]
+    except Exception as e:
+        logger.exception("Error filtering holdings by instrument_token:")
+        return "HOLD"
 
-        if holdings_symbol_data.empty:
-            logger.info(f"No holdings data for instrument_token {instrument_token}. Returning HOLD.")
-            return "HOLD"
+    if holdings_symbol_data.empty:
+        logger.info(f"No holdings data for instrument_token {instrument_token}. Returning HOLD.")
+        return "HOLD"
 
+    try:
         tradingsymbol = holdings_symbol_data['tradingsymbol'].iloc[0]
         average_price = float(holdings_symbol_data['average_price'].iloc[0])
+    except (KeyError, IndexError, ValueError, TypeError) as e:
+        logger.exception("Error extracting tradingsymbol or average_price from holdings:")
+        return "HOLD"
 
+    try:
         last_row = df.iloc[-1]
         last_price = float(last_row['Close'])
+    except (IndexError, KeyError, TypeError, ValueError) as e:
+        logger.exception("Error extracting last price from df:")
+        return "HOLD"
 
-        # Load existing stop-loss
+    try:
         stop_loss_data = load_stop_loss_json()
         stop_loss = stop_loss_data.get(tradingsymbol, None)
         if stop_loss is not None:
-            stop_loss = safe_float(stop_loss, default=None)
+            stop_loss = float(stop_loss)
+    except Exception as e:
+        logger.exception("Error loading stop_loss from JSON:")
+        # Can't proceed safely if stop_loss is unknown. We'll just hold.
+        return "HOLD"
 
-        # Extract indicators safely, ensuring float
-        def safe_get(row, col, default=0.0):
-            val = row.get(col, default)
-            return safe_float(val, default)
+    # Safe fetching indicators
+    def safe_get(series, col, default=0.0):
+        try:
+            val = series.get(col, default)
+            return float(val)
+        except (TypeError, ValueError):
+            logger.warning(f"Invalid value for {col}. Using default {default}")
+            return default
 
+    try:
         last_atr = safe_get(last_row, "ATR")
         last_rsi = safe_get(last_row, "RSI")
         last_macd = safe_get(last_row, "MACD")
         last_macd_signal = safe_get(last_row, "MACD_Signal")
         macd_histogram = safe_get(last_row, "MACD_Hist")
         current_volume = safe_get(last_row, "Volume")
-        avg_volume_20 = df['Volume'].rolling(window=20).mean().iloc[-1] if len(df) >= 20 else current_volume
+
+        # Compute avg_volume_20 safely
+        if len(df) >= 20:
+            avg_volume_20 = df['Volume'].rolling(window=20).mean().iloc[-1]
+        else:
+            avg_volume_20 = current_volume
+
         relative_volume = current_volume / avg_volume_20 if avg_volume_20 != 0 else 1.0
 
         ema_10 = safe_get(last_row, "EMA10")
         ema_50 = safe_get(last_row, "EMA50")
         fib_38_2 = safe_get(last_row, "Fibonacci_38_2")
         fib_61_8 = safe_get(last_row, "Fibonacci_61_8")
+    except Exception as e:
+        logger.exception("Error extracting indicators from last_row:")
+        return "HOLD"
 
-        # Compute Bollinger Bands using TA-Lib
+    try:
+        # Compute Bollinger Bands
         upper_band, middle_band, lower_band = talib.BBANDS(
             df['Close'].astype(float), timeperiod=20, nbdevup=2, nbdevdn=2
         )
+    except Exception as e:
+        logger.exception("Error computing Bollinger Bands with TA-Lib:")
+        return "HOLD"
 
+    try:
         profit_percent = ((last_price - average_price) / average_price) * 100.0
-        new_stop_loss = stop_loss
+    except Exception as e:
+        logger.exception("Error calculating profit_percent:")
+        return "HOLD"
 
-        # Begin logic
+    new_stop_loss = stop_loss
+
+    try:
+        # Main logic
         if last_price < average_price:
             # Set initial stop-loss if None
             if new_stop_loss is None:
                 new_stop_loss = last_price - (2.0 * last_atr)
 
-            # Tighten stop-loss if indicators show weakening momentum
             if last_rsi < 50:
                 new_stop_loss = max(new_stop_loss, last_price - (1.5 * last_atr))
             if last_rsi < 45:
@@ -167,17 +194,13 @@ def buy_or_sell(df, row, holdings):
                 new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
             if talib.CDLENGULFING(df['Open'], df['High'], df['Low'], df['Close']).iloc[-1] != 0:
                 new_stop_loss = last_price - (1.0 * last_atr)
-
-            # Check for Fibonacci support levels
             if last_price < fib_61_8:
                 logger.info(f"Price below 61.8% Fibonacci level for {tradingsymbol}. Exiting position.")
                 return handle_sell(tradingsymbol)
-
         else:
             # Profit scenario
             if profit_percent > 20:
                 tmp_sl = max(last_price - (0.5 * last_atr), average_price * 1.15)
-                # Ensure stop-loss is not above last_price
                 new_stop_loss = tmp_sl
             elif profit_percent > 15:
                 tmp_sl = max(last_price - (0.8 * last_atr), average_price * 1.10)
@@ -203,7 +226,7 @@ def buy_or_sell(df, row, holdings):
             # MACD adjustments
             if last_macd < last_macd_signal:
                 new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
-            if len(df) > 1 and safe_float(df["MACD_Hist"].iloc[-2], 0) > macd_histogram:
+            if len(df) > 1 and float(df["MACD_Hist"].iloc[-2]) > macd_histogram:
                 new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
 
             # Chart patterns
@@ -235,16 +258,19 @@ def buy_or_sell(df, row, holdings):
             if last_price < ema_50 and relative_volume > 1.5:
                 logger.info(f"Price below EMA 50 with significant volume spike for {tradingsymbol}. Exiting position.")
                 return handle_sell(tradingsymbol)
+    except Exception as e:
+        logger.exception("Error applying trading logic:")
+        return "HOLD"
 
-        # Ensure new_stop_loss is valid float
+    try:
+        # Validate new_stop_loss
         if new_stop_loss is not None:
             new_stop_loss = float(new_stop_loss)
-            # Ensure trailing stop is not above current price (to avoid immediate unintended sell)
             if new_stop_loss > last_price:
-                logger.warning(f"New stop-loss ({new_stop_loss}) > last_price ({last_price}) for {tradingsymbol}. Adjusting.")
+                logger.warning(f"New stop-loss ({new_stop_loss}) > last_price ({last_price}) for {tradingsymbol}. Adjusting to last_price.")
                 new_stop_loss = last_price
 
-            # Update stop-loss if it improved (increased) from old stop-loss or old was None
+            # Update stop-loss if it improved
             if stop_loss is None or new_stop_loss > stop_loss:
                 update_stop_loss_json(tradingsymbol, new_stop_loss)
 
@@ -254,7 +280,6 @@ def buy_or_sell(df, row, holdings):
                 return handle_sell(tradingsymbol)
 
         return "HOLD"
-
     except Exception as e:
-        logger.error(f"Error processing {row['instrument_token']}: Traceback: {traceback.format_exc()}")
+        logger.exception("Error finalizing stop-loss and sell check:")
         return "HOLD"
