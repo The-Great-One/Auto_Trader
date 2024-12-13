@@ -1,6 +1,6 @@
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY
-from Auto_Trader.utils import read_session_data
+from Auto_Trader.utils import read_session_data, fetch_holdings
 from math import floor
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -179,9 +179,9 @@ def handle_decisions(message_queue, decisions):
     Returns:
         None
     """
-    holdings = kite.holdings()
-    if holdings:
-        holdings = pd.DataFrame(holdings).set_index("tradingsymbol")
+    holdings = fetch_holdings().set_index("tradingsymbol")
+    if not holdings.empty:
+        pass
     else:
         holdings = pd.DataFrame(columns=["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"])
     
@@ -207,8 +207,8 @@ def handle_decisions(message_queue, decisions):
             contributing_rules = decision["ContributingRules"]
             
             # Safely access the quantity for the symbol
-            quantity = holdings.loc[symbol]["quantity"] if symbol in holdings.index else 0
-            
+            quantity = holdings.loc[symbol, "quantity"] if symbol in holdings.index else 0
+
             if quantity == 0:
                 continue
 
