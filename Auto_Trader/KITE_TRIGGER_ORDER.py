@@ -229,6 +229,7 @@ def handle_decisions(message_queue, decisions):
             symbol = decision["Symbol"]
             exchange = decision["Exchange"]
             close_price = decision["Close"]
+            contributing_rules = decision["ContributingRules"]
 
             try:
                 # Fetch the fund allocation from an environment variable, with a default value of 20000
