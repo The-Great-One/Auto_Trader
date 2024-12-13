@@ -1,12 +1,19 @@
-from Auto_Trader import mcal, KiteConnect, json, datetime, pd, retry, ZoneInfo, timedelta, logging, sys, shutil, os, np, talib, traceback
-from Auto_Trader.my_secrets import API_KEY, API_SECRET
-from Auto_Trader.Request_Token import get_request_token
+import json
+import multiprocessing
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
-import multiprocessing
+
+from filelock import FileLock, Timeout
 
 # Import rule set modules
-from Auto_Trader import RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4, RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8
+from Auto_Trader import (RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4,
+                         RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8,
+                         KiteConnect, ZoneInfo, datetime, json, logging, mcal,
+                         np, os, pd, retry, shutil, sys, talib, timedelta,
+                         traceback)
+from Auto_Trader.my_secrets import API_KEY, API_SECRET
+from Auto_Trader.Request_Token import get_request_token
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -622,3 +629,77 @@ def load_instruments_data():
     except Exception as e:
         logger.error(f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}")
         sys.exit(1)  # Exit if we cannot load instruments data
+
+def cleanup_stop_loss_json(holdings = fetch_holdings()):
+    """
+    Cleans up the stop-loss JSON file by removing any entries that 
+    do not correspond to currently held tradingsymbols.
+    
+    Parameters:
+    holdings (pd.DataFrame): A DataFrame with a 'tradingsymbol' column
+                             representing currently held instruments.
+    """
+    
+    HOLDINGS_FILE_PATH = 'intermediary_files/Holdings.json'
+    LOCK_FILE_PATH = 'intermediary_files/Holdings.lock'
+
+    def safe_float(value, default=None):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    # Load current stop-loss data
+    lock = FileLock(LOCK_FILE_PATH)
+    stop_loss_data = {}
+    try:
+        with lock.acquire(timeout=10):
+            if os.path.exists(HOLDINGS_FILE_PATH):
+                with open(HOLDINGS_FILE_PATH, 'r') as json_file:
+                    try:
+                        data = json.load(json_file)
+                        # Ensure all values are floats
+                        for k, v in data.items():
+                            data[k] = safe_float(v, default=None)
+                        stop_loss_data = data
+                    except json.JSONDecodeError:
+                        # File corrupted, start fresh
+                        stop_loss_data = {}
+            else:
+                # No file exists yet, nothing to do
+                return
+    except Timeout:
+        # Could not acquire lock, log and return
+        logger.error(f"Timeout acquiring lock for {HOLDINGS_FILE_PATH}")
+        return
+    except Exception as e:
+        logger.error(f"Error loading stop-loss from JSON: {str(e)}")
+        return
+
+    # Verify holdings DataFrame has the required column
+    if 'tradingsymbol' not in holdings.columns:
+        logger.error("Holdings DataFrame does not have a 'tradingsymbol' column.")
+        return
+
+    current_symbols = set(holdings['tradingsymbol'].unique())
+    keys_to_remove = [symbol for symbol in stop_loss_data.keys() if symbol not in current_symbols]
+
+    if not keys_to_remove:
+        logger.info("No outdated stop-loss entries to remove. JSON is up-to-date.")
+        return
+
+    # Acquire lock again to write updated data
+    try:
+        with lock.acquire(timeout=10):
+            for key in keys_to_remove:
+                del stop_loss_data[key]
+
+            with open(HOLDINGS_FILE_PATH, 'w') as json_file:
+                json.dump(stop_loss_data, json_file, indent=4)
+            logger.info(f"Removed {len(keys_to_remove)} outdated stop-loss entries from JSON.")
+    except Timeout:
+        logger.error(f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}.")
+        return
+    except Exception as e:
+        logger.error(f"Error during cleanup of stop-loss JSON: {str(e)}")
+        return
