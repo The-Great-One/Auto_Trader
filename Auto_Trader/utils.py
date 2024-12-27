@@ -19,9 +19,7 @@ logger = logging.getLogger("Auto_Trade_Logger")
 
 # Default rule set values
 DEFAULT_RULE_SETS = {
-    'RULE_SET_1': RULE_SET_1,
     'RULE_SET_2': RULE_SET_2,
-    'RULE_SET_3': RULE_SET_3,
     'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
     'RULE_SET_6': RULE_SET_6,
