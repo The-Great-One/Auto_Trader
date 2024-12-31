@@ -7,7 +7,7 @@ from functools import lru_cache
 from filelock import FileLock, Timeout
 
 # Import rule set modules
-from Auto_Trader import (RULE_SET_1, RULE_SET_2, RULE_SET_3, RULE_SET_4,
+from Auto_Trader import (RULE_SET_2, RULE_SET_4,
                          RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8,
                          KiteConnect, ZoneInfo, datetime, json, logging, mcal,
                          np, os, pd, retry, shutil, sys, talib, timedelta,
