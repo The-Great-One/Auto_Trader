@@ -5,20 +5,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 
 from filelock import FileLock, Timeout
+from sqlalchemy import create_engine
 
 # Import rule set modules
-from Auto_Trader import (RULE_SET_2, RULE_SET_4,
-                         RULE_SET_5, RULE_SET_6, RULE_SET_7, RULE_SET_8,
-                         KiteConnect, ZoneInfo, datetime, json, logging, mcal,
-                         np, os, pd, retry, shutil, sys, talib, timedelta,
-                         traceback)
-from Auto_Trader.my_secrets import API_KEY, API_SECRET
+from Auto_Trader import (RULE_SET_1, RULE_SET_2, RULE_SET_4, RULE_SET_5, RULE_SET_6,
+                         RULE_SET_7, RULE_SET_8, KiteConnect, ZoneInfo,
+                         datetime, json, logging, mcal, np, os, pd, retry,
+                         shutil, sys, talib, timedelta, traceback)
+from Auto_Trader.my_secrets import API_KEY, API_SECRET, HOST, USER, DB_PASSWORD, DATABASE
 from Auto_Trader.Request_Token import get_request_token
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
 # Default rule set values
 DEFAULT_RULE_SETS = {
+    'RULE_SET_1': RULE_SET_1,
     'RULE_SET_2': RULE_SET_2,
     'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
@@ -235,6 +236,29 @@ def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr
         nbdevdn=2,
         matype=0
     )
+    
+    # Calculate 20-period moving average of volume
+    df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
+
+    # Calculate ADX using TA-Lib
+    adx = talib.ADX(df['High'], df['Low'], df['Close'], timeperiod=14)
+    df['ADX'] = adx
+    
+    # Calculate On-Balance Volume (OBV) using TA-Lib
+    obv = talib.OBV(df['Close'], df['Volume'])
+    df['OBV'] = obv
+    
+    # Calculate Stochastic Oscillator using TA-Lib
+    slowk, slowd = talib.STOCH(
+        df['High'], df['Low'], df['Close'],
+        fastk_period=14,
+        slowk_period=3,
+        slowk_matype=0,
+        slowd_period=3,
+        slowd_matype=0
+    )
+    df['Stochastic_%K'] = slowk
+    df['Stochastic_%D'] = slowd
     
     #Calculate Supertrend for Rule-8
     df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=3, sup_col_name="Supertrend_Rule_8_Exit", sup_dir_name="Supertrend_Direction_Rule_8_Exit")
@@ -701,3 +725,34 @@ def cleanup_stop_loss_json(holdings = fetch_holdings()):
     except Exception as e:
         logger.error(f"Error during cleanup of stop-loss JSON: {str(e)}")
         return
+
+@lru_cache(maxsize=None)
+def get_params_grid():
+    """
+    Connect to a MySQL database using SQLAlchemy, read the tables,
+    and convert the Trade_Params table into a nested dictionary.
+
+    Args:
+        host (str): Host address for the MySQL database.
+        user (str): Username for the MySQL database.
+        password (str): Password for the MySQL database.
+        database (str): Name of the database.
+
+    Returns:
+        dict: A nested dictionary with the ticker as the key and parameter key-value pairs as the value.
+    """
+    try:
+        # Create the SQLAlchemy engine
+        engine = create_engine(f"mysql+mysqlconnector://{USER}:{DB_PASSWORD}@{HOST}/{DATABASE}")
+        
+        # Query the Trade_Params table
+        query = "SELECT * FROM Trade_Params"
+        df_trade_params = pd.read_sql(query, engine)
+
+        # Convert the DataFrame to a nested dictionary
+        nested_dict = df_trade_params.set_index("ticker").T.to_dict()
+        return nested_dict
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return {}
