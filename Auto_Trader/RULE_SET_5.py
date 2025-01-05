@@ -47,18 +47,8 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Volume'] > df['SMA_20_Volume'].iloc[-1])  # Volume confirmation for strong trend
     )
 
-
-    # Sell signal conditions (tightened to lock in profits)
-    # sell_condition = (
-    #     (latest_data['MACD'] < latest_data['MACD_Signal']) or  # MACD bearish crossover
-    #     (latest_data['MACD_Hist'] < 0) or  # MACD histogram turning negative
-    #     (latest_data['Close'] < latest_data['EMA20_LOW'])  # Price falling below EMA20 Low
-    # )
-
     # Determine the action based on conditions
     if buy_condition and buy_close_condition and macd_crossover_last_3_days:
         return "BUY"
-    # elif sell_condition:
-    #     return "SELL"
     else:
         return "HOLD"
