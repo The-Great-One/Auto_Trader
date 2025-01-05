@@ -1,11 +1,7 @@
-import pandas as pd
-import numpy as np
 import logging
-import traceback
 from filelock import FileLock, Timeout
 import json
 import os
-from datetime import datetime
 import talib
 
 logger = logging.getLogger("Auto_Trade_Logger")
