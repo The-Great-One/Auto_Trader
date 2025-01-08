@@ -45,6 +45,9 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Close'] > latest_data['EMA50']) and
         (latest_data['Close'] > latest_data['EMA100']) and
         (latest_data['Close'] > latest_data['EMA200']) and
+        (latest_data['EMA20'] > latest_data['EMA50']) and
+        (latest_data['EMA50'] > latest_data['EMA100']) and
+        (latest_data['EMA100'] > latest_data['EMA200']) and
         (latest_data['Volume'] > df['SMA_20_Volume'].iloc[-1])  # Volume confirmation for strong trend
     )
 
