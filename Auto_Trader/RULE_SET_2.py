@@ -81,9 +81,12 @@ def buy_or_sell(df, row, holdings):
     """
     Comprehensive strategy for profit booking and stop-loss management.
     """
+    # ------------------------------
+    # 1. Preliminary validations
+    # ------------------------------
     try:
         instrument_token = row['instrument_token']
-    except KeyError as e:
+    except KeyError:
         logger.error("Row data does not contain 'instrument_token'. Returning HOLD.")
         return "HOLD"
     except Exception as e:
@@ -103,17 +106,20 @@ def buy_or_sell(df, row, holdings):
     try:
         tradingsymbol = holdings_symbol_data['tradingsymbol'].iloc[0]
         average_price = float(holdings_symbol_data['average_price'].iloc[0])
-    except (KeyError, IndexError, ValueError, TypeError) as e:
+    except (KeyError, IndexError, ValueError, TypeError):
         logger.exception("Error extracting tradingsymbol or average_price from holdings:")
         return "HOLD"
 
     try:
         last_row = df.iloc[-1]
         last_price = float(last_row['Close'])
-    except (IndexError, KeyError, TypeError, ValueError) as e:
+    except (IndexError, KeyError, TypeError, ValueError):
         logger.exception("Error extracting last price from df:")
         return "HOLD"
 
+    # -----------------------------------
+    # 2. Load stop_loss from JSON
+    # -----------------------------------
     try:
         stop_loss_data = load_stop_loss_json()
         stop_loss = stop_loss_data.get(tradingsymbol, None)
@@ -124,7 +130,18 @@ def buy_or_sell(df, row, holdings):
         # Can't proceed safely if stop_loss is unknown. We'll just hold.
         return "HOLD"
 
-    # Safe fetching indicators
+    # --------------------------------------------------------------------
+    # 2.1 Optional immediate SELL check if JSON stop-loss is above price
+    #     This ensures we don't silently HOLD when the stored SL is higher.
+    # --------------------------------------------------------------------
+    if stop_loss is not None and stop_loss >= last_price:
+        logger.warning(
+            f"[Immediate Check] JSON stop-loss ({stop_loss}) >= last_price ({last_price}) for {tradingsymbol}. "
+            "Triggering sell..."
+        )
+        return handle_sell(tradingsymbol)
+
+    # Safe getter for indicators
     def safe_get(series, col, default=0.0):
         try:
             val = series.get(col, default)
@@ -133,6 +150,9 @@ def buy_or_sell(df, row, holdings):
             logger.warning(f"Invalid value for {col}. Using default {default}")
             return default
 
+    # -----------------------------------------
+    # 3. Gather indicators for main logic
+    # -----------------------------------------
     try:
         last_atr = safe_get(last_row, "ATR")
         last_rsi = safe_get(last_row, "RSI")
@@ -172,13 +192,16 @@ def buy_or_sell(df, row, holdings):
         logger.exception("Error calculating profit_percent:")
         return "HOLD"
 
-    new_stop_loss = stop_loss
+    new_stop_loss = stop_loss  # Start with what's in the JSON (could be None).
 
+    # -----------------------------------------
+    # 4. Main logic for stop-loss adjustments
+    # -----------------------------------------
     try:
-        # Main logic
         if last_price < average_price:
-            # Set initial stop-loss if None
+            # Loss scenario
             if new_stop_loss is None:
+                # Set an initial stop-loss if none is set
                 new_stop_loss = last_price - (2.0 * last_atr)
 
             if last_rsi < 50:
@@ -188,28 +211,33 @@ def buy_or_sell(df, row, holdings):
                 return handle_sell(tradingsymbol)
             if last_macd < last_macd_signal:
                 new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
+
+            # Engulfing (candlestick) check
             if talib.CDLENGULFING(df['Open'], df['High'], df['Low'], df['Close']).iloc[-1] != 0:
                 new_stop_loss = last_price - (1.0 * last_atr)
+
+            # Fibonacci check
             if last_price < fib_61_8:
                 logger.info(f"Price below 61.8% Fibonacci level for {tradingsymbol}. Exiting position.")
                 return handle_sell(tradingsymbol)
+
         else:
             # Profit scenario
             if profit_percent > 20:
                 tmp_sl = max(last_price - (0.5 * last_atr), average_price * 1.15)
-                new_stop_loss = tmp_sl
+                new_stop_loss = tmp_sl if new_stop_loss is None else max(new_stop_loss, tmp_sl)
             elif profit_percent > 15:
                 tmp_sl = max(last_price - (0.8 * last_atr), average_price * 1.10)
-                new_stop_loss = tmp_sl
+                new_stop_loss = tmp_sl if new_stop_loss is None else max(new_stop_loss, tmp_sl)
             elif profit_percent > 10:
                 tmp_sl = max(last_price - (1.0 * last_atr), average_price * 1.07)
-                new_stop_loss = tmp_sl
+                new_stop_loss = tmp_sl if new_stop_loss is None else max(new_stop_loss, tmp_sl)
             elif profit_percent > 5:
                 tmp_sl = max(last_price - (1.2 * last_atr), average_price * 1.05)
-                new_stop_loss = tmp_sl
+                new_stop_loss = tmp_sl if new_stop_loss is None else max(new_stop_loss, tmp_sl)
             elif profit_percent > 0:
                 tmp_sl = max(last_price - (1.5 * last_atr), average_price * 0.98)
-                new_stop_loss = tmp_sl
+                new_stop_loss = tmp_sl if new_stop_loss is None else max(new_stop_loss, tmp_sl)
 
             # RSI adjustments
             if last_rsi > 75:
@@ -225,7 +253,7 @@ def buy_or_sell(df, row, holdings):
             if len(df) > 1 and float(df["MACD_Hist"].iloc[-2]) > macd_histogram:
                 new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
 
-            # Chart patterns
+            # Candlestick patterns
             if talib.CDLENGULFING(df['Open'], df['High'], df['Low'], df['Close']).iloc[-1] != 0:
                 new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
             if talib.CDLSHOOTINGSTAR(df['Open'], df['High'], df['Low'], df['Close']).iloc[-1] != 0:
@@ -254,28 +282,43 @@ def buy_or_sell(df, row, holdings):
             if last_price < ema_50 and relative_volume > 1.5:
                 logger.info(f"Price below EMA 50 with significant volume spike for {tradingsymbol}. Exiting position.")
                 return handle_sell(tradingsymbol)
+
     except Exception as e:
         logger.exception("Error applying trading logic:")
         return "HOLD"
 
+    # -------------------------------------------
+    # 5. Final stop-loss check + JSON update
+    # -------------------------------------------
     try:
-        # Validate new_stop_loss
+        logger.debug(
+            f"[Pre-Final-Check] {tradingsymbol}: old_stop_loss={stop_loss}, "
+            f"new_stop_loss={new_stop_loss}, last_price={last_price}"
+        )
+
         if new_stop_loss is not None:
             new_stop_loss = float(new_stop_loss)
+
+            # If new_stop_loss is above last_price, clamp it
             if new_stop_loss > last_price:
-                logger.warning(f"New stop-loss ({new_stop_loss}) > last_price ({last_price}) for {tradingsymbol}. Adjusting to last_price.")
+                logger.warning(
+                    f"New stop-loss ({new_stop_loss}) > last_price ({last_price}) for {tradingsymbol}. "
+                    "Clamping to last_price => immediate SELL."
+                )
                 new_stop_loss = last_price
 
-            # Update stop-loss if it improved
+            # Update the JSON only if we are raising the stop-loss (or it was None)
             if stop_loss is None or new_stop_loss > stop_loss:
                 update_stop_loss_json(tradingsymbol, new_stop_loss)
 
-            # Final check for stop-loss hit
+            # Final check: if price is at or below new_stop_loss, SELL
             if last_price <= new_stop_loss:
-                logger.info(f"Stop-loss hit for {tradingsymbol}. Returning SELL.")
+                logger.info(f"Stop-loss hit (or clamped) for {tradingsymbol} => SELL.")
                 return handle_sell(tradingsymbol)
 
+        logger.debug(f"[Final] {tradingsymbol} => HOLD. SL={new_stop_loss}, last_price={last_price}")
         return "HOLD"
+
     except Exception as e:
         logger.exception("Error finalizing stop-loss and sell check:")
         return "HOLD"
