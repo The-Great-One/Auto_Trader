@@ -42,7 +42,7 @@ def goodStocks():
                 "qIncEbiK", # Last Quarter EBITDA
             ],
             sortby='mrktCapf',  # Sorting by market capitalization
-            number_of_records=10000  # Increased number to fetch more records
+            number_of_records=1500  # Increased number to fetch more records
         )
 
         # Define market cap thresholds for categorizing stocks into large-cap, mid-cap, and small-cap categories.
@@ -86,7 +86,7 @@ def goodStocks():
 
 
         # Combine the results for all bins
-        filtered_list_df = pd.concat([large_cap_stocks, mid_cap_stocks_final, small_cap_stocks_final]).drop_duplicates()
+        # filtered_list_df = pd.concat([large_cap_stocks, mid_cap_stocks_final, small_cap_stocks_final]).drop_duplicates()
 
         
         # Select specific columns by name: 'info.ticker' (renamed to 'Symbol') and 'sid'
