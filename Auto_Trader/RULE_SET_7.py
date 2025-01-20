@@ -24,6 +24,14 @@ def buy_or_sell(df, row, holdings):
         (df['Close'].iloc[-1] <= df['SMA_10_Close'].iloc[-1] * 1.08)
     )
     
+    buy_EMA_condition = ((df['Close'].iloc[-1] > df['EMA20'].iloc[-1]) and
+        (df['Close'].iloc[-1] > df['EMA50'].iloc[-1]) and
+        (df['Close'].iloc[-1] > df['EMA100'].iloc[-1]) and
+        (df['Close'].iloc[-1] > df['EMA200'].iloc[-1]) and
+        (df['EMA20'].iloc[-1] > df['EMA50'].iloc[-1]) and
+        (df['EMA50'].iloc[-1] > df['EMA100'].iloc[-1]) and
+        (df['EMA100'].iloc[-1] > df['EMA200'].iloc[-1]))
+    
     # Define a MACD crossover in the last 3 days
     macd_crossover_last_3_days = (
         ((df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)))  # MACD crosses above MACD_Signal
@@ -38,7 +46,7 @@ def buy_or_sell(df, row, holdings):
         and (df["MACD_Hist"].iloc[-1] > 0)
         and (df["MACD_Hist"].iloc[-1] > df["MACD_Hist"].shift(1).iloc[-1])  # Ensure MACD Histogram is increasing
         and (df['Volume'] > (1.5 * df['SMA_20_Volume'])).iloc[-1]  # Stronger volume confirmation
-    ) and buy_close_condition and macd_crossover_last_3_days:
+    ) and buy_close_condition and macd_crossover_last_3_days and buy_EMA_condition:
         return "BUY"  # Buy Signal
 
     # Sell signal conditions
