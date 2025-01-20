@@ -29,14 +29,11 @@ def buy_or_sell(df, row, holdings):
     
     # Define a MACD crossover in the last 3 days
     macd_crossover_last_3_days = (
-        ((df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) < df['MACD_Signal'].shift(1)))  # MACD crosses above Signal
-        .tail(3)  # Look at the last 3 days
-        .any()  # Check if crossover happened on any of the last 3 days
-    )
+        (df['MACD_Hist'] > 0) & (df['MACD_Hist'].shift(1) <= 0)
+    ).iloc[-3:].any()
 
     # Buy signal conditions (tightened to improve win rate)
     buy_condition = (
-        (latest_data['MACD_Hist'] > 0) and
         (latest_data['MACD'] > 0) and
         (latest_data['RSI'] >= 60) and  # Reduced RSI threshold for earlier entry
         (latest_data['RSI'] <= 70) and  # Avoid overbought conditions
