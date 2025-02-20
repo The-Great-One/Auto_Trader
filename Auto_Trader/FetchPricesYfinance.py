@@ -54,10 +54,12 @@ def download_ticker_data(ticker, fetched_data_manager):
 
     try:
         data = yf.download(ticker_ns, threads=20, progress=False, period="max")
+        data.columns = data.columns.droplevel(1)
 
         if data.empty:
             data = yf.download(ticker_bs, threads=20, progress=False, period="max")
-
+            data.columns = data.columns.droplevel(1)
+            
         if data.empty:
             data = stocks.get_data(stock_symbol=ticker, start_date=str(datetime.now().date() - relativedelta(months=3)), end_date=str(datetime.now().date()))
 
