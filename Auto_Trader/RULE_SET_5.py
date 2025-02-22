@@ -27,10 +27,10 @@ def buy_or_sell(df, row, holdings):
         (latest_data['Close'] <= latest_data['SMA_10_Close'] * 1.08)
     )
     
-    # Define a MACD crossover in the last 3 days
+    # Define a MACD crossover in the last 5 days
     macd_crossover_last_3_days = (
         (df['MACD_Hist'] > 0) & (df['MACD_Hist'].shift(1) <= 0)
-    ).iloc[-3:].any()
+    ).iloc[-5:].any()
 
     # Buy signal conditions (tightened to improve win rate)
     buy_condition = (
