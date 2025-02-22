@@ -32,11 +32,11 @@ def buy_or_sell(df, row, holdings):
         (df['EMA50'].iloc[-1] > df['EMA100'].iloc[-1]) and
         (df['EMA100'].iloc[-1] > df['EMA200'].iloc[-1]))
     
-    # Define a MACD crossover in the last 3 days
+    # Define a MACD crossover in the last 5 days
     macd_crossover_last_3_days = (
         ((df['MACD'] > df['MACD_Signal']) & (df['MACD'].shift(1) <= df['MACD_Signal'].shift(1)))  # MACD crosses above MACD_Signal
-        .tail(3)  # Look at the last 3 days
-        .any()  # Check if crossover happened on any of the last 3 days
+        .tail(5)  # Look at the last 5 days
+        .any()  # Check if crossover happened on any of the last 5 days
     )
     
     # Buy signal conditions
