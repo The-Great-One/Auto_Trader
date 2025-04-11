@@ -270,12 +270,12 @@ def buy_or_sell(df, row, holdings):
                 return handle_sell(tradingsymbol)
 
             # Bollinger Bands checks
-            if last_price >= upper_band.iloc[-1] and last_rsi > 65:
-                new_stop_loss = max(new_stop_loss, last_price - (0.9 * last_atr))
-            if last_price >= upper_band.iloc[-1] and last_rsi > 70:
-                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
             if last_price >= upper_band.iloc[-1] and last_rsi > 60:
-                new_stop_loss = max(new_stop_loss, last_price - (1 * last_atr))
+                new_stop_loss = max(new_stop_loss, last_price - (0.9 * last_atr))
+            if last_price >= upper_band.iloc[-1] and last_rsi > 65:
+                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
+            if last_price >= upper_band.iloc[-1] and last_rsi > 70:
+                new_stop_loss = max(new_stop_loss, last_price - (0.7 * last_atr))
 
             # EMA checks
             if last_price < ema_10 and last_rsi < 55:

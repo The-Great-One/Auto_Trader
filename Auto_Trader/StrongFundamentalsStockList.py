@@ -42,7 +42,7 @@ def goodStocks():
                 "qIncEbiK", # Last Quarter EBITDA
             ],
             sortby='mrktCapf',  # Sorting by market capitalization
-            number_of_records=2000  # Increased number to fetch more records
+            number_of_records=2300  # Increased number to fetch more records
         )
 
         # Define market cap thresholds for categorizing stocks into large-cap, mid-cap, and small-cap categories.
