@@ -31,7 +31,6 @@ def buy_or_sell(df, row, holdings):
     trend_strong = (
         (df["EMA20"].iloc[-1] > df["EMA50"].iloc[-1]) and
         (df["EMA50"].iloc[-1] > df["EMA100"].iloc[-1]) and
-        (df["EMA100"].iloc[-1] > df["EMA200"].iloc[-1]) and
         (df["Close"].iloc[-1] > df["EMA20"].iloc[-1])  # Price above short-term EMA
     )
 
