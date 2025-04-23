@@ -51,6 +51,7 @@ def buy_or_sell(df, row, holdings):
     # ---------------------------
     rsi_strong = (
         (df["RSI"].iloc[-1] > 60) and
+        (df["RSI"].iloc[-1] < 70) and
         ((df["RSI"].iloc[-1] - df["RSI"].shift(1).iloc[-1]) > 2)  # RSI is rising, not flat
     )
     rsi_recent_cross = (
