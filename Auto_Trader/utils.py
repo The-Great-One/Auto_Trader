@@ -4,28 +4,28 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 
+import numpy as np
+import pandas as pd
+import talib
 from filelock import FileLock, Timeout
 from sqlalchemy import create_engine
 
 # Import rule set modules
-from Auto_Trader import (RULE_SET_1, RULE_SET_2, RULE_SET_4, RULE_SET_5, RULE_SET_6,
-                         RULE_SET_7, RULE_SET_8, KiteConnect, ZoneInfo,
-                         datetime, json, logging, mcal, np, os, pd, retry,
-                         shutil, sys, talib, timedelta, traceback)
-from Auto_Trader.my_secrets import API_KEY, API_SECRET, HOST, USER, DB_PASSWORD, DATABASE
+from Auto_Trader import (RULE_SET_2, RULE_SET_5,
+                         RULE_SET_7, KiteConnect,
+                         ZoneInfo, datetime, json, logging, mcal, np, os, pd,
+                         retry, shutil, sys, talib, timedelta, traceback)
+from Auto_Trader.my_secrets import (API_KEY, API_SECRET, DATABASE, DB_PASSWORD,
+                                    HOST, USER)
 from Auto_Trader.Request_Token import get_request_token
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
 # Default rule set values
 DEFAULT_RULE_SETS = {
-    'RULE_SET_1': RULE_SET_1,
     'RULE_SET_2': RULE_SET_2,
-    'RULE_SET_4': RULE_SET_4,
     'RULE_SET_5': RULE_SET_5,
-    'RULE_SET_6': RULE_SET_6,
     'RULE_SET_7': RULE_SET_7,
-    'RULE_SET_8': RULE_SET_8,
     # Add more default rule sets as needed
 }
 
@@ -124,206 +124,190 @@ def initialize_kite():
         build_access_token()
         return initialize_kite()
 
-def calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2, sup_col_name="Supertrend", sup_dir_name="Supertrend_Direction"):
+def compute_supertrend(
+    df: pd.DataFrame,
+    atr: np.ndarray,
+    *,
+    multiplier: float = 2.0,
+    sup_col: str = "Supertrend",
+    sup_dir: str = "Supertrend_Direction",
+) -> None:
     """
-    Vectorized Supertrend calculation using TA-Lib for ATR.
-
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        The DataFrame containing historical stock data with 'High', 'Low', and 'Close' columns.
-    atr : pd.Series
-        The Average True Range values already calculated.
-    period : int
-        The look-back period for calculating the ATR (default is 10).
-    multiplier : float
-        The multiplier for the ATR to create the Supertrend bands (default is 2).
-
-    Returns:
-    --------
-    pd.DataFrame
-        The DataFrame with additional columns for Supertrend values and direction.
+    Vectorized Supertrend: appends `sup_col` & `sup_dir` in-place.
     """
-    hl2 = (df['High'] + df['Low']) / 2
-    upper_band = hl2 + (multiplier * atr)
-    lower_band = hl2 - (multiplier * atr)
+    hl2 = (df["High"].values + df["Low"].values) * 0.5
+    up = hl2 + multiplier * atr
+    dn = hl2 - multiplier * atr
 
-    # Vectorized calculation of Supertrend
-    supertrend = np.where(df['Close'] > upper_band.shift(1), lower_band,
-                          np.where(df['Close'] < lower_band.shift(1), upper_band, np.nan))
+    up_shift = np.roll(up, 1)
+    dn_shift = np.roll(dn, 1)
+    up_shift[0] = dn_shift[0] = np.nan
 
-    # Forward fill to maintain trend direction
-    supertrend = pd.Series(supertrend).fillna(method='ffill').values
+    raw = np.where(
+        df["Close"].values > up_shift,
+        dn,
+        np.where(df["Close"].values < dn_shift, up, np.nan),
+    )
+    st = pd.Series(raw, index=df.index, dtype="float64").ffill().values
+    direction = df["Close"].values > st
 
-    # Determine the trend direction
-    direction = np.where(df['Close'] > supertrend, True, False)
+    df[sup_col] = st
+    df[sup_dir] = direction
 
-    # Assigning new columns
-    df[sup_col_name] = supertrend
-    df[sup_dir_name] = direction
 
-    return df
-
-def calculate_fibonacci_levels(df):
+def compute_fibonacci(
+    high: pd.Series,
+    low: pd.Series,
+) -> dict[str, float]:
     """
-    Calculate Fibonacci retracement levels based on the most recent high and low in the DataFrame.
-
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        The DataFrame containing historical stock data with 'High' and 'Low' columns.
-
-    Returns:
-    --------
-    dict
-        A dictionary containing Fibonacci retracement levels.
+    Classic Fibonacci retracement.
     """
-    recent_high = df['High'].max()
-    recent_low = df['Low'].min()
-
-    fib_levels = {
-        '0%': recent_low,
-        '23.6%': recent_high - 0.236 * (recent_high - recent_low),
-        '38.2%': recent_high - 0.382 * (recent_high - recent_low),
-        '50%': recent_high - 0.5 * (recent_high - recent_low),
-        '61.8%': recent_high - 0.618 * (recent_high - recent_low),
-        '100%': recent_high
+    top, bot = float(high.max()), float(low.min())
+    span = top - bot
+    return {
+        "Fibonacci_0": bot,
+        "Fibonacci_23_6": top - 0.236 * span,
+        "Fibonacci_38_2": top - 0.382 * span,
+        "Fibonacci_50": top - 0.5 * span,
+        "Fibonacci_61_8": top - 0.618 * span,
+        "Fibonacci_100": top,
     }
 
-    return fib_levels
 
-def Indicators(df, rsi_period=14, macd_fast=12, macd_slow=26, macd_signal=9, atr_period=14):
+def Indicators(
+    df: pd.DataFrame,
+    *,
+    rsi_period: int = 14,
+    macd_fast: int = 12,
+    macd_slow: int = 26,
+    macd_signal: int = 9,
+    atr_period: int = 14,
+) -> pd.DataFrame:
     """
-        Calculate key financial indicators using TA-Lib for a DataFrame of stock prices, optimized for performance.
+    Append core + advanced indicators to `df` using uppercase column names.
 
-        Args:
-            df (pd.DataFrame): DataFrame containing stock data with 'Close', 'High', 'Low', and 'Volume' columns.
-            rsi_period (int): Time period for RSI calculation.
-            macd_fast (int): Fast period for MACD calculation.
-            macd_slow (int): Slow period for MACD calculation.
-            macd_signal (int): Signal period for MACD calculation.
-            atr_period (int): Time period for ATR calculation.
+    Usage:
+        df = Indicators(df)
+    """
+    # Required fields
+    required = {"High", "Low", "Close", "Volume"}
+    if not required.issubset(df.columns):
+        raise KeyError(f"DataFrame missing: {', '.join(required - set(df.columns))}")
 
-        Returns:
-            pd.DataFrame: DataFrame with additional indicator columns.
-        """
-    if "Close" not in df.columns or "Volume" not in df.columns:
-        raise KeyError("The DataFrame does not have the required columns: 'Close' or 'Volume'.")
-
-    # Calculate RSI
-    rsi = talib.RSI(df["Close"], timeperiod=rsi_period)
-
-    # Calculate MACD
-    macd, macd_signal, macd_hist = talib.MACD(df["Close"], fastperiod=macd_fast, slowperiod=macd_slow, signalperiod=macd_signal)
-
-    # Calculate MACD for rule 8 (fastperiod=23, slowperiod=9, signalperiod=9)
-    macd_rule_8, macd_rule_8_signal, macd_rule_8_hist = talib.MACD(df["Close"], fastperiod=23, slowperiod=9, signalperiod=9)
-
-    # Calculate EMAs for different periods
-    ema_values = {f"EMA{period}": talib.EMA(df["Close"], timeperiod=period) for period in [5, 9, 10, 13, 20, 21, 50, 100, 200, 12, 26]}
-    ema20_low = talib.EMA(df["Low"], timeperiod=20)  # EMA based on the Low prices
-
-    # Calculate ATR
-    atr = talib.ATR(df['High'], df['Low'], df['Close'], timeperiod=atr_period)
-
-    # Calculate Supertrend using the optimized function
-    df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=2)
-    
-    df['UpperBand'], df['MiddleBand'], df['LowerBand'] = talib.BBANDS(
-        df["Close"],
-        timeperiod=20,
-        nbdevup=2,
-        nbdevdn=2,
-        matype=0
-    )
-    
-    # Calculate 20-period moving average of volume
-    df['Volume_MA20'] = df['Volume'].rolling(window=20).mean()
-
-    # Calculate ADX using TA-Lib
-    adx = talib.ADX(df['High'], df['Low'], df['Close'], timeperiod=14)
-    df['ADX'] = adx
-    
-    # Calculate On-Balance Volume (OBV) using TA-Lib
-    obv = talib.OBV(df['Close'], df['Volume'])
-    df['OBV'] = obv
-    
-    # Calculate Stochastic Oscillator using TA-Lib
-    slowk, slowd = talib.STOCH(
-        df['High'], df['Low'], df['Close'],
-        fastk_period=14,
-        slowk_period=3,
-        slowk_matype=0,
-        slowd_period=3,
-        slowd_matype=0
-    )
-    df['Stochastic_%K'] = slowk
-    df['Stochastic_%D'] = slowd
-    
-    #Calculate Supertrend for Rule-8
-    df = calculate_supertrend_talib_optimized(df, atr, period=10, multiplier=3, sup_col_name="Supertrend_Rule_8_Exit", sup_dir_name="Supertrend_Direction_Rule_8_Exit")
-
-    # Calculate SMAs
-    sma_10_close = df['Close'].rolling(window=10).mean()
-    sma_20_close = df['Close'].rolling(window=20).mean()
-    sma_20_low = df['Low'].rolling(window=20).mean()
-    sma_200_close = df['Close'].rolling(window=200).mean()
-    sma_20_high = df['High'].rolling(window=20).mean()
-    sma_20_volume =df['Volume'].rolling(window=20).mean()
-    sma_200_volume = df['Volume'].rolling(window=200).mean()
-
-    # Weekly SMAs
-    weekly_sma_20 = talib.SMA(df['Close'], timeperiod=20 * 5)
-    weekly_sma_200 = talib.SMA(df['Close'], timeperiod=200 * 5)
-
-    # Shifting Weekly SMA for the last 4 weeks
-    weekly_sma_200_1w = weekly_sma_200.shift(5)
-    weekly_sma_200_2w = weekly_sma_200.shift(10)
-    weekly_sma_200_3w = weekly_sma_200.shift(15)
-    weekly_sma_200_4w = weekly_sma_200.shift(20)
-
-    # Volume confirmation
-    volume_confirmed = df['Volume'] > (1.2 * sma_20_volume)
-    
-    # Calculate Fibonacci levels based on the most recent high and low
-    fibonacci_levels = calculate_fibonacci_levels(df)
-
-    # Assign calculated indicators to the DataFrame using .assign()
-    df = df.assign(
-        RSI=rsi,
-        MACD=macd,
-        MACD_Signal=macd_signal,
-        MACD_Hist=macd_hist,
-        ATR=atr,
-        SMA_10_Close=sma_10_close,
-        SMA_20_Low=sma_20_low,
-        SMA_20_Close=sma_20_close,
-        SMA_200_Close=sma_200_close,
-        SMA_20_High=sma_20_high,
-        SMA_20_Volume=sma_20_volume,
-        SMA_200_Volume=sma_200_volume,
-        Weekly_SMA_20=weekly_sma_20,
-        Weekly_SMA_200=weekly_sma_200,
-        Weekly_SMA_200_1w=weekly_sma_200_1w,
-        Weekly_SMA_200_2w=weekly_sma_200_2w,
-        Weekly_SMA_200_3w=weekly_sma_200_3w,
-        Weekly_SMA_200_4w=weekly_sma_200_4w,
-        EMA20_LOW=ema20_low,
-        VolumeConfirmed=volume_confirmed,
-        **ema_values,  # Spread the EMA dictionary to add each EMA column
-        MACD_Rule_8=macd_rule_8,
-        MACD_Rule_8_Signal=macd_rule_8_signal,
-        MACD_Rule_8_Hist=macd_rule_8_hist,
-        Fibonacci_0=fibonacci_levels['0%'],
-        Fibonacci_23_6=fibonacci_levels['23.6%'],
-        Fibonacci_38_2=fibonacci_levels['38.2%'],
-        Fibonacci_50=fibonacci_levels['50%'],
-        Fibonacci_61_8=fibonacci_levels['61.8%'],
-        Fibonacci_100=fibonacci_levels['100%']
+    # Coerce numeric dtypes once
+    df[["High","Low","Close","Volume"]] = (
+        df[["High","Low","Close","Volume"]]
+        .apply(pd.to_numeric, errors="coerce").astype("float64")
     )
 
-    # Return the DataFrame with the relevant columns
+    high = df["High"].values
+    low = df["Low"].values
+    close = df["Close"].values
+    vol = df["Volume"].values
+
+    # TA‑Lib outputs
+    RSI = talib.RSI(close, timeperiod=rsi_period)
+    MACD, MACD_Signal, MACD_Hist = talib.MACD(
+        close, fastperiod=macd_fast, slowperiod=macd_slow, signalperiod=macd_signal
+    )
+    MACD_Rule_8, MACD_Rule_8_Signal, MACD_Rule_8_Hist = talib.MACD(
+        close, fastperiod=23, slowperiod=9, signalperiod=9
+    )
+    EMA_periods = (5,9,10,12,13,20,21,26,50,100,200)
+    EMA_values = {f"EMA{p}": talib.EMA(close, timeperiod=p) for p in EMA_periods}
+    ATR = talib.ATR(high, low, close, timeperiod=atr_period)
+    UpperBand, MiddleBand, LowerBand = talib.BBANDS(
+        close, timeperiod=20, nbdevup=2, nbdevdn=2
+    )
+    ADX = talib.ADX(high, low, close, timeperiod=14)
+    OBV = talib.OBV(close, vol)
+    Stochastic_K, Stochastic_D = talib.STOCH(
+        high, low, close,
+        fastk_period=14, slowk_period=3, slowk_matype=0,
+        slowd_period=3, slowd_matype=0
+    )
+
+    # Rolling SMAs & Volume MA20
+    SMA_10_Close = df["Close"].rolling(10).mean()
+    SMA_20_Close = df["Close"].rolling(20).mean()
+    SMA_20_Low   = df["Low"].rolling(20).mean()
+    SMA_20_High  = df["High"].rolling(20).mean()
+    SMA_200_Close= df["Close"].rolling(200).mean()
+    SMA_20_Volume= df["Volume"].rolling(20).mean()
+    SMA_200_Volume= df["Volume"].rolling(200).mean()
+
+    Weekly_SMA_20 = talib.SMA(close, timeperiod=100)  # 20*5
+    Weekly_SMA_200= talib.SMA(close, timeperiod=1000) # 200*5
+    ws = pd.Series(Weekly_SMA_200, index=df.index)
+    Weekly_SMA_200_1w = ws.shift(5)
+    Weekly_SMA_200_2w = ws.shift(10)
+    Weekly_SMA_200_3w = ws.shift(15)
+    Weekly_SMA_200_4w = ws.shift(20)
+
+    Volume_MA20 = SMA_20_Volume
+    VolumeConfirmed = vol > (1.2 * SMA_20_Volume.values)
+
+    # Fibonacci static levels
+    fib = compute_fibonacci(df["High"], df["Low"])
+
+    # Collect into single dict for assign
+    assign_kwargs = {
+        # momentum
+        "RSI": RSI,
+        "MACD": MACD,
+        "MACD_Signal": MACD_Signal,
+        "MACD_Hist": MACD_Hist,
+        "MACD_Rule_8": MACD_Rule_8,
+        "MACD_Rule_8_Signal": MACD_Rule_8_Signal,
+        "MACD_Rule_8_Hist": MACD_Rule_8_Hist,
+        # volatility
+        "ATR": ATR,
+        "UpperBand": UpperBand,
+        "MiddleBand": MiddleBand,
+        "LowerBand": LowerBand,
+        "ADX": ADX,
+        # volume
+        "OBV": OBV,
+        "Volume_MA20": Volume_MA20,
+        "VolumeConfirmed": VolumeConfirmed,
+        # stochastic
+        "Stochastic_%K": Stochastic_K,
+        "Stochastic_%D": Stochastic_D,
+        # SMAs
+        "SMA_10_Close": SMA_10_Close,
+        "SMA_20_Close": SMA_20_Close,
+        "SMA_20_Low":   SMA_20_Low,
+        "SMA_20_High":  SMA_20_High,
+        "SMA_200_Close":SMA_200_Close,
+        "SMA_20_Volume":SMA_20_Volume,
+        "SMA_200_Volume":SMA_200_Volume,
+        # weekly SMAs
+        "Weekly_SMA_20": Weekly_SMA_20,
+        "Weekly_SMA_200": Weekly_SMA_200,
+        "Weekly_SMA_200_1w": Weekly_SMA_200_1w,
+        "Weekly_SMA_200_2w": Weekly_SMA_200_2w,
+        "Weekly_SMA_200_3w": Weekly_SMA_200_3w,
+        "Weekly_SMA_200_4w": Weekly_SMA_200_4w,
+        # EMAs
+        **EMA_values,
+        # Fibonacci
+        **fib,
+    }
+
+    # Bulk assign
+    df = df.assign(**assign_kwargs)
+
+    # Supertrend variants
+    compute_supertrend(df, ATR, multiplier=2.0)
+    compute_supertrend(
+        df, ATR,
+        multiplier=3.0,
+        sup_col="Supertrend_Rule_8_Exit",
+        sup_dir="Supertrend_Direction_Rule_8_Exit",
+    )
+
     return df
+
 
 def load_historical_data(symbol):
     try:
