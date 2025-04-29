@@ -103,7 +103,7 @@ def buy_or_sell(df, row, holdings):
         return "HOLD"
 
     if holdings_symbol_data.empty:
-        logger.info(f"No holdings data for instrument_token {instrument_token}. Returning HOLD.")
+        logger.debug(f"No holdings data for instrument_token {instrument_token}. Returning HOLD.")
         return "HOLD"
 
     try:
