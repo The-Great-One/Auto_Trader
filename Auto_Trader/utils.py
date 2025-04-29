@@ -401,7 +401,7 @@ def apply_trading_rules(df, row):
             holdings = pd.read_feather("intermediary_files/Holdings.feather")
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
-            logger.info(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
+            logger.debug(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
             return rule_set_name, decision
         except Exception as e:
             logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
