@@ -10,8 +10,7 @@ Welcome to **AutoTrader Bot**, a Python-based automated stock trading bot design
 - 📈 **Real-Time Data**: Fetches live price and volume data using Zerodha’s KiteTicker.
 - 🤖 **Automated Orders**: Executes buy, sell, and hold signals based on predefined conditions.
 - 🚀 **Performance Optimization**: Efficient order placement adhering to rate limits, with caching and multiprocessing capabilities.
-- 💰 **Funds Management**: Allocates ₹20,000 per stock for trading.
-- 🛡️ **Error Handling**: Logging module coming soon.
+- 💰 **Funds Management**: Allocates ₹20,000 per stock for trading or a custom amount set by you.
 
 ## 📚 Table of Contents
 
@@ -216,9 +215,6 @@ The bot will now refresh the session token daily at 8:30 AM.
 
 ## 🛠️ Future Enhancements
 
-- **Additional Indicators**: Add support for Bollinger Bands, Stochastic Oscillator, etc.
-- **More Exchanges**: Support for BSE, international exchanges.
-- **Advanced Risk Management**: Stop-loss, trailing stops, and better fund management.
 - **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
 
 ## 🤝 Contributing
