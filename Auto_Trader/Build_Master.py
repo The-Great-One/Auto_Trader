@@ -4,7 +4,7 @@ import traceback
 from .utils import fetch_instruments_list, get_instrument_token, fetch_holdings, cleanup_stop_loss_json
 from Auto_Trader import logging
 from .StrongFundamentalsStockList import goodStocks
-from .FetchPricesYfinance import download_historical_quotes
+from .FetchPricesKite import download_historical_quotes
 import sys
 
 logger = logging.getLogger("Auto_Trade_Logger")
