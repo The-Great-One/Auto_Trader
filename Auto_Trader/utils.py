@@ -54,7 +54,6 @@ def build_access_token():
         str: The new access token.
     """
     try:
-        logger.warning("Session Expired..Creating New.")
         kite = KiteConnect(api_key=API_KEY)
         data = kite.generate_session(
             request_token=get_request_token(), api_secret=API_SECRET
@@ -105,7 +104,7 @@ def read_session_data():
             return build_access_token()
 
     except (FileNotFoundError, json.JSONDecodeError):
-        logger.warning("Session data file not found or invalid. Creating a new session.")
+        logger.warning("Creating a new session.")
         return build_access_token()
 
 def initialize_kite():
