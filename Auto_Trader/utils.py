@@ -16,7 +16,7 @@ from Auto_Trader import (RULE_SET_2, RULE_SET_5,
                          ZoneInfo, datetime, json, logging, mcal, np, os, pd,
                          retry, shutil, sys, talib, timedelta, traceback)
 from Auto_Trader.my_secrets import (API_KEY, API_SECRET, DATABASE, DB_PASSWORD,
-                                    HOST, USER)
+                                    HOST, USER, DEBUG_MODE)
 from Auto_Trader.Request_Token import get_request_token
 
 logger = logging.getLogger("Auto_Trade_Logger")
@@ -216,7 +216,7 @@ def Indicators(
     EMA_values = {f"EMA{p}": talib.EMA(close, timeperiod=p) for p in EMA_periods}
     ATR = talib.ATR(high, low, close, timeperiod=atr_period)
     UpperBand, MiddleBand, LowerBand = talib.BBANDS(
-        close, timeperiod=20, nbdevup=2, nbdevdn=2
+        close, timeperiod=20, nbdevup=3, nbdevdn=2
     )
     ADX = talib.ADX(high, low, close, timeperiod=14)
     OBV = talib.OBV(close, vol)
@@ -551,6 +551,7 @@ def get_market_schedule():
 def is_Market_Open(schedule=get_market_schedule()):
     """
     Check if the NSE market is currently open.
+    Returns True if DEBUG_MODE is True.
     
     Args:
     schedule (pd.DataFrame): Market schedule for the day.
@@ -558,6 +559,9 @@ def is_Market_Open(schedule=get_market_schedule()):
     Returns:
     bool: True if the market is open, False otherwise.
     """
+    if DEBUG_MODE:
+        return True
+
     if schedule is None:
         logger.info("Market is closed today.")
         return False
