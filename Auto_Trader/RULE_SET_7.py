@@ -1,83 +1,59 @@
 def buy_or_sell(df, row, holdings):
-    """
-    Refined swing trading strategy with bulletproof momentum conditions.
 
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        The DataFrame containing historical data and necessary technical indicators.
-    row : int
-        The latest row for evaluation.
-    holdings : dict
-        Dictionary representing current stock holdings (can be used for position sizing).
+    # Work on the requested index (defaults to last row if row == -1)
+    latest = df.iloc[row]
+    prev   = df.iloc[row - 1] if row > 0 else latest
 
-    Returns:
-    --------
-    str
-        'BUY', 'SELL', or 'HOLD' based on the technical indicator evaluation.
-    """
-
-    # ---------------------------------
-    # 1. Price Breakout Zone Condition
-    # ---------------------------------
-    price_breakout_zone = (
-        (df["Close"].iloc[-1] > df["SMA_10_Close"].iloc[-1] * 1.01) and
-        (df["Close"].iloc[-1] < df["SMA_10_Close"].iloc[-1] * 1.08)
+    # 1) Break‑out band 1–8 % above SMA‑10 and above SMA‑20
+    breakout = (
+        (latest["Close"] > latest["SMA_10_Close"] * 1.01) and
+        (latest["Close"] < latest["SMA_10_Close"] * 1.08) and
+        (latest["Close"] > latest["SMA_20_Close"])
     )
 
-    # -----------------------------
-    # 2. Strong Trend Confirmation
-    # -----------------------------
+    # 2) Multi‑EMA trend stack
     trend_strong = (
-        (df["EMA20"].iloc[-1] > df["EMA50"].iloc[-1]) and
-        (df["EMA50"].iloc[-1] > df["EMA100"].iloc[-1]) and
-        (df["Close"].iloc[-1] > df["EMA20"].iloc[-1])  # Price above short-term EMA
+        latest["EMA20"] > latest["EMA50"] > latest["EMA100"] and
+        latest["Close"] > latest["EMA20"]
     )
 
-    # ---------------------------
-    # 3. Bulletproof MACD Check
-    # ---------------------------
-    macd_strong_momentum = (
-        (df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]) and  # Bullish crossover
-        ((df["MACD"].iloc[-1] - df["MACD_Signal"].iloc[-1]) > 0.15) and  # Sufficient distance to avoid flat cross
-        ((df["MACD"].iloc[-1] - df["MACD"].shift(1).iloc[-1]) > 0.1) and  # Strong upward slope of MACD line
-        ((df["MACD_Hist"].iloc[-1] - df["MACD_Hist"].shift(1).iloc[-1]) > 0.1) and  # Rapid histogram acceleration
-        (df["MACD_Hist"].iloc[-1] > 0)  # Ensure histogram is positive
+    # 3) “Bullet‑proof” MACD momentum
+    macd_ok = (
+        latest["MACD"] > latest["MACD_Signal"] and
+        (latest["MACD"] - latest["MACD_Signal"]) > 0.15 and
+        (latest["MACD"] - prev["MACD"]) > 0.10 and
+        (latest["MACD_Hist"] - prev["MACD_Hist"]) > 0.10 and
+        latest["MACD_Hist"] > 0
     )
 
-    # ---------------------------
-    # 4. RSI Confirmation Check
-    # ---------------------------
-    rsi_strong = (
-        (df["RSI"].iloc[-1] > 60) and
-        (df["RSI"].iloc[-1] < 70) and
-        ((df["RSI"].iloc[-1] - df["RSI"].shift(1).iloc[-1]) > 2)  # RSI is rising, not flat
+    # 4) RSI 60‑70 and rising **or** fresh cross above 60
+    rsi_ok = (
+        (60 < latest["RSI"] <= 68 and (latest["RSI"] - prev["RSI"]) > 2) or
+        (prev["RSI"] < 60 <= latest["RSI"])
     )
-    rsi_recent_cross = (
-        (df["RSI"].shift(1).iloc[-1] < 60) and (df["RSI"].iloc[-1] > 60)
-    )
-    rsi_confirm = rsi_strong or rsi_recent_cross
 
-    # -------------------------------
-    # 5. Volume Surge Confirmation
-    # -------------------------------
-    volume_surge = df["Volume"].iloc[-1] > 1.2 * df["SMA_20_Volume"].iloc[-1]
+    # 5) Volume surge ≥ 1.2× SMA‑20
+    vol_ok = latest["Volume"] > 1.2 * latest["SMA_20_Volume"]
 
-    # -------------------------
-    # Final BUY Signal Trigger
-    # -------------------------
-    if macd_strong_momentum and rsi_confirm and volume_surge and trend_strong and price_breakout_zone:
+    # 6) NEW – CMF positive and improving
+    cmf_ok = (latest["CMF"] > 0.00) and (latest["CMF"] > prev["CMF"])
+
+    # 7) ADX filter ≥ 20  
+    adx_ok = latest["ADX"] > 20    # keeps original behaviour
+
+    # ---------------- BUY ----------------
+    if all((breakout, trend_strong, macd_ok, rsi_ok, vol_ok, cmf_ok, adx_ok)):
         return "BUY"
 
-    # -----------------------------------
-    # SELL signal conditions (as provided)
-    # -----------------------------------
-    elif (
-        (df["EMA9"].iloc[-1] < df["EMA21"].iloc[-1] * 0.99 < df["EMA50"].iloc[-1] * 0.99)
-        and (df["RSI"].iloc[-1] < 45)
-        and (df["MACD_Hist"].iloc[-1] < 0)
-        and (df["Volume"].iloc[-1] > 1.5 * df["SMA_20_Volume"].iloc[-1])
-    ):
+    # ---------------- SELL ----------------
+    sell_signal = (
+        (latest["EMA9"] < latest["EMA21"] * 0.99 < latest["EMA50"] * 0.99) and
+        (latest["RSI"] < 45) and
+        (latest["MACD_Hist"] < 0) and
+        (latest["Volume"] > 1.5 * latest["SMA_20_Volume"])
+    )  # logic carried over unchanged
+
+    if sell_signal:
         return "SELL"
 
     return "HOLD"
