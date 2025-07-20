@@ -170,6 +170,20 @@ def compute_fibonacci(
         "Fibonacci_100": top,
     }
 
+def compute_cmf(high, low, close, volume, period=20):
+    high = np.asarray(high)
+    low = np.asarray(low)
+    close = np.asarray(close)
+    volume = np.asarray(volume)
+
+    mf_multiplier = ((close - low) - (high - close)) / (high - low + 1e-10)  # Avoid div by zero
+    mf_volume = mf_multiplier * volume
+
+    mfv_sum = pd.Series(mf_volume).rolling(window=period).sum()
+    vol_sum = pd.Series(volume).rolling(window=period).sum()
+
+    cmf = mfv_sum / vol_sum
+    return cmf
 
 def Indicators(
     df: pd.DataFrame,
@@ -247,11 +261,14 @@ def Indicators(
     # Fibonacci static levels
     fib = compute_fibonacci(df["High"], df["Low"])
 
+    CMF = compute_cmf(df['High'], df['Low'], df['Close'], df['Volume'], period=5)
+
     # Collect into single dict for assign
     assign_kwargs = {
         # momentum
         "RSI": RSI,
         "MACD": MACD,
+        "CMF": CMF,
         "MACD_Signal": MACD_Signal,
         "MACD_Hist": MACD_Hist,
         "MACD_Rule_8": MACD_Rule_8,
