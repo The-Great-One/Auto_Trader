@@ -1,8 +1,8 @@
 def buy_or_sell(df, row, holdings):
 
     # Work on the requested index (defaults to last row if row == -1)
-    latest = df.iloc[row]
-    prev   = df.iloc[row - 1] if row > 0 else latest
+    latest = df.iloc[-1]
+    prev   = df.iloc[- 2]
 
     # 1) Break‑out band 1–8 % above SMA‑10 and above SMA‑20
     breakout = (
