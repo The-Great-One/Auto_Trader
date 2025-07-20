@@ -11,7 +11,7 @@ from filelock import FileLock, Timeout
 from sqlalchemy import create_engine
 
 # Import rule set modules
-from Auto_Trader import (RULE_SET_2, RULE_SET_5,
+from Auto_Trader import (RULE_SET_2,
                          RULE_SET_7, KiteConnect,
                          ZoneInfo, datetime, json, logging, mcal, np, os, pd,
                          retry, shutil, sys, talib, timedelta, traceback)
@@ -24,9 +24,7 @@ logger = logging.getLogger("Auto_Trade_Logger")
 # Default rule set values
 DEFAULT_RULE_SETS = {
     'RULE_SET_2': RULE_SET_2,
-    'RULE_SET_5': RULE_SET_5,
     'RULE_SET_7': RULE_SET_7,
-    # Add more default rule sets as needed
 }
 
 # Check if any RULE_SET environment variables are set
