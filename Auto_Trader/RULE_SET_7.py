@@ -13,7 +13,7 @@ def buy_or_sell(df, row, holdings):
 
     # 2) Multi‑EMA trend stack
     trend_strong = (
-        latest["EMA20"] > latest["EMA50"] > latest["EMA100"] and
+        latest["EMA20"] > latest["EMA50"] and
         latest["Close"] > latest["EMA20"]
     )
 
@@ -26,7 +26,7 @@ def buy_or_sell(df, row, holdings):
         latest["MACD_Hist"] > 0
     )
 
-    # 4) RSI 60‑70 and rising **or** fresh cross above 60
+    # 4) RSI 60‑68 and rising **or** fresh cross above 60
     rsi_ok = (
         (60 < latest["RSI"] <= 68 and (latest["RSI"] - prev["RSI"]) > 2) or
         (prev["RSI"] < 60 <= latest["RSI"])
@@ -39,7 +39,7 @@ def buy_or_sell(df, row, holdings):
     cmf_ok = (latest["CMF"] > 0.00) and (latest["CMF"] > prev["CMF"])
 
     # 7) ADX filter ≥ 20  
-    adx_ok = latest["ADX"] > 20    # keeps original behaviour
+    adx_ok = latest["ADX"] > 20
 
     # ---------------- BUY ----------------
     if all((breakout, trend_strong, macd_ok, rsi_ok, vol_ok, cmf_ok, adx_ok)):
@@ -51,7 +51,7 @@ def buy_or_sell(df, row, holdings):
         (latest["RSI"] < 45) and
         (latest["MACD_Hist"] < 0) and
         (latest["Volume"] > 1.5 * latest["SMA_20_Volume"])
-    )  # logic carried over unchanged
+    )
 
     if sell_signal:
         return "SELL"
