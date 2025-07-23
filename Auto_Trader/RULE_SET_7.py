@@ -20,17 +20,11 @@ def buy_or_sell(df, row, holdings):
     # 3) “Bullet‑proof” MACD momentum
     macd_ok = (
         latest["MACD"] > latest["MACD_Signal"] and
-        (latest["MACD"] - latest["MACD_Signal"]) > 0.15 and
-        (latest["MACD"] - prev["MACD"]) > 0.10 and
-        (latest["MACD_Hist"] - prev["MACD_Hist"]) > 0.10 and
         latest["MACD_Hist"] > 0
     )
 
     # 4) RSI 60‑68 and rising **or** fresh cross above 60
-    rsi_ok = (
-        (60 < latest["RSI"] <= 68 and (latest["RSI"] - prev["RSI"]) > 2) or
-        (prev["RSI"] < 60 <= latest["RSI"])
-    )
+    rsi_ok = 60 < latest["RSI"] <= 68 and latest["RSI"] >= prev["RSI"]
 
     # 5) Volume surge ≥ 1.2× SMA‑20
     vol_ok = latest["Volume"] > 1.2 * latest["SMA_20_Volume"]
