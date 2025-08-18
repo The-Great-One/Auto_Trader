@@ -6,7 +6,6 @@ def buy_or_sell(df, row, holdings):
 
     # 2) Multi‑EMA trend stack
     trend_strong = (
-        latest["EMA20"] > latest["EMA50"] and
         latest["Close"] > latest["EMA20"]
     )
 
