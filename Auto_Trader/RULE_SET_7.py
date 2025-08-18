@@ -2,7 +2,7 @@ def buy_or_sell(df, row, holdings):
 
     # Work on the requested index (defaults to last row if row == -1)
     latest = df.iloc[-1]
-    prev   = df.iloc[- 2]
+    prev   = df.iloc[-2]
 
     # 2) Multi‑EMA trend stack
     trend_strong = (
