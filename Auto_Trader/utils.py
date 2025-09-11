@@ -171,19 +171,24 @@ def compute_fibonacci(
     }
 
 def compute_cmf(high, low, close, volume, period=20):
-    high = np.asarray(high)
-    low = np.asarray(low)
-    close = np.asarray(close)
-    volume = np.asarray(volume)
+    idx = getattr(close, "index", None)
 
-    mf_multiplier = ((close - low) - (high - close)) / (high - low + 1e-10)  # Avoid div by zero
-    mf_volume = mf_multiplier * volume
+    high   = pd.Series(high,   index=idx, dtype="float64")
+    low    = pd.Series(low,    index=idx, dtype="float64")
+    close  = pd.Series(close,  index=idx, dtype="float64")
+    volume = pd.Series(volume, index=idx, dtype="float64")
 
-    mfv_sum = pd.Series(mf_volume).rolling(window=period).sum()
-    vol_sum = pd.Series(volume).rolling(window=period).sum()
+    # Money Flow Multiplier; avoid 0-division by turning 0 spans into NaN
+    span = (high - low).replace(0, np.nan)
+    mfm  = ((close - low) - (high - close)) / span
 
-    cmf = mfv_sum / vol_sum
+    mfv = mfm * volume
+
+    cmf = (mfv.rolling(window=period, min_periods=period).sum() /
+           volume.rolling(window=period, min_periods=period).sum())
+
     return cmf
+
 
 def Indicators(
     df: pd.DataFrame,
