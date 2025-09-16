@@ -25,7 +25,7 @@ def goodStocks():
         filtered_list_df = filtered_list_df[
             (filtered_list_df['advancedRatios.apef'] <= 40) &
             (filtered_list_df['advancedRatios.apef'] > 0) &
-            (filtered_list_df['advancedRatios.mrktCapf'] > 500)
+            (filtered_list_df['advancedRatios.mrktCapf'] >= 500) &
             (filtered_list_df['advancedRatios.apef'] >= filtered_list_df['advancedRatios.indpe'])
         ]
         
