@@ -242,6 +242,7 @@ def Indicators(
         fastk_period=14, slowk_period=3, slowk_matype=0,
         slowd_period=3, slowd_matype=0
     )
+    OBV_EMA_20 = talib.EMA(OBV, timeperiod=20)
 
     # Rolling SMAs & Volume MA20
     SMA_10_Close = df["Close"].rolling(10).mean()
@@ -287,6 +288,7 @@ def Indicators(
         "ADX": ADX,
         # volume
         "OBV": OBV,
+        "OBV_EMA_20": OBV_EMA_20,
         "Volume_MA20": Volume_MA20,
         "VolumeConfirmed": VolumeConfirmed,
         # stochastic
