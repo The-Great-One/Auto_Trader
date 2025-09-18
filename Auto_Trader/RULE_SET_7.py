@@ -1,4 +1,4 @@
-from Auto_Trader import logging
+from Auto_Trader import logging, np
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -12,9 +12,8 @@ def buy_or_sell(df, row, holdings):
     vol_ok = latest["Volume"] > 1.2 * latest["SMA_20_Volume"]
     cmf_ok = (latest["CMF"] >= 0.05) and (latest["CMF"] > prev["CMF"])
     adx_ok = latest["ADX"] > 20
-    obv_above_ema = latest["OBV"] > latest["OBV_EMA_20"]
-    obv_rising = latest["OBV"] > df["OBV"].iloc[-4] if len(df) > 3 else latest["OBV"] > prev["OBV"]
-    obv_ok = obv_above_ema and obv_rising
+    z = latest.get("OBV_ZScore20", np.nan)
+    obv_ok = (np.isfinite(z) and z >= 1.0) and (latest["OBV"] > latest["OBV_EMA20"])
 
     # ---------------- BUY ----------------
     if all((trend_strong, macd_ok, rsi_ok, vol_ok, cmf_ok, adx_ok, obv_ok)):

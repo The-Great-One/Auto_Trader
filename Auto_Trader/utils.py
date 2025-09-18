@@ -242,7 +242,18 @@ def Indicators(
         fastk_period=14, slowk_period=3, slowk_matype=0,
         slowd_period=3, slowd_matype=0
     )
-    OBV_EMA_20 = talib.EMA(OBV, timeperiod=20)
+    # --- OBV-derived features for adaptive decisioning ---
+    OBV_EMA20 = talib.EMA(OBV, timeperiod=20)
+    OBV_MA20  = talib.SMA(OBV, timeperiod=20)
+    # Rolling std with ddof=1 (sample std). Use Series to keep index.
+    _OBV_S     = pd.Series(OBV, index=df.index)
+    OBV_STD20  = _OBV_S.rolling(20).std(ddof=1)
+
+    # To avoid look-ahead bias, compute z-score vs *prior* window stats:
+    OBV_MA20_S1  = pd.Series(OBV_MA20, index=df.index).shift(1)
+    OBV_STD20_S1 = pd.Series(OBV_STD20, index=df.index).shift(1)
+    OBV_ZScore20 = (_OBV_S - OBV_MA20_S1) / OBV_STD20_S1
+
 
     # Rolling SMAs & Volume MA20
     SMA_10_Close = df["Close"].rolling(10).mean()
@@ -288,7 +299,10 @@ def Indicators(
         "ADX": ADX,
         # volume
         "OBV": OBV,
-        "OBV_EMA_20": OBV_EMA_20,
+        "OBV_EMA20": OBV_EMA20,
+        "OBV_MA20": OBV_MA20,
+        "OBV_STD20": OBV_STD20,
+        "OBV_ZScore20": OBV_ZScore20,
         "Volume_MA20": Volume_MA20,
         "VolumeConfirmed": VolumeConfirmed,
         # stochastic
