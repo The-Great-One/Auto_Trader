@@ -8,7 +8,7 @@ def buy_or_sell(df, row, holdings):
     latest = df.iloc[-1]
     prev   = df.iloc[-2]
 
-    # --- small helper ---
+    # --- helper for slope ---
     def slope_up(series, win=3):
         if len(series) < win:
             return False
@@ -18,7 +18,7 @@ def buy_or_sell(df, row, holdings):
         var = np.var(x)
         return (cov / var) > 0 if var > 0 else False
 
-    # --- core signals ---
+    # --- signals ---
     trend_ok   = latest["Close"] > latest["EMA20"]
 
     adx        = latest["ADX"]
@@ -29,7 +29,7 @@ def buy_or_sell(df, row, holdings):
     macd_sig   = latest["MACD_Signal"]
     macd_rising = latest["MACD_Hist"] > prev["MACD_Hist"]
 
-    # Volume vs 20D SMA
+    # Volume
     vol     = latest["Volume"]
     vol_sma = latest["SMA_20_Volume"]
     vol_ok  = vol > 1.1 * vol_sma
@@ -43,31 +43,28 @@ def buy_or_sell(df, row, holdings):
     else:
         cmf_ok = (cmf >= 0.05) and (cmf > prev["CMF"])
 
-    # OBV trend / z
+    # OBV
     z         = latest.get("OBV_ZScore20", np.nan)
     obv_trend = latest["OBV"] > latest["OBV_EMA20"]
     obv_slope = slope_up(df["OBV_EMA20"].values)
     obv_ok    = (np.isfinite(z) and z >= 0.5 and obv_trend) or (obv_trend and obv_slope)
 
-    # Breakout context
+    # Breakouts
     prior_high_break = latest["Close"] > prev["High"]
     highN_break      = latest["Close"] >= latest.get("HHV_20", latest["Close"])
 
-    # --- RSI: adaptive & safe ---
+    # RSI with adaptive gates
     rsi          = latest["RSI"]
     rsi_slope_up = rsi >= prev["RSI"]
 
-    # Global floors/ceilings
     if rsi < 45:
         return "HOLD"
     if np.isfinite(z) and z >= 2.0 and rsi >= 75:
         return "HOLD"
 
-    # Base gates
     rsi_pull_gate = 55
     rsi_momo_gate = 60
 
-    # Loosen gates only in strong regime
     strong_regime = trend_ok and adx_strong and (cmf >= 0.05) and obv_trend
     if strong_regime:
         rsi_pull_gate = 50
@@ -76,17 +73,17 @@ def buy_or_sell(df, row, holdings):
     rsi_pullback_trigger = (prev["RSI"] < rsi_pull_gate) and (rsi >= rsi_pull_gate) and rsi_slope_up
     rsi_momo_trigger     = (prev["RSI"] < rsi_momo_gate) and (rsi >= rsi_momo_gate) and rsi_slope_up
 
-    # --- Extra safeguard: if RSI < 55, demand MACD > Signal too ---
-    if rsi < 55 and macd <= macd_sig:
+    # --- Extra safeguard: always demand MACD > Signal ---
+    if macd <= macd_sig:
         return "HOLD"
 
-    # --- Market regime (MMI) guard ---
+    # Market regime (MMI) guard
     mmi = get_mmi_now()
     if mmi is not None and mmi >= 70:
         return "HOLD"
 
     # --- Modes ---
-    pullback_mode = all((trend_ok, adx_ok,  vol_ok, cmf_ok, obv_ok, macd_rising, rsi_pullback_trigger))
+    pullback_mode = all((trend_ok, adx_ok, vol_ok, cmf_ok, obv_ok, macd_rising, rsi_pullback_trigger))
     breakout_mode = all((trend_ok, adx_strong, cmf_ok, obv_ok, (rsi_momo_trigger or highN_break or prior_high_break)))
 
     if pullback_mode or breakout_mode:
