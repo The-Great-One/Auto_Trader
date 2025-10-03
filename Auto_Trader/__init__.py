@@ -23,7 +23,7 @@ import pandas_market_calendars as mcal
 from functools import lru_cache
 from retry import retry
 from zoneinfo import ZoneInfo
-
+import random
 from .kite_ticker import run_ticker
 from .Build_Master import create_master
 from .rt_compute import Apply_Rules
@@ -31,7 +31,6 @@ from .utils import *
 from .updater import Updater
 from .my_secrets import *
 
-import os
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -39,7 +38,9 @@ from logging.handlers import RotatingFileHandler
 logger = logging.getLogger("Auto_Trade_Logger")
 
 # Format for Saving
-formatter = logging.Formatter("[%(asctime)s] {%(filename)s %(funcName)s:%(lineno)d %(threadName)s} %(levelname)s - %(message)s")
+formatter = logging.Formatter(
+    "[%(asctime)s] {%(filename)s %(funcName)s:%(lineno)d %(threadName)s} %(levelname)s - %(message)s"
+)
 
 # Set the Log Level
 logger.setLevel(logging.INFO)
@@ -61,10 +62,7 @@ BACKUPCOUNT = 10  # Keep 10 backup log files
 
 # Setting up RotatingFileHandler for info logs
 INFO_filehandler = RotatingFileHandler(
-    OUTPUT_LOG_PATH, 
-    maxBytes=MAXBYTES, 
-    backupCount=BACKUPCOUNT, 
-    delay=True
+    OUTPUT_LOG_PATH, maxBytes=MAXBYTES, backupCount=BACKUPCOUNT, delay=True
 )
 INFO_filehandler.setLevel(logging.INFO)
 INFO_filehandler.setFormatter(formatter)
@@ -72,10 +70,7 @@ logger.addHandler(INFO_filehandler)
 
 # Setting up RotatingFileHandler for error logs
 ERROR_filehandler = RotatingFileHandler(
-    ERROR_LOG_PATH, 
-    maxBytes=MAXBYTES,
-    backupCount=BACKUPCOUNT, 
-    delay=True
+    ERROR_LOG_PATH, maxBytes=MAXBYTES, backupCount=BACKUPCOUNT, delay=True
 )
 ERROR_filehandler.setLevel(logging.ERROR)
 ERROR_filehandler.setFormatter(formatter)
