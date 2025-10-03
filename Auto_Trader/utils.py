@@ -18,6 +18,9 @@ from Auto_Trader import (RULE_SET_2,
 from Auto_Trader.my_secrets import (API_KEY, API_SECRET, DATABASE, DB_PASSWORD,
                                     HOST, USER, DEBUG_MODE)
 from Auto_Trader.Request_Token import get_request_token
+import requests
+from requests.exceptions import RequestException
+import time
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -779,3 +782,23 @@ def get_params_grid():
     except Exception as e:
         print(f"Error: {e}")
         return {}
+    
+_last_data = None
+_last_fetch = 0
+TTL = 1800  # 30 minutes in seconds
+
+def get_mmi_now(force_refresh: bool = False):
+    """Fetch Tickertape MMI data, cached for 30 minutes to avoid over-hitting."""
+    global _last_data, _last_fetch
+
+    now = time.time()
+    if force_refresh or (now - _last_fetch > TTL) or _last_data is None:
+        try:
+            resp = requests.get("https://api.tickertape.in/mmi/now", timeout=5)
+            resp.raise_for_status()
+            _last_data = resp.json()["data"]["indicator"]
+            _last_fetch = now
+        except (RequestException, ValueError) as e:
+            return None
+
+    return _last_data
