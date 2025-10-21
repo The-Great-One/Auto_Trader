@@ -3,6 +3,31 @@ from . import logging, os, time, random, json, np, talib
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
+# ---------- Tunables (sane defaults) ----------
+CONFIG = {
+    "lock_timeout_s": 30,
+    "retry_sleep_base_s": 0.2,
+    "donch_period": 20,
+    "bb_period": 20,
+    "adx_period": 14,
+    "trend_adx_min": 20.0,        # regime: trending if ADX >= this
+    "ema_break_atr_mult": 0.5,    # close below EMA10 by > 0.5*ATR
+    "ema_confirm_bars": 2,        # need 2 closes below EMA10
+    "hist_bearish_threshold": 0.0,  # MACD histogram < 0 is bearish
+    "relative_volume_exit": 1.5,  # exits that need RVOL
+    "time_stop_bars": 20,         # exit if bars_in_trade >= N and profit < time_stop_min_profit
+    "time_stop_min_profit_pct": 3.0,
+    "min_atr_fallback_frac": 0.02,  # if ATR missing, fallback = max(0.01, frac * price)
+    "profit_ladder": [            # (profit% threshold, trail = max(last - k*ATR, entry*floor_mult))
+        (30, {"k": 0.25, "floor_mult": 1.18}),
+        (20, {"k": 0.40, "floor_mult": 1.12}),
+        (15, {"k": 0.70, "floor_mult": 1.10}),
+        (10, {"k": 1.00, "floor_mult": 1.07}),
+        (5,  {"k": 1.40, "floor_mult": 1.05}),
+        (0,  {"k": 1.70, "floor_mult": 0.98}),
+    ],
+}
+
 # ---------- Paths ----------
 BASE_DIR = os.path.abspath(os.getenv("AT_STATE_DIR", "./intermediary_files"))
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -19,86 +44,102 @@ def _atomic_write(data: dict, path: str):
     os.replace(tmp, path)
 
 
-def _finite(val, default=0.0):
+def _finite(val, default=np.nan):
     try:
-        val = float(val)
-        if np.isfinite(val):
-            return val
-        return default
+        v = float(val)
+        return v if np.isfinite(v) else default
     except Exception:
         return default
 
 
-def load_stop_loss_json():
+def _is_finite_pos(x) -> bool:
+    return x is not None and np.isfinite(x) and x > 0
+
+
+def _get_float(container, key, default=np.nan):
+    try:
+        return _finite(container[key], default)
+    except Exception:
+        return default
+
+
+def _read_json_unlocked(path: str) -> dict:
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        logger.error("Corrupted JSON at %s; resetting to empty.", path)
+        return {}
+    except Exception:
+        logger.exception("Unexpected error reading JSON")
+        return {}
+
+
+def _with_lock(timeout, fn):
+    # Simple wrapper for lock-acquire / backoff retries
     for attempt in range(3):
         try:
-            with FileLock(LOCK_FILE_PATH, timeout=30):
-                if not os.path.exists(HOLDINGS_FILE_PATH):
-                    return {}
-                with open(HOLDINGS_FILE_PATH, "r") as f:
-                    data = json.load(f)
-                out = {}
-                for k, v in data.items():
-                    try:
-                        out[k] = float(v)
-                    except Exception:
-                        logger.warning("Non-numeric stop-loss for %s; setting None", k)
-                        out[k] = None
-                return out
+            with FileLock(LOCK_FILE_PATH, timeout=timeout):
+                return fn()
         except Timeout:
-            logger.warning("Timeout acquiring lock (read), retry %d", attempt + 1)
-            time.sleep(0.2 * (attempt + 1) + random.random() * 0.1)
+            logger.warning("Timeout acquiring lock, retry %d", attempt + 1)
+            time.sleep(CONFIG["retry_sleep_base_s"] * (attempt + 1) + random.random() * 0.1)
         except Exception:
-            logger.exception("Load stop-loss JSON failed")
-            return {}
-    logger.error("Failed to load stop-loss JSON after retries")
-    return {}
+            logger.exception("Lock-guarded operation failed")
+            break
+    return None
+
+
+# ---------- Public JSON API ----------
+def load_stop_loss_json():
+    def _do():
+        data = _read_json_unlocked(HOLDINGS_FILE_PATH)
+        out = {}
+        for k, v in data.items():
+            fv = _finite(v, np.nan)
+            out[k] = None if np.isnan(fv) else float(fv)
+        return out
+    res = _with_lock(CONFIG["lock_timeout_s"], _do)
+    if res is None:
+        logger.error("Failed to load stop-loss JSON after retries")
+        return {}
+    return res
 
 
 def update_stop_loss_json(tradingsymbol, stop_loss):
     try:
         stop_loss = round(float(stop_loss), 2)
+        if not np.isfinite(stop_loss):
+            raise ValueError
     except Exception:
         logger.error("Invalid stop_loss for %s: %r", tradingsymbol, stop_loss)
         return
 
-    for attempt in range(3):
-        try:
-            with FileLock(LOCK_FILE_PATH, timeout=30):
-                data = {}
-                if os.path.exists(HOLDINGS_FILE_PATH):
-                    try:
-                        with open(HOLDINGS_FILE_PATH, "r") as f:
-                            data = json.load(f)
-                    except json.JSONDecodeError:
-                        logger.error("Corrupted JSON; starting fresh")
-                data[tradingsymbol] = stop_loss
-                _atomic_write(data, HOLDINGS_FILE_PATH)
-                logger.info("Updated stop-loss for %s to %.2f", tradingsymbol, stop_loss)
-                return
-        except Timeout:
-            logger.warning("Timeout acquiring lock (write), retry %d", attempt + 1)
-            time.sleep(0.2 * (attempt + 1) + random.random() * 0.1)
-        except Exception:
-            logger.exception("Update stop-loss JSON failed")
-            return
-    logger.error("Failed to update stop-loss JSON after retries")
+    def _do():
+        data = _read_json_unlocked(HOLDINGS_FILE_PATH)
+        data[tradingsymbol] = stop_loss
+        _atomic_write(data, HOLDINGS_FILE_PATH)
+    _with_lock(CONFIG["lock_timeout_s"], _do)
 
 
 def handle_sell(tradingsymbol):
-    try:
-        stop_loss_data = load_stop_loss_json()
-        with FileLock(LOCK_FILE_PATH, timeout=30):
-            stop_loss_data.pop(tradingsymbol, None)
-            _atomic_write(stop_loss_data, HOLDINGS_FILE_PATH)
-        logger.info("Removed %s from stop-loss JSON after selling", tradingsymbol)
-    except Exception:
-        logger.exception("Error while removing %s from JSON:", tradingsymbol)
+    """Remove symbol from JSON under a single lock; return SELL."""
+    def _do():
+        data = _read_json_unlocked(HOLDINGS_FILE_PATH)
+        if tradingsymbol in data:
+            data.pop(tradingsymbol, None)
+            _atomic_write(data, HOLDINGS_FILE_PATH)
+    _with_lock(CONFIG["lock_timeout_s"], _do)
+    logger.info("Removed %s from stop-loss JSON after selling", tradingsymbol)
     return "SELL"
 
 
 # ---------- Main strategy ----------
 def buy_or_sell(df, row, holdings):
+    # ---- Validate & extract base fields ----
     try:
         instrument_token = int(row["instrument_token"])
         holdings = holdings.assign(instrument_token=holdings["instrument_token"].astype(int))
@@ -107,18 +148,18 @@ def buy_or_sell(df, row, holdings):
         return "HOLD"
 
     try:
-        holdings_symbol_data = holdings[holdings["instrument_token"] == instrument_token]
+        h = holdings[holdings["instrument_token"] == instrument_token]
     except Exception:
         logger.exception("Error filtering holdings by instrument_token")
         return "HOLD"
 
-    if holdings_symbol_data.empty:
-        logger.debug("No holdings data for instrument_token %s. HOLD", instrument_token)
+    if h.empty:
+        logger.debug("No holdings for instrument_token %s. HOLD", instrument_token)
         return "HOLD"
 
     try:
-        tradingsymbol = holdings_symbol_data["tradingsymbol"].iloc[0]
-        average_price = float(holdings_symbol_data["average_price"].iloc[0])
+        tradingsymbol = h["tradingsymbol"].iloc[0]
+        average_price = float(h["average_price"].iloc[0])
     except Exception:
         logger.exception("Error extracting tradingsymbol/average_price")
         return "HOLD"
@@ -126,149 +167,211 @@ def buy_or_sell(df, row, holdings):
     try:
         last_row = df.iloc[-1]
         last_price = float(last_row["Close"])
+        day_low = _get_float(last_row, "Low", np.nan)
+        day_high = _get_float(last_row, "High", np.nan)
+        day_open = _get_float(last_row, "Open", np.nan)
     except Exception:
-        logger.exception("Error extracting last price from df")
+        logger.exception("Error extracting OHLC from df")
         return "HOLD"
 
-    # Load stop-loss
-    stop_loss_data = load_stop_loss_json()
-    stop_loss = stop_loss_data.get(tradingsymbol, None)
-    if stop_loss is not None:
-        stop_loss = _finite(stop_loss, None)
+    # ---- Stop-loss state ----
+    sl_map = load_stop_loss_json()
+    stop_loss = sl_map.get(tradingsymbol, None)
+    stop_loss = stop_loss if (stop_loss is None or np.isfinite(stop_loss)) else None
 
-    # Indicators with safe fallbacks
-    last_atr = _finite(last_row.get("ATR", 0.0), 0.0)
-    if not (last_atr > 0):
-        last_atr = max(0.01, 0.02 * last_price)
+    # ---- Indicators (guarded) ----
+    last_atr = _get_float(last_row, "ATR", np.nan)
+    if not _is_finite_pos(last_atr):
+        last_atr = max(0.01, CONFIG["min_atr_fallback_frac"] * last_price)
 
-    def safe_get(series, col, default=0.0):
-        return _finite(series.get(col, default), default)
+    last_rsi = _get_float(last_row, "RSI", np.nan)
+    have_rsi = np.isfinite(last_rsi)
 
-    last_rsi = safe_get(last_row, "RSI", 50)
-    last_macd = safe_get(last_row, "MACD", 0.0)
-    last_macd_signal = safe_get(last_row, "MACD_Signal", 0.0)
-    macd_histogram = safe_get(last_row, "MACD_Hist", 0.0)
-    current_volume = safe_get(last_row, "Volume", 0.0)
+    ema10 = _get_float(last_row, "EMA10", np.nan)
+    have_ema10 = np.isfinite(ema10)
 
-    avg_volume_20 = (
-        df["Volume"].rolling(window=20).mean().iloc[-1]
-        if len(df) >= 20
-        else current_volume
-    )
-    relative_volume = current_volume / avg_volume_20 if avg_volume_20 else 1.0
+    ema50 = _get_float(last_row, "EMA50", np.nan)
+    have_ema50 = np.isfinite(ema50)
 
-    ema_10 = safe_get(last_row, "EMA10")
-    ema_50 = safe_get(last_row, "EMA50")
-    fib_38_2 = safe_get(last_row, "Fibonacci_38_2")
-    fib_61_8 = safe_get(last_row, "Fibonacci_61_8")
+    # MACD histogram
+    macd_hist = _get_float(last_row, "MACD_Hist", np.nan)
+    have_hist = np.isfinite(macd_hist)
 
+    # Relative volume
     try:
-        upper_band, middle_band, lower_band = talib.BBANDS(
-            df["Close"].astype(float), timeperiod=20, nbdevup=2, nbdevdn=2
-        )
+        if "Volume" in df and len(df) >= 20:
+            rv = float(last_row["Volume"]) / max(1e-12, float(df["Volume"].rolling(20).mean().iloc[-1]))
+        else:
+            rv = 1.0
     except Exception:
-        logger.exception("Error computing Bollinger Bands")
-        return "HOLD"
+        rv = 1.0
 
+    # Bollinger Bands (%b failure pattern)
+    ub = mb = lb = np.nan
+    have_bb = False
+    if "Close" in df and len(df) >= CONFIG["bb_period"]:
+        try:
+            UB, MB, LB = talib.BBANDS(
+                df["Close"].astype(float),
+                timeperiod=CONFIG["bb_period"], nbdevup=2, nbdevdn=2
+            )
+            ub = float(UB.iloc[-1]); mb = float(MB.iloc[-1]); lb = float(LB.iloc[-1])
+            have_bb = all(np.isfinite([ub, mb, lb]))
+        except Exception:
+            pass
+
+    # %b current/prev
+    curr_b = prev_b = np.nan
+    if have_bb and len(df) >= CONFIG["bb_period"] + 1:
+        try:
+            prev_UB, prev_MB, prev_LB = talib.BBANDS(
+                df["Close"].astype(float),
+                timeperiod=CONFIG["bb_period"], nbdevup=2, nbdevdn=2
+            )
+            prev_u = float(prev_UB.iloc[-2]); prev_l = float(prev_LB.iloc[-2])
+            prev_c = float(df["Close"].iloc[-2])
+            prev_b = (prev_c - prev_l) / max(1e-9, (prev_u - prev_l))
+            curr_b = (last_price - lb) / max(1e-9, (ub - lb))
+        except Exception:
+            pass
+
+    # ADX regime
+    regime_trending = False
+    if all(c in df for c in ("High", "Low", "Close")) and len(df) >= CONFIG["adx_period"] + 5:
+        try:
+            adx = talib.ADX(
+                df["High"].astype(float),
+                df["Low"].astype(float),
+                df["Close"].astype(float),
+                timeperiod=CONFIG["adx_period"]
+            ).iloc[-1]
+            if np.isfinite(adx) and adx >= CONFIG["trend_adx_min"]:
+                regime_trending = True
+        except Exception:
+            pass
+
+    # Donchian structure
+    donch_low = np.nan
+    have_donch = len(df) >= CONFIG["donch_period"]
+    if have_donch:
+        try:
+            donch_low = float(df["Low"].rolling(CONFIG["donch_period"]).min().iloc[-2])  # prior window min
+        except Exception:
+            have_donch = False
+
+    # Profit %
     try:
-        profit_percent = ((last_price - average_price) / average_price) * 100.0
+        profit_pct = ((last_price - average_price) / average_price) * 100.0
     except Exception:
         logger.exception("Error calculating profit_percent")
         return "HOLD"
 
-    # --- Main logic ---
-    new_stop_loss = stop_loss if stop_loss is not None else last_price - (2.0 * last_atr)
+    # ---- Start with a baseline trailing SL ----
+    new_sl = stop_loss if stop_loss is not None else (last_price - 2.0 * last_atr)
 
+    # ---- HARD BREACH first (handles gaps/intrabar) ----
+    if np.isfinite(day_low) and np.isfinite(new_sl) and day_low <= new_sl:
+        return handle_sell(tradingsymbol)
+
+    # ---- Ordered decision tree ----
     try:
+        # 1) LOSS SCENARIO: prefer structure & hard signals over oscillators
         if last_price < average_price:
-            # Loss scenario
-            if last_rsi < 50:
-                new_stop_loss = max(new_stop_loss, last_price - (1.5 * last_atr))
-            if last_rsi < 45:
+            # Donchian structure break → exit
+            if have_donch and last_price < donch_low:
                 return handle_sell(tradingsymbol)
-            if last_macd < last_macd_signal:
-                new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
-            if talib.CDLENGULFING(df["Open"], df["High"], df["Low"], df["Close"]).iloc[-1] != 0:
-                new_stop_loss = last_price - (1.0 * last_atr)
-            if last_price < fib_61_8:
+
+            # EMA10 2-bar + ATR-scaled break
+            if have_ema10:
+                # Need last 2 closes below EMA10 and depth > k*ATR
+                if len(df) >= 2:
+                    close_1 = float(df["Close"].iloc[-1])
+                    close_2 = float(df["Close"].iloc[-2])
+                    ema10_2 = _finite(df["EMA10"].iloc[-2], np.nan) if "EMA10" in df else np.nan
+                    both_below = np.isfinite(ema10_2) and (close_1 < ema10) and (close_2 < ema10_2)
+                    deep_break = (ema10 - close_1) > (CONFIG["ema_break_atr_mult"] * last_atr)
+                    if both_below and deep_break:
+                        return handle_sell(tradingsymbol)
+
+            # MACD histogram bearish (optional in chop; stronger in trend)
+            if have_hist and macd_hist < CONFIG["hist_bearish_threshold"]:
+                new_sl = max(new_sl, last_price - 1.0 * last_atr)
+
+            # RSI capitulation (only as a tie-breaker; avoid overusing oscillators)
+            if have_rsi and last_rsi < 40:
                 return handle_sell(tradingsymbol)
+
+        # 2) PROFIT SCENARIO: laddered trailing + regime-aware filters
         else:
-            # Profit scenario
-            if profit_percent > 30:
-                tmp_sl = last_price - (0.2 * last_atr)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
-            if profit_percent > 20:
-                tmp_sl = max(last_price - (0.3 * last_atr), average_price * 1.15)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
-            elif profit_percent > 15:
-                tmp_sl = max(last_price - (0.5 * last_atr), average_price * 1.10)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
-            elif profit_percent > 10:
-                tmp_sl = max(last_price - (0.8 * last_atr), average_price * 1.07)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
-            elif profit_percent > 5:
-                tmp_sl = max(last_price - (1.2 * last_atr), average_price * 1.05)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
-            elif profit_percent >= 0:
-                tmp_sl = max(last_price - (1.5 * last_atr), average_price * 0.98)
-                new_stop_loss = max(new_stop_loss, tmp_sl)
+            # Profit ladder: widen a bit to reduce whipsaws, also lock level gains vs entry
+            for thresh, rule in CONFIG["profit_ladder"]:
+                if profit_pct >= thresh:
+                    k = float(rule["k"])
+                    floor_mult = float(rule["floor_mult"])
+                    lvl = max(last_price - k * last_atr, average_price * floor_mult)
+                    new_sl = max(new_sl, lvl)
+                    break  # apply the highest matching tier only
 
-            if last_rsi > 75:
-                new_stop_loss = max(new_stop_loss, last_price - (0.5 * last_atr))
-            elif last_rsi > 70:
-                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
-            elif last_rsi > 65:
-                new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
+            # MACD histogram < 0 → tighten (trend loss)
+            if have_hist and macd_hist < CONFIG["hist_bearish_threshold"]:
+                new_sl = max(new_sl, last_price - 0.9 * last_atr)
 
-            if last_macd < last_macd_signal:
-                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
-            if len(df) > 1 and _finite(df["MACD_Hist"].iloc[-2], 0.0) > macd_histogram:
-                new_stop_loss = max(new_stop_loss, last_price - (1.0 * last_atr))
+            # Upper-band failure: tag then lose strength (only tighten, don't insta-exit)
+            if np.isfinite(prev_b) and np.isfinite(curr_b) and have_bb:
+                if prev_b >= 1.0 and curr_b < 0.5 and last_price < mb:
+                    new_sl = max(new_sl, last_price - 0.9 * last_atr)
 
-            if talib.CDLENGULFING(df["Open"], df["High"], df["Low"], df["Close"]).iloc[-1] != 0:
-                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
-            if talib.CDLSHOOTINGSTAR(df["Open"], df["High"], df["Low"], df["Close"]).iloc[-1] != 0:
-                new_stop_loss = max(new_stop_loss, last_price - (0.7 * last_atr))
-            if talib.CDLDOJI(df["Open"], df["High"], df["Low"], df["Close"]).iloc[-1] != 0:
-                new_stop_loss = max(new_stop_loss, last_price - (0.6 * last_atr))
+            # EMA10 break with confirmation & ATR depth (optional SELL)
+            if have_ema10 and len(df) >= 2 and have_rsi:
+                close_1 = float(df["Close"].iloc[-1])
+                close_2 = float(df["Close"].iloc[-2])
+                ema10_2 = _finite(df["EMA10"].iloc[-2], np.nan) if "EMA10" in df else np.nan
+                both_below = np.isfinite(ema10_2) and (close_1 < ema10) and (close_2 < ema10_2)
+                deep_break = (ema10 - close_1) > (CONFIG["ema_break_atr_mult"] * last_atr)
+                if both_below and deep_break and (last_rsi < 50):
+                    return handle_sell(tradingsymbol)
 
-            if last_price < fib_38_2 and last_rsi < 50:
-                return handle_sell(tradingsymbol)
-            elif last_price < fib_61_8 and last_rsi < 45:
+            # Donchian structure break in profit → exit
+            if have_donch and last_price < donch_low:
                 return handle_sell(tradingsymbol)
 
-            if last_price >= upper_band.iloc[-1] and last_rsi > 60:
-                new_stop_loss = max(new_stop_loss, last_price - (0.9 * last_atr))
-            if last_price >= upper_band.iloc[-1] and last_rsi > 65:
-                new_stop_loss = max(new_stop_loss, last_price - (0.8 * last_atr))
-            if last_price >= upper_band.iloc[-1] and last_rsi > 70:
-                new_stop_loss = max(new_stop_loss, last_price - (0.7 * last_atr))
+            # RVOL-confirmed weakness: price < EMA50 with heavy volume
+            if have_ema50 and rv > CONFIG["relative_volume_exit"] and last_price < ema50:
+                return handle_sell(tradingsymbol)
 
-            if last_price < ema_10 and last_rsi < 55:
+        # 3) TIME STOP (mostly for chop)
+        try:
+            bars_in_trade = int(h.get("bars_in_trade", np.nan))
+        except Exception:
+            bars_in_trade = np.nan
+        if np.isfinite(bars_in_trade) and bars_in_trade >= CONFIG["time_stop_bars"]:
+            if profit_pct < CONFIG["time_stop_min_profit_pct"]:
                 return handle_sell(tradingsymbol)
-            if last_price < ema_50 and relative_volume > 1.5:
-                return handle_sell(tradingsymbol)
+
     except Exception:
         logger.exception("Error applying trading logic")
         return "HOLD"
 
-    # --- Final SL check & update ---
+    # ---- Finalize SL & breach check ----
     try:
-        if new_stop_loss is not None:
-            if new_stop_loss > last_price:
+        if new_sl is not None and np.isfinite(new_sl):
+            if new_sl > last_price:
                 logger.warning(
-                    "New SL (%.2f) > last_price (%.2f) for %s. Clamp to last_price.",
-                    new_stop_loss, last_price, tradingsymbol,
+                    "New SL (%.2f) > last_price (%.2f) for %s. Clamp.",
+                    new_sl, last_price, tradingsymbol
                 )
-                new_stop_loss = last_price
+                new_sl = last_price
 
-            if stop_loss is None or new_stop_loss > stop_loss:
-                update_stop_loss_json(tradingsymbol, new_stop_loss)
+            if (stop_loss is None) or (new_sl > stop_loss):
+                update_stop_loss_json(tradingsymbol, new_sl)
 
-            if last_price <= new_stop_loss:
+            # Re-check with updated SL (covers post-adjust breach)
+            if np.isfinite(day_low) and day_low <= new_sl:
+                return handle_sell(tradingsymbol)
+            if last_price <= new_sl:
                 return handle_sell(tradingsymbol)
 
         return "HOLD"
     except Exception:
-        logger.exception("Error finalizing stop-loss and sell check")
+        logger.exception("Error finalizing stop-loss and breach check")
         return "HOLD"
