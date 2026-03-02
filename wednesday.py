@@ -1,16 +1,25 @@
+import logging
+import traceback
 import time
 import sys
 from multiprocessing import Queue, Process
-from Auto_Trader import is_Market_Open, run_ticker, create_master, Apply_Rules, Updater, logging, traceback
+from Auto_Trader import (
+    is_Market_Open,
+    run_ticker,
+    create_master,
+    Apply_Rules,
+    Updater,
+)
 from Auto_Trader.TelegramLink import telegram_main
 
 logger = logging.getLogger("Auto_Trade_Logger")
+
 
 def monitor_market():
     processes = []
     q = Queue()  # Queue for Orders Placements
     message_queue = Queue()  # Queue for Telegram Messages
-    
+
     def start_processes():
         """Starts all necessary processes."""
         logger.info("Market is open. Starting processes.")
@@ -55,12 +64,15 @@ def monitor_market():
 
         except Exception as e:
             logger.error(f"Error occurred: {e}, Traceback: {traceback.format_exc()}")
-            message_queue.put(f"Error occurred: {e}, Traceback: {traceback.format_exc()}")
+            message_queue.put(
+                f"Error occurred: {e}, Traceback: {traceback.format_exc()}"
+            )
             if processes:
                 processes = stop_processes(processes)
             sys.exit(1)  # Exit with an error code to indicate failure
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         monitor_market()
     except KeyboardInterrupt:

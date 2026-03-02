@@ -1,80 +1,63 @@
+import logging
 import os
-
-import sys
-import time
-from datetime import datetime, timedelta
-from functools import *
-from multiprocessing import Process, Queue
-import subprocess
-import logging
-from logging.handlers import *
-import shutil
-import talib
 import traceback
-
-import pandas as pd
-import requests
-from datetime import datetime, timedelta
-from kiteconnect import KiteConnect
-import pandas as pd
-import json
-import numpy as np
-import pandas_market_calendars as mcal
-from functools import lru_cache
-from retry import retry
-from zoneinfo import ZoneInfo
-import random
-from .kite_ticker import run_ticker
-from .Build_Master import create_master
-from .rt_compute import Apply_Rules
-from .utils import *
-from .updater import Updater
-from .my_secrets import *
-
-import logging
 from logging.handlers import RotatingFileHandler
 
-# Create a Logger for the package
+from .Build_Master import create_master as create_master
+from .kite_ticker import run_ticker as run_ticker
+from .rt_compute import Apply_Rules as Apply_Rules
+from .updater import Updater as Updater
+from .utils import is_Market_Open as is_Market_Open
+
 logger = logging.getLogger("Auto_Trade_Logger")
-
-# Format for Saving
-formatter = logging.Formatter(
-    "[%(asctime)s] {%(filename)s %(funcName)s:%(lineno)d %(threadName)s} %(levelname)s - %(message)s"
-)
-
-# Set the Log Level
 logger.setLevel(logging.INFO)
 
-# Console Handler for Warnings and higher
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+if not logger.handlers:
+    formatter = logging.Formatter(
+        "[%(asctime)s] {%(filename)s %(funcName)s:%(lineno)d %(threadName)s} %(levelname)s - %(message)s"
+    )
 
-# Create Folders for Logs
-os.makedirs("log", exist_ok=True)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-# Actual file paths and settings
-OUTPUT_LOG_PATH = "log/output.log"
-ERROR_LOG_PATH = "log/error.log"
-MAXBYTES = 10 * 1024 * 1024  # 10 MB log file size
-BACKUPCOUNT = 10  # Keep 10 backup log files
+    os.makedirs("log", exist_ok=True)
 
-# Setting up RotatingFileHandler for info logs
-INFO_filehandler = RotatingFileHandler(
-    OUTPUT_LOG_PATH, maxBytes=MAXBYTES, backupCount=BACKUPCOUNT, delay=True
-)
-INFO_filehandler.setLevel(logging.INFO)
-INFO_filehandler.setFormatter(formatter)
-logger.addHandler(INFO_filehandler)
+    output_log_path = "log/output.log"
+    error_log_path = "log/error.log"
+    max_bytes = 10 * 1024 * 1024
+    backup_count = 10
 
-# Setting up RotatingFileHandler for error logs
-ERROR_filehandler = RotatingFileHandler(
-    ERROR_LOG_PATH, maxBytes=MAXBYTES, backupCount=BACKUPCOUNT, delay=True
-)
-ERROR_filehandler.setLevel(logging.ERROR)
-ERROR_filehandler.setFormatter(formatter)
-logger.addHandler(ERROR_filehandler)
+    info_file_handler = RotatingFileHandler(
+        output_log_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        delay=True,
+    )
+    info_file_handler.setLevel(logging.INFO)
+    info_file_handler.setFormatter(formatter)
+    logger.addHandler(info_file_handler)
 
-# Disable propagation to prevent duplicate logs from being passed to the root logger
+    error_file_handler = RotatingFileHandler(
+        error_log_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        delay=True,
+    )
+    error_file_handler.setLevel(logging.ERROR)
+    error_file_handler.setFormatter(formatter)
+    logger.addHandler(error_file_handler)
+
 logger.propagate = False
+
+__all__ = [
+    "Apply_Rules",
+    "Updater",
+    "create_master",
+    "is_Market_Open",
+    "logger",
+    "logging",
+    "run_ticker",
+    "traceback",
+]

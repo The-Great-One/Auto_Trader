@@ -19,16 +19,19 @@ if TG_TOKEN is not None and CHANNEL is not None:
             try:
                 await bot.send_message(chat_id=CHANNEL, text=message)
             except Exception as e:
-                logger.error(f"Error sending message: {e}, Traceback: {traceback.format_exc()}")
+                logger.error(
+                    f"Error sending message: {e}, Traceback: {traceback.format_exc()}"
+                )
 
     def telegram_main(message_queue):
         """Main function to handle the Telegram message sending process."""
         asyncio.run(send_to_channel(message_queue))
 
 else:
+
     async def send_to_channel(message_queue):
         pass
-    
+
     def telegram_main(message_queue):
         """Main function to handle the Telegram message sending process."""
         asyncio.run(send_to_channel(message_queue))

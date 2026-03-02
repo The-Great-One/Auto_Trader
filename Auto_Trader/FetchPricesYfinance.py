@@ -15,6 +15,7 @@ FETCHED_DATA_FILE = "intermediary_files/fetched_data.json"
 LOCK_FILE = "intermediary_files/fetched_data.lock"
 HIST_DIR = "intermediary_files/Hist_Data"
 
+
 # Ray actor to manage shared state
 @ray.remote
 class FetchedDataManager:
@@ -23,13 +24,13 @@ class FetchedDataManager:
 
     def load_fetched_data(self):
         if os.path.exists(FETCHED_DATA_FILE):
-            with open(FETCHED_DATA_FILE, 'r') as file:
+            with open(FETCHED_DATA_FILE, "r") as file:
                 return json.load(file)
         return {}
 
     def save_fetched_data(self):
         with FileLock(LOCK_FILE):
-            with open(FETCHED_DATA_FILE, 'w') as file:
+            with open(FETCHED_DATA_FILE, "w") as file:
                 json.dump(self.fetched_data, file)
 
     def is_fetched(self, ticker):
@@ -40,6 +41,7 @@ class FetchedDataManager:
         today = str(datetime.now().date())
         self.fetched_data[ticker] = today
         self.save_fetched_data()
+
 
 @ray.remote
 @retry(tries=2, delay=2)
@@ -69,11 +71,7 @@ def download_ticker_data(ticker, fetched_data_manager):
     # Try NSE (.NS) then BSE (.BO)
     for suffix in [".NS", ".BO"]:
         data = yf.download(
-            ticker + suffix,
-            threads=20,
-            progress=False,
-            start=start_str,
-            end=today_str
+            ticker + suffix, threads=20, progress=False, start=start_str, end=today_str
         )
 
         # drop extra level if present
@@ -92,7 +90,9 @@ def download_ticker_data(ticker, fetched_data_manager):
     data = data.sort_values("Date", ascending=True)
 
     # Exclude today’s partial bars if market is open
-    if (is_Market_Open() or is_PreMarket_Open()) and data["Date"].iloc[-1] == datetime.today().date():
+    if (is_Market_Open() or is_PreMarket_Open()) and data["Date"].iloc[
+        -1
+    ] == datetime.today().date():
         data = data.iloc[:-1]
 
     os.makedirs(HIST_DIR, exist_ok=True)
@@ -102,22 +102,22 @@ def download_ticker_data(ticker, fetched_data_manager):
     ray.get(fetched_data_manager.mark_fetched.remote(ticker))
     return True
 
+
 def download_historical_quotes(df):
-    if 'Symbol' not in df.columns:
+    if "Symbol" not in df.columns:
         raise ValueError("Missing 'Symbol' Column")
 
     os.makedirs(HIST_DIR, exist_ok=True)
     ray.init(ignore_reinit_error=True)
     fetched_data_manager = FetchedDataManager.remote()
 
-    tickers = df['Symbol'].tolist()
+    tickers = df["Symbol"].tolist()
     with tqdm(total=len(tickers), desc="Downloading tickers") as pbar:
         batch_size = 10
         for i in range(0, len(tickers), batch_size):
-            batch = tickers[i:i + batch_size]
+            batch = tickers[i : i + batch_size]
             result_ids = [
-                download_ticker_data.remote(t, fetched_data_manager)
-                for t in batch
+                download_ticker_data.remote(t, fetched_data_manager) for t in batch
             ]
             for success in ray.get(result_ids):
                 if success:
