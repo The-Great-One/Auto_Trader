@@ -1,33 +1,46 @@
 import json
 import multiprocessing
 import os
+import shutil
+import sys
+import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
+import pandas_market_calendars as mcal
+import requests
 import talib
 from filelock import FileLock, Timeout
+from kiteconnect import KiteConnect
+from retry import retry
+from requests.exceptions import RequestException
 from sqlalchemy import create_engine
 
 # Import rule set modules
-from Auto_Trader import (RULE_SET_2,
-                         RULE_SET_7, KiteConnect,
-                         ZoneInfo, datetime, json, logging, mcal, np, os, pd,
-                         retry, shutil, sys, talib, timedelta, traceback)
-from Auto_Trader.my_secrets import (API_KEY, API_SECRET, DATABASE, DB_PASSWORD,
-                                    HOST, USER, DEBUG_MODE)
-from Auto_Trader.Request_Token import get_request_token
-import requests
-from requests.exceptions import RequestException
-import time
+from . import RULE_SET_2, RULE_SET_7
+from .my_secrets import (
+    API_KEY,
+    API_SECRET,
+    DATABASE,
+    DB_PASSWORD,
+    HOST,
+    USER,
+    DEBUG_MODE,
+)
+from .Request_Token import get_request_token
+import logging
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
 # Default rule set values
 DEFAULT_RULE_SETS = {
-    'RULE_SET_2': RULE_SET_2,
-    'RULE_SET_7': RULE_SET_7,
+    "RULE_SET_2": RULE_SET_2,
+    "RULE_SET_7": RULE_SET_7,
 }
 
 # Check if any RULE_SET environment variables are set
@@ -45,12 +58,13 @@ else:
     RULE_SETS = DEFAULT_RULE_SETS
 
 # Initialize the NSE market calendar
-nse_calendar = mcal.get_calendar('NSE')
+nse_calendar = mcal.get_calendar("NSE")
+
 
 def build_access_token():
     """
     Generate a new access token and save it to a JSON file.
-    
+
     Returns:
         str: The new access token.
     """
@@ -75,21 +89,24 @@ def build_access_token():
                         os.remove(item_path)
                     elif os.path.isdir(item_path):
                         shutil.rmtree(item_path)
-            
+
         os.makedirs("intermediary_files", exist_ok=True)
-        
+
         with open("intermediary_files/access_token.json", "w") as json_file:
             json.dump(session_data, json_file, indent=4)
         return data["access_token"]
     except Exception as e:
-        logger.error(f"Error in generating session: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(
+            f"Error in generating session: {e}, Traceback: {traceback.format_exc()}"
+        )
         sys.exit()
         return None
+
 
 def read_session_data():
     """
     Read the access token from a JSON file and validate its date.
-    
+
     Returns:
         str: The valid access token, or None if a new one needs to be created.
     """
@@ -108,21 +125,32 @@ def read_session_data():
         logger.warning("Creating a new session.")
         return build_access_token()
 
+
 def initialize_kite():
     """
     Initialize the KiteConnect object with a valid session.
-    
+
     Returns:
         KiteConnect: An instance of KiteConnect with a valid session.
     """
-    try:
-        kite = KiteConnect(api_key=API_KEY)
-        access_token = read_session_data()
-        kite.set_access_token(access_token)
-        return kite
-    except:
-        build_access_token()
-        return initialize_kite()
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            kite = KiteConnect(api_key=API_KEY)
+            access_token = read_session_data()
+            kite.set_access_token(access_token)
+            return kite
+        except Exception:
+            logger.exception(
+                "Failed to initialize Kite session (attempt %s/%s).",
+                attempt,
+                max_retries,
+            )
+            if attempt >= max_retries:
+                raise
+            build_access_token()
+            time.sleep(attempt)
+
 
 def compute_supertrend(
     df: pd.DataFrame,
@@ -173,22 +201,25 @@ def compute_fibonacci(
         "Fibonacci_100": top,
     }
 
+
 def compute_cmf(high, low, close, volume, period=20):
     idx = getattr(close, "index", None)
 
-    high   = pd.Series(high,   index=idx, dtype="float64")
-    low    = pd.Series(low,    index=idx, dtype="float64")
-    close  = pd.Series(close,  index=idx, dtype="float64")
+    high = pd.Series(high, index=idx, dtype="float64")
+    low = pd.Series(low, index=idx, dtype="float64")
+    close = pd.Series(close, index=idx, dtype="float64")
     volume = pd.Series(volume, index=idx, dtype="float64")
 
     # Money Flow Multiplier; avoid 0-division by turning 0 spans into NaN
     span = (high - low).replace(0, np.nan)
-    mfm  = ((close - low) - (high - close)) / span
+    mfm = ((close - low) - (high - close)) / span
 
     mfv = mfm * volume
 
-    cmf = (mfv.rolling(window=period, min_periods=period).sum() /
-           volume.rolling(window=period, min_periods=period).sum())
+    cmf = (
+        mfv.rolling(window=period, min_periods=period).sum()
+        / volume.rolling(window=period, min_periods=period).sum()
+    )
 
     return cmf
 
@@ -214,9 +245,10 @@ def Indicators(
         raise KeyError(f"DataFrame missing: {', '.join(required - set(df.columns))}")
 
     # Coerce numeric dtypes once
-    df[["High","Low","Close","Volume"]] = (
-        df[["High","Low","Close","Volume"]]
-        .apply(pd.to_numeric, errors="coerce").astype("float64")
+    df[["High", "Low", "Close", "Volume"]] = (
+        df[["High", "Low", "Close", "Volume"]]
+        .apply(pd.to_numeric, errors="coerce")
+        .astype("float64")
     )
 
     high = df["High"].values
@@ -232,7 +264,7 @@ def Indicators(
     MACD_Rule_8, MACD_Rule_8_Signal, MACD_Rule_8_Hist = talib.MACD(
         close, fastperiod=23, slowperiod=9, signalperiod=9
     )
-    EMA_periods = (5,9,10,12,13,20,21,26,50,100,200)
+    EMA_periods = (5, 9, 10, 12, 13, 20, 21, 26, 50, 100, 200)
     EMA_values = {f"EMA{p}": talib.EMA(close, timeperiod=p) for p in EMA_periods}
     ATR = talib.ATR(high, low, close, timeperiod=atr_period)
     UpperBand, MiddleBand, LowerBand = talib.BBANDS(
@@ -241,34 +273,40 @@ def Indicators(
     ADX = talib.ADX(high, low, close, timeperiod=14)
     OBV = talib.OBV(close, vol)
     Stochastic_K, Stochastic_D = talib.STOCH(
-        high, low, close,
-        fastk_period=14, slowk_period=3, slowk_matype=0,
-        slowd_period=3, slowd_matype=0
+        high,
+        low,
+        close,
+        fastk_period=14,
+        slowk_period=3,
+        slowk_matype=0,
+        slowd_period=3,
+        slowd_matype=0,
     )
     # --- OBV-derived features for adaptive decisioning ---
     OBV_EMA20 = talib.EMA(OBV, timeperiod=20)
-    OBV_MA20  = talib.SMA(OBV, timeperiod=20)
+    OBV_MA20 = talib.SMA(OBV, timeperiod=20)
     # Rolling std with ddof=1 (sample std). Use Series to keep index.
-    _OBV_S     = pd.Series(OBV, index=df.index)
-    OBV_STD20  = _OBV_S.rolling(20).std(ddof=1)
+    _OBV_S = pd.Series(OBV, index=df.index)
+    OBV_STD20 = _OBV_S.rolling(20).std(ddof=1)
 
     # To avoid look-ahead bias, compute z-score vs *prior* window stats:
-    OBV_MA20_S1  = pd.Series(OBV_MA20, index=df.index).shift(1)
+    OBV_MA20_S1 = pd.Series(OBV_MA20, index=df.index).shift(1)
     OBV_STD20_S1 = pd.Series(OBV_STD20, index=df.index).shift(1)
     OBV_ZScore20 = (_OBV_S - OBV_MA20_S1) / OBV_STD20_S1
-
 
     # Rolling SMAs & Volume MA20
     SMA_10_Close = df["Close"].rolling(10).mean()
     SMA_20_Close = df["Close"].rolling(20).mean()
-    SMA_20_Low   = df["Low"].rolling(20).mean()
-    SMA_20_High  = df["High"].rolling(20).mean()
-    SMA_200_Close= df["Close"].rolling(200).mean()
-    SMA_20_Volume= df["Volume"].rolling(20).mean()
-    SMA_200_Volume= df["Volume"].rolling(200).mean()
+    SMA_20_Low = df["Low"].rolling(20).mean()
+    SMA_20_High = df["High"].rolling(20).mean()
+    HHV_20 = df["High"].rolling(20).max().shift(1)
+    LLV_20 = df["Low"].rolling(20).min().shift(1)
+    SMA_200_Close = df["Close"].rolling(200).mean()
+    SMA_20_Volume = df["Volume"].rolling(20).mean()
+    SMA_200_Volume = df["Volume"].rolling(200).mean()
 
     Weekly_SMA_20 = talib.SMA(close, timeperiod=100)  # 20*5
-    Weekly_SMA_200= talib.SMA(close, timeperiod=1000) # 200*5
+    Weekly_SMA_200 = talib.SMA(close, timeperiod=1000)  # 200*5
     ws = pd.Series(Weekly_SMA_200, index=df.index)
     Weekly_SMA_200_1w = ws.shift(5)
     Weekly_SMA_200_2w = ws.shift(10)
@@ -281,7 +319,7 @@ def Indicators(
     # Fibonacci static levels
     fib = compute_fibonacci(df["High"], df["Low"])
 
-    CMF = compute_cmf(df['High'], df['Low'], df['Close'], df['Volume'], period=5)
+    CMF = compute_cmf(df["High"], df["Low"], df["Close"], df["Volume"], period=5)
 
     # Collect into single dict for assign
     assign_kwargs = {
@@ -314,11 +352,13 @@ def Indicators(
         # SMAs
         "SMA_10_Close": SMA_10_Close,
         "SMA_20_Close": SMA_20_Close,
-        "SMA_20_Low":   SMA_20_Low,
-        "SMA_20_High":  SMA_20_High,
-        "SMA_200_Close":SMA_200_Close,
-        "SMA_20_Volume":SMA_20_Volume,
-        "SMA_200_Volume":SMA_200_Volume,
+        "SMA_20_Low": SMA_20_Low,
+        "SMA_20_High": SMA_20_High,
+        "HHV_20": HHV_20,
+        "LLV_20": LLV_20,
+        "SMA_200_Close": SMA_200_Close,
+        "SMA_20_Volume": SMA_20_Volume,
+        "SMA_200_Volume": SMA_200_Volume,
         # weekly SMAs
         "Weekly_SMA_20": Weekly_SMA_20,
         "Weekly_SMA_200": Weekly_SMA_200,
@@ -338,7 +378,8 @@ def Indicators(
     # Supertrend variants
     compute_supertrend(df, ATR, multiplier=2.0)
     compute_supertrend(
-        df, ATR,
+        df,
+        ATR,
         multiplier=3.0,
         sup_col="Supertrend_Rule_8_Exit",
         sup_dir="Supertrend_Direction_Rule_8_Exit",
@@ -381,13 +422,14 @@ def preprocess_data(row_df, symbol):
 
     # Convert 'Date' to datetime and set as index
     for dataframe in [df, append_df]:
-        dataframe['Date'] = pd.to_datetime(dataframe['Date'], errors='coerce')
-        dataframe.dropna(subset=['Date'], inplace=True)
-        dataframe.set_index('Date', inplace=True)
+        dataframe["Date"] = pd.to_datetime(dataframe["Date"], errors="coerce")
+        dataframe.dropna(subset=["Date"], inplace=True)
+        dataframe.set_index("Date", inplace=True)
 
     # Concatenate and remove duplicates
     df = pd.concat([df, append_df])
-    df = df[~df.index.duplicated(keep='last')]  # Keep the last duplicate
+    df = df[~df.index.duplicated(keep="last")]  # Keep the last duplicate
+    df.sort_index(inplace=True)
     df = Indicators(df)
 
     if df.empty:
@@ -395,6 +437,7 @@ def preprocess_data(row_df, symbol):
         return None
 
     return df
+
 
 def process_single_stock(row):
     """
@@ -407,50 +450,68 @@ def process_single_stock(row):
         pd.DataFrame or None: The preprocessed DataFrame, or None if processing fails.
     """
     # Prepare row DataFrame
-    row_df = pd.DataFrame([{
-        'Date': row['Date'],
-        'Close': row['last_price'],
-        'Volume': row['volume_traded'],
-        'High': row['ohlc']['high'],
-        "Low": row['ohlc']['low'],
-    }])
+    row_df = pd.DataFrame(
+        [
+            {
+                "Date": row["Date"],
+                "Close": row["last_price"],
+                "Volume": row["volume_traded"],
+                "High": row["ohlc"]["high"],
+                "Low": row["ohlc"]["low"],
+            }
+        ]
+    )
 
-    df = preprocess_data(row_df, row['Symbol'])
+    df = preprocess_data(row_df, row["Symbol"])
     return df
+
 
 def apply_trading_rules(df, row):
     """
     Apply all trading rules from the RULE_SETS dictionary to the stock data
     and return the strongest trading signal (e.g., SELL > BUY > HOLD) along with contributing rules.
-    
+
     Parameters:
         df (pd.DataFrame): The preprocessed stock data.
         row (dict): The current stock data row.
 
     Returns:
-        tuple: (str, dict) where str is the strongest trading decision, 
+        tuple: (str, dict) where str is the strongest trading decision,
                and dict contains rules contributing to each decision.
     """
     # Initialize a dictionary to track the decisions and their contributing rules
     decisions = {"SELL": [], "BUY": [], "HOLD": []}
 
+    try:
+        holdings = pd.read_feather("intermediary_files/Holdings.feather")
+    except Exception as e:
+        logger.error(
+            f"Error loading holdings for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}"
+        )
+        holdings = pd.DataFrame()
+
     def apply_rule(rule_set_name, rule_set_module):
         try:
-            holdings = pd.read_feather("intermediary_files/Holdings.feather")
             # Apply the trading rule from the current rule set
             decision = rule_set_module.buy_or_sell(df, row, holdings)
-            logger.debug(f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}")
+            logger.debug(
+                f"Rule {rule_set_name} made a {decision} decision for {row['Symbol']}"
+            )
             return rule_set_name, decision
         except Exception as e:
-            logger.error(f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}")
+            logger.error(
+                f"Error applying trading rule {rule_set_name} for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}"
+            )
             return rule_set_name, "HOLD"
 
-    num_cores = multiprocessing.cpu_count()
+    num_cores = max(1, min(len(RULE_SETS), multiprocessing.cpu_count()))
     # Use ThreadPoolExecutor to parallelize rule application
     with ThreadPoolExecutor(max_workers=num_cores) as executor:
         # Submit all rules to the executor and process them concurrently
-        futures = {executor.submit(apply_rule, rule_set_name, rule_set_module): rule_set_name
-                   for rule_set_name, rule_set_module in RULE_SETS.items()}
+        futures = {
+            executor.submit(apply_rule, rule_set_name, rule_set_module): rule_set_name
+            for rule_set_name, rule_set_module in RULE_SETS.items()
+        }
 
         # Collect results as they complete
         for future in as_completed(futures):
@@ -459,7 +520,9 @@ def apply_trading_rules(df, row):
                 decisions[decision].append(rule_set_name)
             else:
                 # Log the specific rule set that returned an unknown decision
-                logger.error(f"Rule {rule_set_name} returned an unknown decision: {decision}")
+                logger.error(
+                    f"Rule {rule_set_name} returned an unknown decision: {decision}"
+                )
                 pass
 
     # Print decisions for each stock (for debugging)
@@ -472,6 +535,7 @@ def apply_trading_rules(df, row):
         return "BUY", {"BUY": decisions["BUY"]}
     else:
         return "HOLD", {"HOLD": decisions["HOLD"]}
+
 
 def process_stock_and_decide(row):
     """
@@ -491,31 +555,36 @@ def process_stock_and_decide(row):
             decision, contributing_rules = apply_trading_rules(df, row)
             if decision != "HOLD":
                 return {
-                    "Symbol": row['Symbol'],
+                    "Symbol": row["Symbol"],
                     "Decision": decision,
                     "ContributingRules": contributing_rules,
-                    "Exchange": row['exchange'],
-                    "Close": row['last_price']
+                    "Exchange": row["exchange"],
+                    "Close": row["last_price"],
+                    "AssetClass": row.get("AssetClass", "EQUITY"),
+                    "ETFTheme": row.get("ETFTheme", ""),
                 }
     except Exception as e:
         # Log exceptions with stock symbol for easier debugging
-        logger.error(f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(
+            f"Error processing stock {row.get('Symbol', 'Unknown')}: {e}, Traceback: {traceback.format_exc()}"
+        )
     return None
 
 
 # Initialize Kite
 kite = initialize_kite()
 
+
 # Retry decorator, with exponential backoff and jitter
 @retry(tries=3, delay=2, backoff=2, jitter=(0, 1), exceptions=(Exception,))
 def fetch_holdings(kite=kite):
     """
-    Fetch the list of instruments and holdings from the Kite API, 
+    Fetch the list of instruments and holdings from the Kite API,
     and save the holdings to a CSV file.
-    
+
     Args:
         kite (KiteConnect): An instance of KiteConnect with a valid session.
-    
+
     Returns:
         pd.DataFrame: DataFrame containing NSE stocks with instrument tokens.
     """
@@ -523,63 +592,88 @@ def fetch_holdings(kite=kite):
         # Fetch holdings
         holdings = kite.holdings()
         if holdings:
-            holdings = pd.DataFrame(holdings)[["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"]]
-            
+            holdings = pd.DataFrame(holdings)[
+                [
+                    "tradingsymbol",
+                    "instrument_token",
+                    "exchange",
+                    "average_price",
+                    "quantity",
+                    "t1_quantity",
+                ]
+            ]
+
             # Merge Holdings and t1_quantity
-            holdings['quantity'] = holdings['quantity'] + holdings['t1_quantity']
-                        
+            holdings["quantity"] = holdings["quantity"] + holdings["t1_quantity"]
+
             # Filter out holdings with quantity greater than 0
             holdings = holdings[holdings["quantity"] > 0]
-            
+
             # Save holdings to CSV
             holdings.to_feather("intermediary_files/Holdings.feather")
-            
+
             logger.info(f"Number of Holdings: {len(holdings)}")
             return holdings
         else:
             # Initialize an empty DataFrame with the expected columns
-            holdings = pd.DataFrame(columns=["tradingsymbol", "instrument_token", "exchange", "average_price", "quantity", "t1_quantity"])
+            holdings = pd.DataFrame(
+                columns=[
+                    "tradingsymbol",
+                    "instrument_token",
+                    "exchange",
+                    "average_price",
+                    "quantity",
+                    "t1_quantity",
+                ]
+            )
             holdings.to_feather("intermediary_files/Holdings.feather")
             logger.debug("No holdings found, returning an empty DataFrame.")
             return holdings
 
     except Exception as e:
-        logger.error(f"Error in fetching holdings: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(
+            f"Error in fetching holdings: {e}, Traceback: {traceback.format_exc()}"
+        )
         raise  # Re-raise to trigger the retry decorator
-    
+
+
 # Retry decorator, with exponential backoff and jitter
 @retry(tries=3, delay=2, backoff=2, jitter=(0, 1), exceptions=(Exception,))
 def fetch_instruments_list(kite=kite):
     """
-    Fetch the list of instruments and holdings from the Kite API, 
+    Fetch the list of instruments and holdings from the Kite API,
     and save the holdings to a CSV file.
-    
+
     Args:
         kite (KiteConnect): An instance of KiteConnect with a valid session.
-    
+
     Returns:
         pd.DataFrame: DataFrame containing NSE stocks with instrument tokens.
     """
     try:
         # Fetch instruments
         instruments = kite.instruments()
-        
+
         # Filter for NSE stocks only
         nse_stocks = [
-            instrument for instrument in instruments if instrument["instrument_type"] == "EQ"
+            instrument
+            for instrument in instruments
+            if instrument["instrument_type"] == "EQ"
         ]
         df = pd.DataFrame(nse_stocks)[["instrument_token", "tradingsymbol", "exchange"]]
         return df
 
     except Exception as e:
-        logger.error(f"Error in fetching instruments: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(
+            f"Error in fetching instruments: {e}, Traceback: {traceback.format_exc()}"
+        )
         raise  # Re-raise to trigger the retry decorator
 
-    
+
 def get_market_schedule():
     """
     Get the NSE market schedule for the current day.
-    
+
     Returns:
     pd.DataFrame or None: Market schedule for the day, or None if market is closed.
     """
@@ -587,14 +681,15 @@ def get_market_schedule():
     schedule = nse_calendar.schedule(start_date=now.date(), end_date=now.date())
     return schedule if not schedule.empty else None
 
+
 def is_Market_Open(schedule=get_market_schedule()):
     """
     Check if the NSE market is currently open.
     Returns True if DEBUG_MODE is True.
-    
+
     Args:
     schedule (pd.DataFrame): Market schedule for the day.
-    
+
     Returns:
     bool: True if the market is open, False otherwise.
     """
@@ -604,38 +699,40 @@ def is_Market_Open(schedule=get_market_schedule()):
     if schedule is None:
         logger.info("Market is closed today.")
         return False
-    
+
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata"))
-    market_close = schedule.iloc[0]['market_close'].astimezone(ZoneInfo("Asia/Kolkata"))
-    
+    market_open = schedule.iloc[0]["market_open"].astimezone(ZoneInfo("Asia/Kolkata"))
+    market_close = schedule.iloc[0]["market_close"].astimezone(ZoneInfo("Asia/Kolkata"))
+
     return market_open <= now <= market_close
+
 
 def is_PreMarket_Open(schedule=get_market_schedule()):
     """
     Check if the NSE premarket is currently open.
-    
+
     Args:
     schedule (pd.DataFrame): Market schedule for the day.
-    
+
     Returns:
     bool: True if the premarket is open, False otherwise.
     """
     if schedule is None:
         logger.info("Market is closed today.")
         return False
-    
+
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    market_open = schedule.iloc[0]['market_open'].astimezone(ZoneInfo("Asia/Kolkata"))
-    premarket_open = (market_open - timedelta(minutes=15))
-    
+    market_open = schedule.iloc[0]["market_open"].astimezone(ZoneInfo("Asia/Kolkata"))
+    premarket_open = market_open - timedelta(minutes=15)
+
     return premarket_open <= now < market_open
+
 
 def get_instrument_token(good_stock_list_df, instruments_df):
     """
     Merge a list of good stocks with instruments data to obtain instrument tokens,
     prioritizing NSE exchange.
-    
+
     Args:
         good_stock_list_df (pd.DataFrame): DataFrame with a list of good stocks.
         instruments_df (pd.DataFrame): DataFrame containing instrument data.
@@ -658,12 +755,25 @@ def get_instrument_token(good_stock_list_df, instruments_df):
     # Drop duplicates by 'Symbol', keeping the first occurrence, which prioritizes 'NSE'
     deduplicated_df = sorted_df.drop_duplicates(subset=["Symbol"], keep="first")
 
-    # Select relevant columns
-    final_nse_prioritized_df = deduplicated_df[
-        ["Symbol", "instrument_token", "exchange"]
+    # Keep metadata columns from screener list (e.g., AssetClass/ETFTheme/Sector).
+    metadata_cols = [
+        col
+        for col in good_stock_list_df.columns
+        if col not in {"Symbol", "instrument_token", "exchange"}
     ]
+    selected_cols = ["Symbol", "instrument_token", "exchange", *metadata_cols]
+    final_nse_prioritized_df = deduplicated_df[selected_cols]
+    if "AssetClass" not in final_nse_prioritized_df.columns:
+        final_nse_prioritized_df["AssetClass"] = "EQUITY"
+    if "ETFTheme" not in final_nse_prioritized_df.columns:
+        final_nse_prioritized_df["ETFTheme"] = ""
+    else:
+        final_nse_prioritized_df["ETFTheme"] = final_nse_prioritized_df[
+            "ETFTheme"
+        ].fillna("")
 
     return final_nse_prioritized_df
+
 
 # Use LRU Cache for loading instruments data
 @lru_cache(maxsize=None)
@@ -675,21 +785,24 @@ def load_instruments_data():
         instruments_df = pd.read_feather("intermediary_files/Instruments.feather")
         return instruments_df.set_index("instrument_token").to_dict(orient="index")
     except Exception as e:
-        logger.error(f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}")
+        logger.error(
+            f"Failed to read Instruments.csv: {e}, Traceback: {traceback.format_exc()}"
+        )
         sys.exit(1)  # Exit if we cannot load instruments data
 
-def cleanup_stop_loss_json(holdings = fetch_holdings()):
+
+def cleanup_stop_loss_json(holdings=fetch_holdings()):
     """
-    Cleans up the stop-loss JSON file by removing any entries that 
+    Cleans up the stop-loss JSON file by removing any entries that
     do not correspond to currently held tradingsymbols.
-    
+
     Parameters:
     holdings (pd.DataFrame): A DataFrame with a 'tradingsymbol' column
                              representing currently held instruments.
     """
-    
-    HOLDINGS_FILE_PATH = 'intermediary_files/Holdings.json'
-    LOCK_FILE_PATH = 'intermediary_files/Holdings.lock'
+
+    HOLDINGS_FILE_PATH = "intermediary_files/Holdings.json"
+    LOCK_FILE_PATH = "intermediary_files/Holdings.lock"
 
     def safe_float(value, default=None):
         try:
@@ -703,7 +816,7 @@ def cleanup_stop_loss_json(holdings = fetch_holdings()):
     try:
         with lock.acquire(timeout=10):
             if os.path.exists(HOLDINGS_FILE_PATH):
-                with open(HOLDINGS_FILE_PATH, 'r') as json_file:
+                with open(HOLDINGS_FILE_PATH, "r") as json_file:
                     try:
                         data = json.load(json_file)
                         # Ensure all values are floats
@@ -725,12 +838,14 @@ def cleanup_stop_loss_json(holdings = fetch_holdings()):
         return
 
     # Verify holdings DataFrame has the required column
-    if 'tradingsymbol' not in holdings.columns:
+    if "tradingsymbol" not in holdings.columns:
         logger.error("Holdings DataFrame does not have a 'tradingsymbol' column.")
         return
 
-    current_symbols = set(holdings['tradingsymbol'].unique())
-    keys_to_remove = [symbol for symbol in stop_loss_data.keys() if symbol not in current_symbols]
+    current_symbols = set(holdings["tradingsymbol"].unique())
+    keys_to_remove = [
+        symbol for symbol in stop_loss_data.keys() if symbol not in current_symbols
+    ]
 
     if not keys_to_remove:
         logger.info("No outdated stop-loss entries to remove. JSON is up-to-date.")
@@ -742,15 +857,20 @@ def cleanup_stop_loss_json(holdings = fetch_holdings()):
             for key in keys_to_remove:
                 del stop_loss_data[key]
 
-            with open(HOLDINGS_FILE_PATH, 'w') as json_file:
+            with open(HOLDINGS_FILE_PATH, "w") as json_file:
                 json.dump(stop_loss_data, json_file, indent=4)
-            logger.info(f"Removed {len(keys_to_remove)} outdated stop-loss entries from JSON.")
+            logger.info(
+                f"Removed {len(keys_to_remove)} outdated stop-loss entries from JSON."
+            )
     except Timeout:
-        logger.error(f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}.")
+        logger.error(
+            f"Timeout while trying to acquire the lock for {HOLDINGS_FILE_PATH}."
+        )
         return
     except Exception as e:
         logger.error(f"Error during cleanup of stop-loss JSON: {str(e)}")
         return
+
 
 @lru_cache(maxsize=None)
 def get_params_grid():
@@ -769,8 +889,10 @@ def get_params_grid():
     """
     try:
         # Create the SQLAlchemy engine
-        engine = create_engine(f"mysql+mysqlconnector://{USER}:{DB_PASSWORD}@{HOST}/{DATABASE}")
-        
+        engine = create_engine(
+            f"mysql+mysqlconnector://{USER}:{DB_PASSWORD}@{HOST}/{DATABASE}"
+        )
+
         # Query the Trade_Params table
         query = "SELECT * FROM Trade_Params"
         df_trade_params = pd.read_sql(query, engine)
@@ -782,10 +904,12 @@ def get_params_grid():
     except Exception as e:
         print(f"Error: {e}")
         return {}
-    
+
+
 _last_data = None
 _last_fetch = 0
 TTL = 1800  # 30 minutes in seconds
+
 
 def get_mmi_now(force_refresh: bool = False):
     """Fetch Tickertape MMI data, cached for 30 minutes to avoid over-hitting."""
@@ -798,7 +922,7 @@ def get_mmi_now(force_refresh: bool = False):
             resp.raise_for_status()
             _last_data = resp.json()["data"]["indicator"]
             _last_fetch = now
-        except (RequestException, ValueError) as e:
+        except (RequestException, ValueError):
             return None
 
     return _last_data
