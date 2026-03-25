@@ -9,9 +9,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+import sys
 
 # run from repo root expected
 REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
 HIST = REPO / "intermediary_files" / "Hist_Data" / "NIFTYETF.feather"
 ENV_FILE = Path("/home/ubuntu/.autotrader_env")
 
