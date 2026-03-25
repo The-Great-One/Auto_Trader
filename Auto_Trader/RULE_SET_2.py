@@ -27,7 +27,7 @@ CONFIG = {
     "min_atr_fallback_frac": 0.02,  # if ATR missing, fallback = max(0.01, frac * price)
     "breakeven_trigger_pct": 2.5,  # once crossed, SL should protect principal
     "breakeven_buffer_pct": 0.2,  # lock at least +0.2% above avg after trigger
-    "momentum_exit_rsi": 45.0,
+    "momentum_exit_rsi": 42.0,
     "profit_ladder": [  # (profit% threshold, trail = max(last - k*ATR, entry*floor_mult))
         (30, {"k": 0.25, "floor_mult": 1.18}),
         (20, {"k": 0.40, "floor_mult": 1.12}),

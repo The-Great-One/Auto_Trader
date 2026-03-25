@@ -6,13 +6,13 @@ import numpy as np
 logger = logging.getLogger("Auto_Trade_Logger")
 
 CONFIG = {
-    "adx_min": float(os.getenv("AT_BUY_ADX_MIN", "20")),
+    "adx_min": float(os.getenv("AT_BUY_ADX_MIN", "18")),
     "adx_strong_min": float(os.getenv("AT_BUY_ADX_STRONG_MIN", "25")),
     "mmi_risk_off": float(os.getenv("AT_BUY_MMI_RISK_OFF", "65")),
     "min_atr_pct": float(os.getenv("AT_BUY_MIN_ATR_PCT", "0.006")),
     "max_atr_pct": float(os.getenv("AT_BUY_MAX_ATR_PCT", "0.09")),
-    "max_extension_atr": float(os.getenv("AT_BUY_MAX_EXTENSION_ATR", "2.5")),
-    "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "2.0")),
+    "max_extension_atr": float(os.getenv("AT_BUY_MAX_EXTENSION_ATR", "2.2")),
+    "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "2.5")),
 }
 
 

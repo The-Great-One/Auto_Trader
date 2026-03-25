@@ -155,15 +155,18 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
 
 
 def variants() -> list[tuple[str, dict, dict]]:
+    # Production model: BUY from RULE_SET_7, SELL from RULE_SET_2
     buy_grid = {
-        "adx_min": [18, 20],
-        "max_obv_zscore": [2.0, 2.5],
-        "max_extension_atr": [2.2, 2.8],
+        "adx_min": [16, 18, 20],
+        "max_obv_zscore": [2.0, 2.5, 3.0],
+        "max_extension_atr": [2.0, 2.2, 2.5],
+        "mmi_risk_off": [62, 65],
     }
     sell_grid = {
-        "momentum_exit_rsi": [42.0, 45.0, 48.0],
-        "ema_break_atr_mult": [0.5, 0.7],
-        "breakeven_trigger_pct": [2.5, 3.5],
+        "momentum_exit_rsi": [40.0, 42.0, 45.0],
+        "ema_break_atr_mult": [0.45, 0.5, 0.7],
+        "breakeven_trigger_pct": [2.0, 2.5, 3.0],
+        "relative_volume_exit": [1.2, 1.3],
     }
 
     out = []
@@ -173,7 +176,12 @@ def variants() -> list[tuple[str, dict, dict]]:
         for svals in itertools.product(*sell_grid.values()):
             s = dict(zip(sell_grid.keys(), svals))
             idx += 1
-            out.append((f"variant_{idx:02d}", b, s))
+            out.append((f"variant_{idx:04d}", b, s))
+
+    # keep runtime bounded for weekly cron
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "700"))
+    if len(out) > max_variants:
+        out = out[:max_variants]
 
     # baseline = current configs
     out.insert(0, ("baseline_current", {}, {}))
@@ -192,8 +200,10 @@ def main():
 
     recommendation = {
         "generated_at": datetime.now().isoformat(),
+        "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
         "baseline": asdict(baseline),
         "best": asdict(best),
+        "tested_variants": len(rank),
         "improvement_return_pct": round(best.total_return_pct - baseline.total_return_pct, 2),
         "should_promote": bool(best.name != baseline.name and best.total_return_pct > baseline.total_return_pct and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + 2.0),
     }
