@@ -38,6 +38,18 @@ CONFIG = {
     ],
 }
 
+# Dip-aware sell guard (for long-horizon accumulation symbols like NIFTYETF)
+_DIP_HOLD_SYMBOLS = {
+    x.strip().upper()
+    for x in os.getenv("AT_DIP_HOLD_SYMBOLS", "NIFTYETF").split(",")
+    if x.strip()
+}
+_DIP_MAX_DRAWDOWN_PCT = max(0.0, float(os.getenv("AT_DIP_MAX_DRAWDOWN_PCT", "12")))
+_DIP_STRONG_BREAK_RSI = float(os.getenv("AT_DIP_STRONG_BREAK_RSI", "35"))
+_DIP_STRONG_BREAK_MACD = float(os.getenv("AT_DIP_STRONG_BREAK_MACD", "-0.20"))
+# Optional kill-switch date: while today <= this date, dip symbols never SELL
+_DIP_NO_SELL_UNTIL = os.getenv("AT_DIP_NO_SELL_UNTIL", "").strip()
+
 # ---------- Paths ----------
 BASE_DIR = os.path.abspath(os.getenv("AT_STATE_DIR", "./intermediary_files"))
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -151,6 +163,39 @@ def handle_sell(tradingsymbol):
     _with_lock(CONFIG["lock_timeout_s"], _do)
     logger.info("Removed %s from stop-loss JSON after selling", tradingsymbol)
     return "SELL"
+
+
+def _dip_guard_blocks_sell(tradingsymbol: str, profit_pct: float, rsi: float, macd_hist: float) -> bool:
+    symbol_u = (tradingsymbol or "").upper()
+    if symbol_u not in _DIP_HOLD_SYMBOLS:
+        return False
+
+    # Hard no-sell window (useful when intentionally buying panic dips)
+    if _DIP_NO_SELL_UNTIL:
+        try:
+            today = np.datetime64("today")
+            deadline = np.datetime64(_DIP_NO_SELL_UNTIL)
+            if today <= deadline:
+                logger.info("Dip guard hold for %s until %s", symbol_u, _DIP_NO_SELL_UNTIL)
+                return True
+        except Exception:
+            pass
+
+    # During moderate drawdown, prefer HOLD unless breakdown is very strong
+    if np.isfinite(profit_pct) and (-_DIP_MAX_DRAWDOWN_PCT <= profit_pct < 0):
+        rsi_bad = np.isfinite(rsi) and (rsi <= _DIP_STRONG_BREAK_RSI)
+        macd_bad = np.isfinite(macd_hist) and (macd_hist <= _DIP_STRONG_BREAK_MACD)
+        if not (rsi_bad and macd_bad):
+            logger.info(
+                "Dip guard HOLD %s at %.2f%% (RSI=%s, MACD_Hist=%s)",
+                symbol_u,
+                profit_pct,
+                rsi,
+                macd_hist,
+            )
+            return True
+
+    return False
 
 
 # ---------- Main strategy ----------
@@ -294,6 +339,11 @@ def buy_or_sell(df, row, holdings):
         logger.exception("Error calculating profit_percent")
         return "HOLD"
 
+    def _maybe_sell():
+        if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+            return "HOLD"
+        return _maybe_sell()
+
     # ---- Start with a baseline trailing SL ----
     new_sl = stop_loss if stop_loss is not None else (last_price - 2.0 * last_atr)
     if profit_pct >= CONFIG["breakeven_trigger_pct"]:
@@ -302,7 +352,7 @@ def buy_or_sell(df, row, holdings):
 
     # ---- HARD BREACH first (handles gaps/intrabar) ----
     if np.isfinite(day_low) and np.isfinite(new_sl) and day_low <= new_sl:
-        return handle_sell(tradingsymbol)
+        return _maybe_sell()
 
     # ---- Ordered decision tree ----
     try:
@@ -310,7 +360,7 @@ def buy_or_sell(df, row, holdings):
         if last_price < average_price:
             # Donchian structure break → exit
             if have_donch and last_price < donch_low:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
             # EMA10 2-bar + ATR-scaled break
             if have_ema10:
@@ -332,7 +382,7 @@ def buy_or_sell(df, row, holdings):
                         CONFIG["ema_break_atr_mult"] * last_atr
                     )
                     if both_below and deep_break:
-                        return handle_sell(tradingsymbol)
+                        return _maybe_sell()
 
             # MACD histogram bearish (optional in chop; stronger in trend)
             if have_hist and macd_hist < CONFIG["hist_bearish_threshold"]:
@@ -340,7 +390,7 @@ def buy_or_sell(df, row, holdings):
 
             # RSI capitulation (only as a tie-breaker; avoid overusing oscillators)
             if have_rsi and last_rsi < 40:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
         # 2) PROFIT SCENARIO: laddered trailing + regime-aware filters
         else:
@@ -364,7 +414,7 @@ def buy_or_sell(df, row, holdings):
                 and (last_rsi < CONFIG["momentum_exit_rsi"])
                 and (macd_hist < CONFIG["hist_bearish_threshold"])
             ):
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
             # Upper-band failure: tag then lose strength (only tighten, don't insta-exit)
             if np.isfinite(prev_b) and np.isfinite(curr_b) and have_bb:
@@ -385,11 +435,11 @@ def buy_or_sell(df, row, holdings):
                     CONFIG["ema_break_atr_mult"] * last_atr
                 )
                 if both_below and deep_break and (last_rsi < 50):
-                    return handle_sell(tradingsymbol)
+                    return _maybe_sell()
 
             # Donchian structure break in profit → exit
             if have_donch and last_price < donch_low:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
             # RVOL-confirmed weakness: price < EMA50 with heavy volume
             if (
@@ -397,7 +447,7 @@ def buy_or_sell(df, row, holdings):
                 and rv > CONFIG["relative_volume_exit"]
                 and last_price < ema50
             ):
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
         # 3) TIME STOP (mostly for chop)
         try:
@@ -409,7 +459,7 @@ def buy_or_sell(df, row, holdings):
             bars_in_trade = np.nan
         if np.isfinite(bars_in_trade) and bars_in_trade >= CONFIG["time_stop_bars"]:
             if profit_pct < CONFIG["time_stop_min_profit_pct"]:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
     except Exception:
         logger.exception("Error applying trading logic")
@@ -432,9 +482,9 @@ def buy_or_sell(df, row, holdings):
 
             # Re-check with updated SL (covers post-adjust breach)
             if np.isfinite(day_low) and day_low <= new_sl:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
             if last_price <= new_sl:
-                return handle_sell(tradingsymbol)
+                return _maybe_sell()
 
         return "HOLD"
     except Exception:
