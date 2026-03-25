@@ -16,6 +16,27 @@ HIST = REPO / "intermediary_files" / "Hist_Data" / "NIFTYETF.feather"
 ENV_FILE = Path("/home/ubuntu/.autotrader_env")
 
 
+def _load_price_data() -> pd.DataFrame:
+    if HIST.exists():
+        df = pd.read_feather(HIST)
+        if "Date" in df.columns:
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+            df = df.sort_values("Date")
+        return df.tail(260).reset_index(drop=True)
+
+    # Fallback for lean servers without Hist_Data cache
+    try:
+        import yfinance as yf
+
+        d = yf.download("NIFTYBEES.NS", period="2y", interval="1d", auto_adjust=False, progress=False)
+        if d is None or d.empty:
+            raise RuntimeError("yfinance returned empty data")
+        d = d.reset_index().rename(columns={"Date": "Date", "Open": "Open", "High": "High", "Low": "Low", "Close": "Close", "Volume": "Volume"})
+        return d[["Date", "Open", "High", "Low", "Close", "Volume"]].tail(260).reset_index(drop=True)
+    except Exception as e:
+        raise SystemExit(f"Missing data: {HIST} and yfinance fallback failed: {e}")
+
+
 @dataclass
 class Result:
     rule: str
@@ -107,14 +128,7 @@ def _simulate(rule_name: str, df: pd.DataFrame) -> Result:
 
 
 def main():
-    if not HIST.exists():
-        raise SystemExit(f"Missing data: {HIST}")
-
-    df = pd.read_feather(HIST)
-    if "Date" in df.columns:
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-        df = df.sort_values("Date")
-    df = df.tail(260).reset_index(drop=True)
+    df = _load_price_data()
 
     candidates = ["RULE_SET_2", "RULE_SET_7"]
     results = [_simulate(c, df) for c in candidates]
