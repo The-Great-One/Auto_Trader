@@ -342,7 +342,7 @@ def buy_or_sell(df, row, holdings):
     def _maybe_sell():
         if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
             return "HOLD"
-        return _maybe_sell()
+        return handle_sell(tradingsymbol)
 
     # ---- Start with a baseline trailing SL ----
     new_sl = stop_loss if stop_loss is not None else (last_price - 2.0 * last_atr)
