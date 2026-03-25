@@ -35,8 +35,20 @@ def _load_price_data() -> pd.DataFrame:
         d = yf.download("NIFTYBEES.NS", period="2y", interval="1d", auto_adjust=False, progress=False)
         if d is None or d.empty:
             raise RuntimeError("yfinance returned empty data")
-        d = d.reset_index().rename(columns={"Date": "Date", "Open": "Open", "High": "High", "Low": "Low", "Close": "Close", "Volume": "Volume"})
-        return d[["Date", "Open", "High", "Low", "Close", "Volume"]].tail(260).reset_index(drop=True)
+        # flatten columns in case provider returns multi-index
+        if hasattr(d.columns, "levels"):
+            d.columns = [str(c[0]) for c in d.columns]
+        d = d.reset_index()
+        cmap = {str(c).lower(): c for c in d.columns}
+        out = pd.DataFrame()
+        out["Date"] = pd.to_datetime(d[cmap.get("date", "Date")], errors="coerce")
+        out["Open"] = pd.to_numeric(d[cmap.get("open", "Open")], errors="coerce")
+        out["High"] = pd.to_numeric(d[cmap.get("high", "High")], errors="coerce")
+        out["Low"] = pd.to_numeric(d[cmap.get("low", "Low")], errors="coerce")
+        out["Close"] = pd.to_numeric(d[cmap.get("close", "Close")], errors="coerce")
+        out["Volume"] = pd.to_numeric(d[cmap.get("volume", "Volume")], errors="coerce")
+        out = out.dropna(subset=["Date", "Open", "High", "Low", "Close"]).fillna({"Volume": 0})
+        return out.tail(260).reset_index(drop=True)
     except Exception as e:
         raise SystemExit(f"Missing data: {HIST} and yfinance fallback failed: {e}")
 
