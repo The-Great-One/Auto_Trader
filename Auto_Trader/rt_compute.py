@@ -7,10 +7,38 @@ from Auto_Trader.utils import process_stock_and_decide, load_instruments_data
 import logging
 import traceback
 import queue  # Import Python's queue module for handling empty exceptions
+import json
+from datetime import datetime
 
 logger = logging.getLogger("Auto_Trade_Logger")
 TRADING_MODE = os.getenv("AT_TRADING_MODE", "DAILY").strip().upper()
 BAR_MINUTES = max(1, int(os.getenv("AT_BAR_MINUTES", "5")))
+PAPER_SHADOW_MODE = os.getenv("AT_PAPER_SHADOW_MODE", "0").strip() in {"1", "true", "TRUE", "yes", "YES"}
+
+
+def _publish_paper_decisions(message_queue, decisions):
+    buys = [d for d in decisions if d.get("Decision") == "BUY"]
+    sells = [d for d in decisions if d.get("Decision") == "SELL"]
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    payload = {
+        "time": ts,
+        "mode": "paper-shadow",
+        "buy_count": len(buys),
+        "sell_count": len(sells),
+        "buys": [d.get("Symbol") for d in buys[:20]],
+        "sells": [d.get("Symbol") for d in sells[:20]],
+        "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+    }
+
+    os.makedirs("reports", exist_ok=True)
+    with open("reports/paper_shadow_live_latest.json", "w") as f:
+        json.dump(payload, f, indent=2)
+
+    if buys or sells:
+        message_queue.put(
+            f"[PAPER] {ts} | BUY:{len(buys)} {payload['buys']} | SELL:{len(sells)} {payload['sells']}"
+        )
 
 
 def _resolve_bar_timestamp(stock_data):
@@ -131,7 +159,10 @@ def Apply_Rules(q, message_queue):
 
                 # Handle the decisions
                 if decisions:
-                    handle_decisions(message_queue, decisions=decisions)
+                    if PAPER_SHADOW_MODE:
+                        _publish_paper_decisions(message_queue, decisions)
+                    else:
+                        handle_decisions(message_queue, decisions=decisions)
 
             except queue.Empty:
                 # If the queue is empty, log a message and continue
