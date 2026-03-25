@@ -230,6 +230,11 @@ New scripts:
   - Reads latest scorecard + portfolio intel report
   - Sends daily health card to Discord via webhook (`DISCORD_WEBHOOK_URL`)
 
+- `scripts/weekly_strategy_supervisor.py`
+  - Backtests multiple strategies (`RULE_SET_2`, `RULE_SET_7`) on recent NIFTYETF history
+  - If current strategy is not profitable and an alternate is better, rotates rule-set and restarts `auto_trade.service`
+  - Writes `reports/weekly_strategy_supervisor.json`
+
 Suggested cron (example):
 
 ```bash
