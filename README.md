@@ -213,6 +213,33 @@ I wasn't able to refresh the session token in Python, so I'm using `systemd` to 
 
 The bot will now refresh the session token daily at 8:30 AM.
 
+## 🧠 Portfolio Intelligence (Equity + ETF + MF + News-aware Rebalance)
+
+New scripts:
+
+- `scripts/daily_portfolio_report.py`
+  - Pulls Kite holdings + `mf_holdings()`
+  - Builds allocation snapshot (Equity / ETF / MF)
+  - Computes news risk score from Reuters RSS headlines
+  - Generates target allocation drift and INR rebalance advice
+  - Writes:
+    - `reports/portfolio_intel_YYYY-MM-DD.json`
+    - `reports/portfolio_intel_YYYY-MM-DD.md`
+
+- `scripts/send_discord_health_alert.py`
+  - Reads latest scorecard + portfolio intel report
+  - Sends daily health card to Discord via webhook (`DISCORD_WEBHOOK_URL`)
+
+Suggested cron (example):
+
+```bash
+# 16:20 IST generate intelligence report
+20 16 * * 1-5 /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/daily_portfolio_report.py >> /home/ubuntu/Auto_Trader/reports/portfolio_intel_cron.log 2>&1
+
+# 16:25 IST send Discord health alert
+25 16 * * 1-5 DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...' /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/send_discord_health_alert.py >> /home/ubuntu/Auto_Trader/reports/discord_alert_cron.log 2>&1
+```
+
 ## 🛠️ Future Enhancements
 
 - **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
