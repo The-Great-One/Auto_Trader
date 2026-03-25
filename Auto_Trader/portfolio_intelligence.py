@@ -94,8 +94,14 @@ def fetch_portfolio_snapshot(kite) -> pd.DataFrame:
 
 def news_risk_score() -> Tuple[int, List[str]]:
     sources = [
+        # Global
         "https://feeds.reuters.com/reuters/worldNews",
         "https://feeds.reuters.com/reuters/businessNews",
+        # India-focused
+        "https://www.moneycontrol.com/rss/business.xml",
+        "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+        "https://www.livemint.com/rss/markets",
+        "https://www.businesstoday.in/rss/markets",
     ]
     risk_words = [
         "war",
@@ -104,9 +110,15 @@ def news_risk_score() -> Tuple[int, List[str]]:
         "attack",
         "conflict",
         "oil spike",
+        "crude spikes",
         "emergency",
         "invasion",
         "terror",
+        "border tension",
+        "loc",
+        "geopolitical",
+        "india-pakistan",
+        "middle east conflict",
     ]
     calm_words = ["ceasefire", "truce", "deal", "eases", "cools", "decline in oil"]
 
