@@ -54,6 +54,92 @@ class MFExecutionConfig:
     )
 
 
+REBALANCE_PROFILES: dict[str, dict[str, Any]] = {
+    "aggressive": {
+        "description": "Tilts new MF allocation toward higher-beta equity funds and trims conservative funds first.",
+        "buy_positive": [
+            "small cap",
+            "mid cap",
+            "micro cap",
+            "flexi cap",
+            "focused",
+            "infrastructure",
+            "sector",
+            "thematic",
+            "nasdaq",
+            "opportunities",
+            "momentum",
+            "multicap",
+            "equity",
+        ],
+        "buy_negative": [
+            "liquid",
+            "debt",
+            "arbitrage",
+            "money market",
+            "short duration",
+            "corporate bond",
+            "gilt",
+            "balanced",
+            "equity & debt",
+            "hybrid",
+            "index",
+        ],
+        "redeem_positive": [
+            "liquid",
+            "debt",
+            "arbitrage",
+            "money market",
+            "short duration",
+            "corporate bond",
+            "gilt",
+            "balanced",
+            "equity & debt",
+            "hybrid",
+            "index",
+            "large cap",
+        ],
+        "redeem_negative": [
+            "small cap",
+            "mid cap",
+            "micro cap",
+            "flexi cap",
+            "focused",
+            "infrastructure",
+            "sector",
+            "thematic",
+            "nasdaq",
+            "opportunities",
+            "momentum",
+        ],
+        "auto_buy_limit": 3,
+        "auto_redeem_limit": 3,
+    },
+    "balanced": {
+        "description": "Spreads MF rebalancing across diversified funds with even weights.",
+        "buy_positive": ["flexi cap", "multicap", "index", "large cap", "hybrid", "balanced"],
+        "buy_negative": ["liquid", "debt", "arbitrage"],
+        "redeem_positive": ["sector", "thematic", "small cap", "mid cap", "momentum"],
+        "redeem_negative": ["hybrid", "balanced", "index", "large cap"],
+        "auto_buy_limit": 3,
+        "auto_redeem_limit": 3,
+    },
+    "tax-aware": {
+        "description": "Avoids redeeming tax-saver style funds when possible and prefers broad diversified additions.",
+        "buy_positive": ["elss", "tax saver", "flexi cap", "index", "large cap"],
+        "buy_negative": ["liquid", "debt", "arbitrage"],
+        "redeem_positive": ["liquid", "debt", "arbitrage", "hybrid", "balanced"],
+        "redeem_negative": ["elss", "tax saver"],
+        "auto_buy_limit": 3,
+        "auto_redeem_limit": 3,
+    },
+}
+
+
+def available_rebalance_profiles() -> dict[str, str]:
+    return {name: str(cfg.get("description") or "") for name, cfg in REBALANCE_PROFILES.items()}
+
+
 def _safe_float(value: Any) -> float | None:
     try:
         if value is None or value == "":
@@ -515,6 +601,110 @@ def _normalize_weights(symbols: list[str], weights: list[float] | None) -> dict[
     return {symbol: raw[idx] / total for idx, symbol in enumerate(clean_symbols)}
 
 
+def _candidate_text(symbol: str, instruments: dict[str, dict[str, Any]], holdings_index: dict[str, dict[str, Any]]) -> str:
+    instrument = instruments.get(symbol) or {}
+    holding = holdings_index.get(symbol) or {}
+    return " ".join(
+        str(x or "")
+        for x in [
+            symbol,
+            instrument.get("name"),
+            instrument.get("scheme_name"),
+            instrument.get("amc"),
+            instrument.get("scheme_type"),
+            instrument.get("plan"),
+            holding.get("fund"),
+            holding.get("scheme_name"),
+        ]
+    ).lower()
+
+
+def _score_candidate(text: str, positive: list[str], negative: list[str], for_buy: bool) -> float:
+    score = 1.0
+    for word in positive:
+        if word in text:
+            score += 2.0
+    for word in negative:
+        if word in text:
+            score -= 1.5
+    if for_buy:
+        if " direct " in f" {text} ":
+            score += 0.4
+        if " regular " in f" {text} ":
+            score -= 0.6
+        if " growth " in f" {text} ":
+            score += 0.2
+    return score
+
+
+def _select_profile_symbols(
+    profile_name: str,
+    action: str,
+    instruments: dict[str, dict[str, Any]],
+    holdings_index: dict[str, dict[str, Any]],
+    symbols: list[str] | None,
+    weights: list[float] | None,
+) -> tuple[list[str], list[float] | None, dict[str, Any], list[str]]:
+    profile_key = profile_name.strip().lower()
+    if profile_key not in REBALANCE_PROFILES:
+        raise ValueError(f"Unknown MF rebalance profile: {profile_name}")
+
+    profile = REBALANCE_PROFILES[profile_key]
+    for_buy = action.upper() == "BUY"
+    provided_symbols = [s.strip().upper() for s in (symbols or []) if s and s.strip()]
+    candidate_symbols = provided_symbols[:]
+
+    if not candidate_symbols:
+        if for_buy:
+            candidate_symbols = [
+                symbol
+                for symbol, row in instruments.items()
+                if bool(row.get("purchase_allowed", True))
+            ]
+        else:
+            candidate_symbols = [
+                symbol
+                for symbol, holding in holdings_index.items()
+                if (_safe_float(holding.get("quantity")) or 0.0) > 0
+            ]
+
+    positive = list(profile.get("buy_positive") if for_buy else profile.get("redeem_positive") or [])
+    negative = list(profile.get("buy_negative") if for_buy else profile.get("redeem_negative") or [])
+    ranked = []
+    for symbol in candidate_symbols:
+        text = _candidate_text(symbol, instruments, holdings_index)
+        score = _score_candidate(text, positive, negative, for_buy=for_buy)
+        ranked.append({"symbol": symbol, "score": round(score, 3), "text": text})
+    ranked.sort(key=lambda item: (item["score"], item["symbol"]), reverse=True)
+
+    notes: list[str] = []
+    if provided_symbols:
+        chosen_symbols = provided_symbols
+        if weights:
+            resolved_weights = weights
+        else:
+            scored_map = {item["symbol"]: max(0.05, float(item["score"])) for item in ranked}
+            resolved_weights = [scored_map.get(symbol, 1.0) for symbol in chosen_symbols]
+            notes.append(f"Applied {profile_key} profile weights across provided {action.lower()} symbols")
+    else:
+        limit = int(profile.get("auto_buy_limit") if for_buy else profile.get("auto_redeem_limit") or 3)
+        chosen = ranked[: max(1, limit)]
+        chosen_symbols = [item["symbol"] for item in chosen]
+        resolved_weights = [max(0.05, float(item["score"])) for item in chosen]
+        if chosen_symbols:
+            notes.append(f"Auto-selected {action.lower()} symbols using {profile_key} profile")
+
+    profile_resolution = {
+        "name": profile_key,
+        "description": profile.get("description"),
+        "action": action.upper(),
+        "provided_symbols": provided_symbols,
+        "selected_symbols": chosen_symbols,
+        "ranked_candidates": [{"symbol": item["symbol"], "score": item["score"]} for item in ranked[:10]],
+    }
+    return chosen_symbols, resolved_weights, profile_resolution, notes
+
+
 def _build_redeem_orders(redeem_amount: float, holdings_index: dict[str, dict[str, Any]], instruments: dict[str, dict[str, Any]], redeem_symbols: list[str], redeem_weights: list[float] | None, tag: str) -> tuple[list[MFOrderRequest], list[str]]:
     orders: list[MFOrderRequest] = []
     notes: list[str] = []
@@ -545,7 +735,17 @@ def _build_redeem_orders(redeem_amount: float, holdings_index: dict[str, dict[st
     return orders, notes
 
 
-def build_rebalance_plan(report: dict, kite, buy_symbols: list[str] | None = None, buy_weights: list[float] | None = None, redeem_symbols: list[str] | None = None, redeem_weights: list[float] | None = None, min_ticket: float = 500.0, tag: str = "mf_rebalance") -> dict[str, Any]:
+def build_rebalance_plan(
+    report: dict,
+    kite,
+    buy_symbols: list[str] | None = None,
+    buy_weights: list[float] | None = None,
+    redeem_symbols: list[str] | None = None,
+    redeem_weights: list[float] | None = None,
+    min_ticket: float = 500.0,
+    tag: str = "mf_rebalance",
+    profile_name: str | None = None,
+) -> dict[str, Any]:
     buy_symbols = buy_symbols or []
     redeem_symbols = redeem_symbols or []
     mf_delta = float((report.get("rebalance_advice_inr") or {}).get("MF", 0.0) or 0.0)
@@ -553,9 +753,22 @@ def build_rebalance_plan(report: dict, kite, buy_symbols: list[str] | None = Non
     notes: list[str] = []
     instruments = fetch_mf_instrument_index(kite)
     holdings_index = fetch_mf_holdings_index(kite)
+    profile_resolution: dict[str, Any] | None = None
 
     if mf_delta > 0:
-        weights = _normalize_weights(buy_symbols, buy_weights)
+        resolved_buy_symbols = buy_symbols
+        resolved_buy_weights = buy_weights
+        if profile_name:
+            resolved_buy_symbols, resolved_buy_weights, profile_resolution, profile_notes = _select_profile_symbols(
+                profile_name,
+                "BUY",
+                instruments,
+                holdings_index,
+                buy_symbols,
+                buy_weights,
+            )
+            notes.extend(profile_notes)
+        weights = _normalize_weights(resolved_buy_symbols, resolved_buy_weights)
         if not weights:
             notes.append("MF allocation wants buys but no buy symbols were provided")
         else:
@@ -567,20 +780,43 @@ def build_rebalance_plan(report: dict, kite, buy_symbols: list[str] | None = Non
                 else:
                     notes.append(f"skipped {symbol} because allocated amount {round(amount, 2)} is below min ticket {min_ticket}")
             orders.extend(build_buy_orders_from_target_amounts(target_amounts, tag=tag))
+            buy_symbols = list(weights.keys())
     elif mf_delta < 0:
         redeem_amount = abs(mf_delta)
-        if not redeem_symbols:
+        resolved_redeem_symbols = redeem_symbols
+        resolved_redeem_weights = redeem_weights
+        if profile_name:
+            resolved_redeem_symbols, resolved_redeem_weights, profile_resolution, profile_notes = _select_profile_symbols(
+                profile_name,
+                "SELL",
+                instruments,
+                holdings_index,
+                redeem_symbols,
+                redeem_weights,
+            )
+            notes.extend(profile_notes)
+        if not resolved_redeem_symbols:
             notes.append("MF allocation wants redemptions but no redeem symbols were provided")
         else:
-            redeem_orders, redeem_notes = _build_redeem_orders(redeem_amount, holdings_index, instruments, redeem_symbols, redeem_weights, tag)
+            redeem_orders, redeem_notes = _build_redeem_orders(
+                redeem_amount,
+                holdings_index,
+                instruments,
+                resolved_redeem_symbols,
+                resolved_redeem_weights,
+                tag,
+            )
             orders.extend(redeem_orders)
             notes.extend(redeem_notes)
+            redeem_symbols = resolved_redeem_symbols
     else:
         notes.append("No MF rebalance action required from current report")
 
     return {
         "generated_at": datetime.now().isoformat(),
         "tag": tag,
+        "profile": profile_name.strip().lower() if profile_name else None,
+        "profile_resolution": profile_resolution,
         "report_mf_delta": round(mf_delta, 2),
         "buy_symbols": [s.strip().upper() for s in buy_symbols if s and s.strip()],
         "redeem_symbols": [s.strip().upper() for s in redeem_symbols if s and s.strip()],

@@ -16,6 +16,7 @@ from Auto_Trader.mf_execution import (
     MFExecutionConfig,
     MFSIPModifyRequest,
     MFSIPRequest,
+    available_rebalance_profiles,
     build_rebalance_plan,
     execute_orders,
     execute_sip_cancel,
@@ -92,6 +93,10 @@ def cmd_allowlist(_kite, args):
     dump_result(sorted(load_allowlist(config)), args.output)
 
 
+def cmd_profiles(_kite, args):
+    dump_result(available_rebalance_profiles(), args.output)
+
+
 def cmd_plan(kite, args):
     payload = load_json(args.plan)
     raw_orders = payload.get("orders", payload)
@@ -124,6 +129,7 @@ def cmd_rebalance_plan(kite, args):
         redeem_weights=_parse_weights(args.redeem_weight),
         min_ticket=args.min_ticket,
         tag=args.tag,
+        profile_name=args.profile,
     )
     plan["report_path"] = str(report_path) if report_path else None
     output_path = args.output or _default_plan_path("mf_rebalance_plan")
@@ -212,6 +218,10 @@ def main():
     p.add_argument("--output")
     p.set_defaults(func=cmd_allowlist)
 
+    p = sub.add_parser("profiles", help="Show built-in MF rebalance profiles")
+    p.add_argument("--output")
+    p.set_defaults(func=cmd_profiles)
+
     p = sub.add_parser("plan", help="Execute a JSON MF order plan")
     p.add_argument("plan")
     p.add_argument("--tag", default="mf_manual")
@@ -227,6 +237,7 @@ def main():
     p.add_argument("--redeem-symbol", action="append", default=[], help="MF tradingsymbol to redeem when MF allocation should shrink. Repeatable")
     p.add_argument("--redeem-weight", action="append", type=float, default=[], help="Optional weight for each --redeem-symbol")
     p.add_argument("--min-ticket", type=float, default=500.0)
+    p.add_argument("--profile", choices=sorted(available_rebalance_profiles().keys()))
     p.add_argument("--tag", default="mf_rebalance")
     p.add_argument("--execute", action="store_true", help="Actually place orders after generating plan")
     p.add_argument("--output", help="Path to write plan JSON")
@@ -240,6 +251,7 @@ def main():
     p.add_argument("--redeem-symbol", action="append", default=[])
     p.add_argument("--redeem-weight", action="append", type=float, default=[])
     p.add_argument("--min-ticket", type=float, default=500.0)
+    p.add_argument("--profile", choices=sorted(available_rebalance_profiles().keys()))
     p.add_argument("--tag", default="mf_rebalance")
     p.add_argument("--execute", action="store_true")
     p.add_argument("--output")
