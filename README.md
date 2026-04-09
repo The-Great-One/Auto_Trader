@@ -235,12 +235,14 @@ New scripts:
   - Requires `AT_MF_ENABLE_LIVE=1` for live order placement
 
 - `scripts/mf_order_manager.py`
-  - Safe CLI for MF search, holdings, orders, and guarded execution
+  - Safe CLI for MF search, holdings, orders, SIPs, and guarded execution
   - Supports:
     - searching Kite MF instruments
-    - viewing MF holdings / MF orders
+    - viewing MF holdings / MF orders / MF SIPs
     - executing a JSON order plan (dry-run by default)
-    - converting `portfolio_intel` MF rebalance advice into guarded BUY orders
+    - generating a MF rebalance plan from `portfolio_intel`
+    - executing a JSON SIP plan (dry-run by default)
+    - creating, modifying, and cancelling MF SIPs with live-guard rails
 
 - `scripts/send_discord_health_alert.py`
   - Reads latest scorecard + portfolio intel report
@@ -257,13 +259,19 @@ New scripts:
 # Search mutual funds
 python scripts/mf_order_manager.py search "parag parikh"
 
-# Dry-run MF rebalance buys from latest portfolio report
-python scripts/mf_order_manager.py from-report \
-  --mf-symbol "PPFAS_FLEXI_CAP_DIRECT_GROWTH" \
-  --mf-symbol "HDFC_INDEX_NIFTY_50_DIRECT_PLAN_GROWTH"
+# Generate MF rebalance plan from latest portfolio report
+python scripts/mf_order_manager.py rebalance-plan \
+  --buy-symbol "INF879O01027" \
+  --buy-symbol "INF179KC1DA9"
+
+# Create a monthly SIP, dry-run by default
+python scripts/mf_order_manager.py sip-create INF879O01027 \
+  --amount 5000 --instalments 24 --frequency monthly --instalment-day 5
 
 # Live execution requires BOTH --execute and env flag
 AT_MF_ENABLE_LIVE=1 python scripts/mf_order_manager.py plan mf_plan.json --execute
+AT_MF_ENABLE_LIVE=1 python scripts/mf_order_manager.py sip-create INF879O01027 \
+  --amount 5000 --instalments 24 --frequency monthly --instalment-day 5 --execute
 ```
 
 Optional guardrails:

@@ -43,7 +43,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_7.py` - current BUY rule
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
-- `mf_execution.py` - guarded mutual-fund search/validation/execution helper
+- `mf_execution.py` - guarded mutual-fund order, SIP, and rebalance-plan helper
 - `updater.py` - background refresh/update worker
 - `TelegramLink.py` - Telegram delivery with retry/backoff
 - `my_secrets.py` - secrets and channel config, highly sensitive
@@ -54,7 +54,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `daily_portfolio_report.py` - holdings + allocation intelligence
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
-- `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, dry-run/live guarded execution
+- `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
@@ -88,12 +88,13 @@ Backtests, permutations, historical analysis, ad hoc research helpers.
 
 - Portfolio analysis includes MF holdings via `kite.mf_holdings()`
 - MF execution is intentionally separate from `wednesday.py` live trading runtime
-- Live MF placement currently happens only through `scripts/mf_order_manager.py`
+- Live MF placement and SIP management currently happen only through `scripts/mf_order_manager.py`
+- Rebalance plans are generated from `portfolio_intel` reports, then optionally executed
 - Guardrails:
   - dry-run by default
   - live placement requires `AT_MF_ENABLE_LIVE=1`
   - optional symbol allowlist support
-  - per-order and per-run amount caps
+  - per-order, per-run, and per-SIP amount caps
 
 ## Current alerting behavior
 
