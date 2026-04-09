@@ -239,6 +239,7 @@ New scripts:
   - Supports:
     - searching Kite MF instruments
     - viewing MF holdings / MF orders / MF SIPs
+    - showing built-in MF rebalance profiles (`aggressive`, `balanced`, `tax-aware`)
     - executing a JSON order plan (dry-run by default)
     - generating a MF rebalance plan from `portfolio_intel`
     - executing a JSON SIP plan (dry-run by default)
@@ -259,10 +260,16 @@ New scripts:
 # Search mutual funds
 python scripts/mf_order_manager.py search "parag parikh"
 
+# Show built-in MF rebalance profiles
+python scripts/mf_order_manager.py profiles
+
 # Generate MF rebalance plan from latest portfolio report
 python scripts/mf_order_manager.py rebalance-plan \
   --buy-symbol "INF879O01027" \
   --buy-symbol "INF179KC1DA9"
+
+# Let the aggressive profile auto-pick MF symbols from current holdings/report context
+python scripts/mf_order_manager.py rebalance-plan --refresh-report --profile aggressive
 
 # Create a monthly SIP, dry-run by default
 python scripts/mf_order_manager.py sip-create INF879O01027 \
