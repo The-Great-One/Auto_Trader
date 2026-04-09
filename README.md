@@ -226,6 +226,22 @@ New scripts:
     - `reports/portfolio_intel_YYYY-MM-DD.json`
     - `reports/portfolio_intel_YYYY-MM-DD.md`
 
+- `Auto_Trader/mf_execution.py`
+  - Guarded mutual-fund execution helper
+  - Validates MF symbols against Kite MF instruments
+  - Enforces dry-run by default
+  - Adds per-order and per-run amount caps
+  - Can optionally require allowlisted MF symbols
+  - Requires `AT_MF_ENABLE_LIVE=1` for live order placement
+
+- `scripts/mf_order_manager.py`
+  - Safe CLI for MF search, holdings, orders, and guarded execution
+  - Supports:
+    - searching Kite MF instruments
+    - viewing MF holdings / MF orders
+    - executing a JSON order plan (dry-run by default)
+    - converting `portfolio_intel` MF rebalance advice into guarded BUY orders
+
 - `scripts/send_discord_health_alert.py`
   - Reads latest scorecard + portfolio intel report
   - Sends daily health card to Discord via webhook (`DISCORD_WEBHOOK_URL`)
@@ -234,6 +250,30 @@ New scripts:
   - Backtests multiple strategies (`RULE_SET_2`, `RULE_SET_7`) on recent NIFTYETF history
   - If current strategy is not profitable and an alternate is better, rotates rule-set and restarts `auto_trade.service`
   - Writes `reports/weekly_strategy_supervisor.json`
+
+### MF execution examples
+
+```bash
+# Search mutual funds
+python scripts/mf_order_manager.py search "parag parikh"
+
+# Dry-run MF rebalance buys from latest portfolio report
+python scripts/mf_order_manager.py from-report \
+  --mf-symbol "PPFAS_FLEXI_CAP_DIRECT_GROWTH" \
+  --mf-symbol "HDFC_INDEX_NIFTY_50_DIRECT_PLAN_GROWTH"
+
+# Live execution requires BOTH --execute and env flag
+AT_MF_ENABLE_LIVE=1 python scripts/mf_order_manager.py plan mf_plan.json --execute
+```
+
+Optional guardrails:
+- `AT_MF_MAX_ORDER_AMOUNT`
+- `AT_MF_MAX_TOTAL_ORDER_AMOUNT`
+- `AT_MF_MIN_ORDER_AMOUNT`
+- `AT_MF_ENABLE_LIVE`
+- `AT_MF_REQUIRE_ALLOWLIST`
+- `AT_MF_ALLOWED_SYMBOLS`
+- `AT_MF_ALLOWLIST_PATH`
 
 Suggested cron (example):
 

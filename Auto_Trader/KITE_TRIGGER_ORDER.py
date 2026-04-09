@@ -1,6 +1,6 @@
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY
-from Auto_Trader.utils import read_session_data, fetch_holdings
+from Auto_Trader.utils import read_session_data, fetch_holdings, get_mmi_now
 from collections import defaultdict
 from math import floor
 import pandas as pd
@@ -46,6 +46,11 @@ _PORTFOLIO_TARGET_EQUITY = float(os.getenv("AT_TARGET_EQUITY", "0.75"))
 _PORTFOLIO_TARGET_ETF = float(os.getenv("AT_TARGET_ETF", "0.25"))
 _PORTFOLIO_BAND = float(os.getenv("AT_PORTFOLIO_BAND", "0.05"))
 _MAX_SINGLE_SYMBOL_WEIGHT = float(os.getenv("AT_MAX_SINGLE_SYMBOL_WEIGHT", "0.15"))
+_MMI_NEUTRAL = float(os.getenv("AT_MMI_NEUTRAL", "50"))
+_MMI_FULL_SCALE = max(1.0, float(os.getenv("AT_MMI_FULL_SCALE", "20")))
+_MMI_MAX_SKEW = max(0.0, float(os.getenv("AT_MMI_MAX_SKEW", "0.20")))
+_MMI_EQUITY_MIN = max(0.0, float(os.getenv("AT_MMI_EQUITY_MIN", "0.20")))
+_MMI_EQUITY_MAX = min(1.0, float(os.getenv("AT_MMI_EQUITY_MAX", "0.90")))
 
 
 def _norm_status(s: str) -> str:
@@ -185,13 +190,30 @@ def _load_symbol_metadata() -> Dict[str, dict]:
         return {}
 
 
-def _normalize_targets() -> Dict[str, float]:
+def _normalize_targets(mmi_value=None) -> Dict[str, float]:
     eq = max(0.0, _PORTFOLIO_TARGET_EQUITY)
     etf = max(0.0, _PORTFOLIO_TARGET_ETF)
     s = eq + etf
     if s <= 0:
-        return {"EQUITY": 0.75, "ETF": 0.25}
-    return {"EQUITY": eq / s, "ETF": etf / s}
+        base_eq, base_etf = 0.75, 0.25
+    else:
+        base_eq, base_etf = (eq / s), (etf / s)
+
+    if mmi_value is None:
+        return {"EQUITY": base_eq, "ETF": base_etf}
+
+    try:
+        mmi = float(mmi_value)
+    except (TypeError, ValueError):
+        return {"EQUITY": base_eq, "ETF": base_etf}
+
+    # Low MMI => risk-on (equity overweight), high MMI => risk-off (ETF overweight).
+    z = (_MMI_NEUTRAL - mmi) / _MMI_FULL_SCALE
+    z = max(-1.0, min(1.0, z))
+    skewed_eq = base_eq + (z * _MMI_MAX_SKEW)
+    skewed_eq = max(_MMI_EQUITY_MIN, min(_MMI_EQUITY_MAX, skewed_eq))
+    skewed_etf = max(0.0, 1.0 - skewed_eq)
+    return {"EQUITY": skewed_eq, "ETF": skewed_etf}
 
 
 def _classify_asset_class(
@@ -579,9 +601,16 @@ def handle_decisions(message_queue, decisions: List[dict]):
     )
 
     symbol_metadata = _load_symbol_metadata()
-    portfolio_targets = _normalize_targets()
+    mmi_value = get_mmi_now()
+    portfolio_targets = _normalize_targets(mmi_value)
     class_notional, symbol_notional, holdings_notional = _compute_portfolio_exposure(
         hdf, symbol_metadata
+    )
+    logger.info(
+        "Portfolio targets from MMI=%s => EQUITY %.1f%%, ETF %.1f%%",
+        mmi_value,
+        portfolio_targets["EQUITY"] * 100.0,
+        portfolio_targets["ETF"] * 100.0,
     )
 
     symbols_held = set(hdf.index)

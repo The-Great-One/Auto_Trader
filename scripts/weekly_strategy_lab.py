@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Local-only strategy lab:
-- builds strategy variants by tweaking RULE_SET_7 (BUY) + RULE_SET_2 (SELL)
+Strategy lab:
+- tweaks RULE_SET_7 (BUY) + RULE_SET_2 (SELL)
 - backtests variants on NIFTYBEES daily data
-- compares against current baseline
-- writes ranked report; DOES NOT deploy to server
+- uses latest daily scorecard to bias the search when useful
+- writes ranked reports; does NOT auto-deploy winners
 """
 
 from __future__ import annotations
@@ -12,21 +12,26 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import sys
 import tempfile
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
-import sys
+
+# Avoid noisy file-handler permission issues during research/backtest runs.
+os.environ.setdefault("AT_DISABLE_FILE_LOGGING", "1")
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Auto_Trader import RULE_SET_2, RULE_SET_7
+from Auto_Trader import RULE_SET_2, RULE_SET_7, logger as at_logger
 from Auto_Trader import utils as at_utils
+
+at_logger.setLevel("WARNING")
 
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
@@ -44,22 +49,129 @@ class BacktestResult:
 
 
 def load_data() -> pd.DataFrame:
-    df = yf.download("NIFTYBEES.NS", period="3y", interval="1d", auto_adjust=False, progress=False)
+    df = yf.download(
+        "NIFTYBEES.NS",
+        period="3y",
+        interval="1d",
+        auto_adjust=False,
+        progress=False,
+    )
     if df is None or df.empty:
         raise RuntimeError("Could not fetch NIFTYBEES.NS data")
     if hasattr(df.columns, "levels"):
         df.columns = [str(c[0]) for c in df.columns]
     df = df.reset_index()
-    use = pd.DataFrame({
-        "Date": pd.to_datetime(df["Date"], errors="coerce"),
-        "Open": pd.to_numeric(df["Open"], errors="coerce"),
-        "High": pd.to_numeric(df["High"], errors="coerce"),
-        "Low": pd.to_numeric(df["Low"], errors="coerce"),
-        "Close": pd.to_numeric(df["Close"], errors="coerce"),
-        "Volume": pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0),
-    }).dropna(subset=["Date", "Open", "High", "Low", "Close"])
+    use = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(df["Date"], errors="coerce"),
+            "Open": pd.to_numeric(df["Open"], errors="coerce"),
+            "High": pd.to_numeric(df["High"], errors="coerce"),
+            "Low": pd.to_numeric(df["Low"], errors="coerce"),
+            "Close": pd.to_numeric(df["Close"], errors="coerce"),
+            "Volume": pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0),
+        }
+    ).dropna(subset=["Date", "Open", "High", "Low", "Close"])
     use = use.sort_values("Date").reset_index(drop=True)
     return at_utils.Indicators(use)
+
+
+def load_scorecard_context() -> dict:
+    explicit = os.getenv("AT_LAB_SCORECARD_PATH", "").strip()
+    scorecard_path = Path(explicit) if explicit else None
+    if scorecard_path is None:
+        matches = sorted(OUT_DIR.glob("daily_scorecard_*.json"))
+        scorecard_path = matches[-1] if matches else None
+
+    if not scorecard_path or not scorecard_path.exists():
+        return {
+            "scorecard_found": False,
+            "optimization_focus": ["baseline_search"],
+            "code_findings": [],
+        }
+
+    raw = json.loads(scorecard_path.read_text())
+    log_counts = raw.get("log_counts", {}) or {}
+    orders = int(raw.get("orders", 0) or 0)
+    trades = int(raw.get("trades", 0) or 0)
+    buy_placed = int(log_counts.get("buy_placed", 0) or 0)
+    sell_placed = int(log_counts.get("sell_placed", 0) or 0)
+    ws_close = int(log_counts.get("ws_close", 0) or 0)
+    order_failed = int(log_counts.get("order_failed", 0) or 0)
+    market_blocked = int(log_counts.get("market_blocked", 0) or 0)
+    tick_size = int(log_counts.get("tick_size", 0) or 0)
+
+    no_trade_day = orders == 0 and trades == 0 and buy_placed == 0 and sell_placed == 0
+    optimization_focus = []
+    code_findings = []
+
+    if no_trade_day:
+        optimization_focus.append("expand_buy_sensitivity")
+    else:
+        optimization_focus.append("balanced_search")
+
+    if ws_close > 0:
+        code_findings.append("websocket_reconnect_review")
+    if order_failed > 0:
+        code_findings.append("order_error_path_review")
+    if market_blocked > 0 or tick_size > 0:
+        code_findings.append("broker_constraints_review")
+    if not code_findings:
+        code_findings.append("no_code_issues_detected_from_scorecard")
+
+    return {
+        "scorecard_found": True,
+        "scorecard_path": str(scorecard_path),
+        "date": raw.get("date"),
+        "orders": orders,
+        "trades": trades,
+        "buy_placed": buy_placed,
+        "sell_placed": sell_placed,
+        "estimated_realized_pnl": raw.get("estimated_realized_pnl"),
+        "verdict": raw.get("verdict"),
+        "log_counts": log_counts,
+        "no_trade_day": no_trade_day,
+        "optimization_focus": optimization_focus,
+        "code_findings": code_findings,
+    }
+
+
+def prioritized_values(values, current):
+    current_f = float(current)
+    uniq = []
+    seen = set()
+    for value in values:
+        key = float(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(value)
+    return sorted(uniq, key=lambda v: (abs(float(v) - current_f), float(v)))
+
+
+def build_grids(scorecard_context: dict) -> tuple[dict, dict]:
+    buy_cfg = RULE_SET_7.CONFIG
+    sell_cfg = RULE_SET_2.CONFIG
+
+    buy_grid = {
+        "adx_min": prioritized_values([14, 16, 18, 20, 22], buy_cfg["adx_min"]),
+        "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5], buy_cfg["max_obv_zscore"]),
+        "max_extension_atr": prioritized_values([1.8, 2.0, 2.2, 2.5, 2.8], buy_cfg["max_extension_atr"]),
+        "mmi_risk_off": prioritized_values([60, 62, 65, 68], buy_cfg["mmi_risk_off"]),
+    }
+    sell_grid = {
+        "momentum_exit_rsi": prioritized_values([38.0, 40.0, 42.0, 45.0], sell_cfg["momentum_exit_rsi"]),
+        "ema_break_atr_mult": prioritized_values([0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
+        "breakeven_trigger_pct": prioritized_values([1.5, 2.0, 2.5, 3.0], sell_cfg["breakeven_trigger_pct"]),
+        "relative_volume_exit": prioritized_values([1.1, 1.2, 1.3], sell_cfg["relative_volume_exit"]),
+    }
+
+    if scorecard_context.get("no_trade_day"):
+        buy_grid["adx_min"] = prioritized_values([12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
+        buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0], buy_cfg["max_obv_zscore"])
+        buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.2], buy_cfg["max_extension_atr"])
+        buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70], buy_cfg["mmi_risk_off"])
+
+    return buy_grid, sell_grid
 
 
 def _set_temp_state(rule2_module, d: str):
@@ -75,70 +187,81 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
     r2 = RULE_SET_2
     r7 = RULE_SET_7
 
-    # patch configs for this variant
     old_r2 = dict(r2.CONFIG)
     old_r7 = dict(r7.CONFIG)
     r2.CONFIG.update(sell_params)
     r7.CONFIG.update(buy_params)
 
-    with tempfile.TemporaryDirectory(prefix="at_state_") as td:
-        _set_temp_state(r2, td)
+    try:
+        with tempfile.TemporaryDirectory(prefix="at_state_") as td:
+            _set_temp_state(r2, td)
 
-        cash = 100000.0
-        qty = 0
-        avg = 0.0
-        trades = 0
-        wins = 0
-        equity_curve = []
+            cash = 100000.0
+            qty = 0
+            avg = 0.0
+            trades = 0
+            wins = 0
+            equity_curve = []
 
-        for i in range(250, len(df)):
-            part = df.iloc[: i + 1].copy()
-            row = part.iloc[-1].to_dict()
-            row.setdefault("instrument_token", 1626369)
-            price = float(part.iloc[-1]["Close"])
+            for i in range(250, len(df)):
+                part = df.iloc[: i + 1].copy()
+                row = part.iloc[-1].to_dict()
+                row.setdefault("instrument_token", 1626369)
+                price = float(part.iloc[-1]["Close"])
 
-            if qty == 0:
-                hold_df = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
-                sig = r7.buy_or_sell(part, row, hold_df)
-                if str(sig).upper() == "BUY":
-                    buy_qty = int(cash // price)
-                    if buy_qty > 0:
-                        qty = buy_qty
-                        cash -= qty * price
-                        avg = price
+                if qty == 0:
+                    hold_df = pd.DataFrame(
+                        columns=[
+                            "instrument_token",
+                            "tradingsymbol",
+                            "average_price",
+                            "quantity",
+                            "t1_quantity",
+                            "bars_in_trade",
+                        ]
+                    )
+                    sig = r7.buy_or_sell(part, row, hold_df)
+                    if str(sig).upper() == "BUY":
+                        buy_qty = int(cash // price)
+                        if buy_qty > 0:
+                            qty = buy_qty
+                            cash -= qty * price
+                            avg = price
+                            trades += 1
+                else:
+                    hold_df = pd.DataFrame(
+                        [
+                            {
+                                "instrument_token": int(row.get("instrument_token", 1626369)),
+                                "tradingsymbol": "NIFTYETF",
+                                "average_price": avg,
+                                "quantity": qty,
+                                "t1_quantity": 0,
+                                "bars_in_trade": i,
+                            }
+                        ]
+                    )
+                    sig = r2.buy_or_sell(part, row, hold_df)
+                    if str(sig).upper() == "SELL":
+                        cash += qty * price
+                        if price > avg:
+                            wins += 1
+                        qty = 0
+                        avg = 0.0
                         trades += 1
-            else:
-                hold_df = pd.DataFrame([
-                    {
-                        "instrument_token": int(row.get("instrument_token", 1626369)),
-                        "tradingsymbol": "NIFTYETF",
-                        "average_price": avg,
-                        "quantity": qty,
-                        "t1_quantity": 0,
-                        "bars_in_trade": i,
-                    }
-                ])
-                sig = r2.buy_or_sell(part, row, hold_df)
-                if str(sig).upper() == "SELL":
-                    cash += qty * price
-                    if price > avg:
-                        wins += 1
-                    qty = 0
-                    avg = 0.0
-                    trades += 1
 
-            port = cash + (qty * price)
-            equity_curve.append(port)
-
-    # restore config
-    r2.CONFIG.clear(); r2.CONFIG.update(old_r2)
-    r7.CONFIG.clear(); r7.CONFIG.update(old_r7)
+                port = cash + (qty * price)
+                equity_curve.append(port)
+    finally:
+        r2.CONFIG.clear()
+        r2.CONFIG.update(old_r2)
+        r7.CONFIG.clear()
+        r7.CONFIG.update(old_r7)
 
     final_val = equity_curve[-1] if equity_curve else 100000.0
     ret = (final_val / 100000.0 - 1.0) * 100.0
     win_rate = (wins / max(1, trades // 2)) * 100.0
 
-    # max drawdown
     s = pd.Series(equity_curve if equity_curve else [100000.0], dtype=float)
     peak = s.cummax()
     dd = ((s - peak) / peak * 100.0).min()
@@ -154,20 +277,8 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
     )
 
 
-def variants() -> list[tuple[str, dict, dict]]:
-    # Production model: BUY from RULE_SET_7, SELL from RULE_SET_2
-    buy_grid = {
-        "adx_min": [16, 18, 20],
-        "max_obv_zscore": [2.0, 2.5, 3.0],
-        "max_extension_atr": [2.0, 2.2, 2.5],
-        "mmi_risk_off": [62, 65],
-    }
-    sell_grid = {
-        "momentum_exit_rsi": [40.0, 42.0, 45.0],
-        "ema_break_atr_mult": [0.45, 0.5, 0.7],
-        "breakeven_trigger_pct": [2.0, 2.5, 3.0],
-        "relative_volume_exit": [1.2, 1.3],
-    }
+def variants(scorecard_context: dict) -> list[tuple[str, dict, dict]]:
+    buy_grid, sell_grid = build_grids(scorecard_context)
 
     out = []
     idx = 0
@@ -178,34 +289,42 @@ def variants() -> list[tuple[str, dict, dict]]:
             idx += 1
             out.append((f"variant_{idx:04d}", b, s))
 
-    # keep runtime bounded for weekly cron
     max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "700"))
     if len(out) > max_variants:
         out = out[:max_variants]
 
-    # baseline = current configs
     out.insert(0, ("baseline_current", {}, {}))
     return out
 
 
 def main():
+    scorecard_context = load_scorecard_context()
     df = load_data()
     results = []
-    for name, b, s in variants():
+    for name, b, s in variants(scorecard_context):
         results.append(run_variant(name, df, b, s))
 
-    rank = sorted(results, key=lambda r: (r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct), reverse=True)
+    rank = sorted(
+        results,
+        key=lambda r: (r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct),
+        reverse=True,
+    )
     baseline = next(r for r in rank if r.name == "baseline_current")
     best = rank[0]
 
     recommendation = {
         "generated_at": datetime.now().isoformat(),
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "scorecard_context": scorecard_context,
         "baseline": asdict(baseline),
         "best": asdict(best),
         "tested_variants": len(rank),
         "improvement_return_pct": round(best.total_return_pct - baseline.total_return_pct, 2),
-        "should_promote": bool(best.name != baseline.name and best.total_return_pct > baseline.total_return_pct and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + 2.0),
+        "should_promote": bool(
+            best.name != baseline.name
+            and best.total_return_pct > baseline.total_return_pct
+            and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + 2.0
+        ),
     }
 
     payload = {
