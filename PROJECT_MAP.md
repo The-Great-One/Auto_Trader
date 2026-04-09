@@ -1,0 +1,162 @@
+# Auto_Trader Project Map
+
+Living navigation doc for the Auto_Trader system. Update this when structure, runtime flow, or ops behavior changes.
+
+## Project roots
+
+- Local repo: `REDACTED_LOCAL_REPO`
+- Live server repo: `/home/ubuntu/Auto_Trader`
+- Live server host: `REDACTED_SERVER`
+- Service entrypoint: `wednesday.py`
+
+## High level runtime flow
+
+1. `wednesday.py`
+   - starts market monitor
+   - launches ticker, compute, updater, and Telegram worker processes
+2. `Auto_Trader/Build_Master.py`
+   - builds watchlist / instrument universe
+3. `Auto_Trader/kite_ticker.py`
+   - receives live market data from Zerodha
+4. `Auto_Trader/rt_compute.py`
+   - enriches ticks, builds bars, runs decision logic
+   - in paper-shadow mode, writes paper reports and sends `[PAPER]` alerts
+5. `Auto_Trader/KITE_TRIGGER_ORDER.py`
+   - places real buy/sell orders when not in paper mode
+6. `Auto_Trader/TelegramLink.py`
+   - sends Telegram messages
+
+## Key code areas
+
+### Root
+- `wednesday.py` - main multi-process runner used by systemd service
+- `README.md` - setup and ops notes
+- `requirements.txt` - Python deps
+- `PROJECT_MAP.md` - this file
+
+### `Auto_Trader/`
+- `__init__.py` - exports runtime entrypoints and sets up logging
+- `Build_Master.py` - creates daily instrument/watchlist universe
+- `kite_ticker.py` - websocket/ticker handling
+- `rt_compute.py` - live decision engine, paper-shadow publish path
+- `KITE_TRIGGER_ORDER.py` - order placement + duplicate protection
+- `RULE_SET_7.py` - current BUY rule
+- `RULE_SET_2.py` - current SELL rule
+- `utils.py` - indicators, market-open helpers, shared data utilities
+- `mf_execution.py` - guarded mutual-fund search/validation/execution helper
+- `updater.py` - background refresh/update worker
+- `TelegramLink.py` - Telegram delivery with retry/backoff
+- `my_secrets.py` - secrets and channel config, highly sensitive
+
+### `scripts/`
+- `daily_ops_supervisor.py` - daily health run, strategy test, paper-shadow check/self-heal
+- `daily_scorecard.py` - daily trading summary from orders/trades/logs
+- `daily_portfolio_report.py` - holdings + allocation intelligence
+- `send_discord_health_alert.py` - Discord webhook health card
+- `paper_shadow.py` - offline paper-trader decision snapshot
+- `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, dry-run/live guarded execution
+- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2
+- `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
+- `walkforward_validate.py` - validation helper
+- `performance_digest.py` - report summarizer
+
+### `reports/`
+Generated outputs, especially:
+- `strategy_lab_*.json/csv` - backtest sweep results
+- `daily_ops_supervisor_YYYY-MM-DD.{json,md}` - daily ops summary
+- `daily_scorecard_YYYY-MM-DD.{json,md}` - daily trading scorecard
+- `paper_shadow_latest.json` - cron/self-heal paper decision
+- `paper_shadow_live_latest.json` - live service paper decision snapshot
+- `portfolio_intel_YYYY-MM-DD.{json,md}` - portfolio intelligence
+
+### `log/`
+- `output.log` - info logs
+- `error.log` - error logs
+
+### `intermediary_files/`
+Working state and cached artifacts, including holdings and historical market data.
+
+### `tests/`
+Backtests, permutations, historical analysis, ad hoc research helpers.
+
+## Current production rule model
+
+- BUY: `RULE_SET_7`
+- SELL: `RULE_SET_2`
+
+## Mutual fund support
+
+- Portfolio analysis includes MF holdings via `kite.mf_holdings()`
+- MF execution is intentionally separate from `wednesday.py` live trading runtime
+- Live MF placement currently happens only through `scripts/mf_order_manager.py`
+- Guardrails:
+  - dry-run by default
+  - live placement requires `AT_MF_ENABLE_LIVE=1`
+  - optional symbol allowlist support
+  - per-order and per-run amount caps
+
+## Current alerting behavior
+
+### Live service alerts
+- Sent through `Auto_Trader/TelegramLink.py`
+- `[PAPER]` alerts originate from `Auto_Trader/rt_compute.py`
+- Paper alerts currently fall back to main Telegram channel if `AT_TEST_TRADER_CHANNEL` is empty
+
+### Paper alert spam guard
+- `rt_compute.py` now suppresses repeated unchanged paper BUY/SELL alerts
+- Re-alerts only on state change or after cooldown (`AT_PAPER_ALERT_MIN_SECONDS`, default 1800s)
+
+## Schedules and automation
+
+### Live service
+- systemd service: `auto_trade.service`
+- daily restart timer: `auto_trade.timer` at `08:30`
+- shell launcher: `~/auto_trade.sh`
+- env overrides: `~/.autotrader_env`
+
+### Current cron jobs on server
+- `16:10` daily: `scripts/daily_ops_supervisor.py`
+- `16:20` weekdays: `scripts/daily_scorecard.py`
+
+## Strategy lab scope
+
+In `scripts/daily_ops_supervisor.py`:
+- weekdays: 50 requested variants
+- weekends: 200 requested variants
+- baseline is included in results, so tested count is usually requested + 1
+
+In `scripts/weekly_strategy_lab.py`:
+- reads latest `daily_scorecard_*.json` when available
+- if the day had zero trades, it expands buy-side search space automatically
+- records scorecard context and optimization focus in the strategy lab JSON output
+- disables file logging during lab runs to avoid noisy permission issues
+
+Relevant env knobs:
+- `AT_DAILY_LAB_MAX_VARIANTS`
+- `AT_WEEKEND_LAB_MAX_VARIANTS`
+- `AT_LAB_MAX_VARIANTS`
+- `AT_LAB_SCORECARD_PATH`
+- `AT_DISABLE_FILE_LOGGING`
+
+## Known repo drift to watch
+
+Server currently has files that may not exist in the local repo snapshot, especially:
+- `scripts/daily_ops_supervisor.py`
+- `scripts/daily_scorecard.py`
+
+Before major edits, check whether local and server copies have drifted.
+
+## Fast navigation checklist
+
+When debugging:
+- service health -> `systemctl status auto_trade.service`
+- recent runtime logs -> `journalctl -u auto_trade.service -n 200 --no-pager`
+- Telegram path -> `Auto_Trader/TelegramLink.py`
+- paper-shadow logic -> `Auto_Trader/rt_compute.py` and `scripts/paper_shadow.py`
+- strategy sweeps -> `scripts/weekly_strategy_lab.py`
+- daily automation -> `scripts/daily_ops_supervisor.py`, `scripts/daily_scorecard.py`
+- reports -> `reports/`
+
+## Update rule
+
+If a new script, service, report, or alert path is added, update this file in the same work session.

@@ -14,20 +14,29 @@ logger = logging.getLogger("Auto_Trade_Logger")
 TRADING_MODE = os.getenv("AT_TRADING_MODE", "DAILY").strip().upper()
 BAR_MINUTES = max(1, int(os.getenv("AT_BAR_MINUTES", "5")))
 PAPER_SHADOW_MODE = os.getenv("AT_PAPER_SHADOW_MODE", "0").strip() in {"1", "true", "TRUE", "yes", "YES"}
+PAPER_ALERT_MIN_SECONDS = max(0, int(os.getenv("AT_PAPER_ALERT_MIN_SECONDS", "1800")))
+_LAST_PAPER_ALERT_SIGNATURE = None
+_LAST_PAPER_ALERT_AT = None
 
 
 def _publish_paper_decisions(message_queue, decisions):
+    global _LAST_PAPER_ALERT_SIGNATURE, _LAST_PAPER_ALERT_AT
+
     buys = [d for d in decisions if d.get("Decision") == "BUY"]
     sells = [d for d in decisions if d.get("Decision") == "SELL"]
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now()
+    ts = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    buy_symbols = sorted({d.get("Symbol") for d in buys[:20] if d.get("Symbol")})
+    sell_symbols = sorted({d.get("Symbol") for d in sells[:20] if d.get("Symbol")})
 
     payload = {
         "time": ts,
         "mode": "paper-shadow",
         "buy_count": len(buys),
         "sell_count": len(sells),
-        "buys": [d.get("Symbol") for d in buys[:20]],
-        "sells": [d.get("Symbol") for d in sells[:20]],
+        "buys": buy_symbols,
+        "sells": sell_symbols,
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
     }
 
@@ -35,10 +44,25 @@ def _publish_paper_decisions(message_queue, decisions):
     with open("reports/paper_shadow_live_latest.json", "w") as f:
         json.dump(payload, f, indent=2)
 
-    if buys or sells:
-        message_queue.put(
-            f"[PAPER] {ts} | BUY:{len(buys)} {payload['buys']} | SELL:{len(sells)} {payload['sells']}"
-        )
+    if not buys and not sells:
+        return
+
+    signature = (
+        tuple(sorted(d.get("Symbol") for d in buys if d.get("Symbol"))),
+        tuple(sorted(d.get("Symbol") for d in sells if d.get("Symbol"))),
+    )
+    should_send = signature != _LAST_PAPER_ALERT_SIGNATURE
+    if not should_send and _LAST_PAPER_ALERT_AT is not None:
+        should_send = (now - _LAST_PAPER_ALERT_AT).total_seconds() >= PAPER_ALERT_MIN_SECONDS
+
+    if not should_send:
+        return
+
+    _LAST_PAPER_ALERT_SIGNATURE = signature
+    _LAST_PAPER_ALERT_AT = now
+    message_queue.put(
+        f"[PAPER] {ts} | BUY:{len(buys)} {buy_symbols} | SELL:{len(sells)} {sell_symbols}"
+    )
 
 
 def _resolve_bar_timestamp(stock_data):
