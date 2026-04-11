@@ -129,8 +129,10 @@ In `scripts/daily_ops_supervisor.py`:
 
 In `scripts/weekly_strategy_lab.py`:
 - reads latest `daily_scorecard_*.json` when available
+- can also read a tradebook CSV via `AT_LAB_TRADEBOOK_PATH`
 - if the day had zero trades, it expands buy-side search space automatically
-- records scorecard context and optimization focus in the strategy lab JSON output
+- if tradebook analysis shows weak 5 to 10 day holds, it biases sell-side search toward tighter time stops
+- records scorecard context and tradebook context in the strategy lab JSON output
 - disables file logging during lab runs to avoid noisy permission issues
 
 Relevant env knobs:
@@ -138,6 +140,7 @@ Relevant env knobs:
 - `AT_WEEKEND_LAB_MAX_VARIANTS`
 - `AT_LAB_MAX_VARIANTS`
 - `AT_LAB_SCORECARD_PATH`
+- `AT_LAB_TRADEBOOK_PATH`
 - `AT_DISABLE_FILE_LOGGING`
 
 ## Known repo drift to watch
