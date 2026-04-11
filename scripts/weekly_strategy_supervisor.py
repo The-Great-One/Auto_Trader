@@ -99,6 +99,7 @@ def _simulate(rule_name: str, df: pd.DataFrame) -> Result:
     cash = 100000.0
     qty = 0
     avg = 0.0
+    entry_idx = None
     trades = 0
 
     for i in range(60, len(dfi)):
@@ -113,7 +114,7 @@ def _simulate(rule_name: str, df: pd.DataFrame) -> Result:
                     "average_price": avg,
                     "quantity": qty,
                     "t1_quantity": 0,
-                    "bars_in_trade": i,
+                    "bars_in_trade": max(0, i - entry_idx) if entry_idx is not None else 0,
                 }]
             )
         else:
@@ -129,11 +130,13 @@ def _simulate(rule_name: str, df: pd.DataFrame) -> Result:
             if qty > 0:
                 cash -= qty * price
                 avg = price
+                entry_idx = i
                 trades += 1
         elif signal == "SELL" and qty > 0:
             cash += qty * price
             qty = 0
             avg = 0.0
+            entry_idx = None
             trades += 1
 
     if qty > 0:

@@ -135,6 +135,110 @@ def load_scorecard_context() -> dict:
     }
 
 
+def load_tradebook_context() -> dict:
+    tradebook_path = os.getenv("AT_LAB_TRADEBOOK_PATH", "").strip()
+    if not tradebook_path:
+        return {
+            "tradebook_found": False,
+            "optimization_focus": [],
+            "code_findings": [],
+        }
+
+    path = Path(tradebook_path)
+    if not path.exists():
+        return {
+            "tradebook_found": False,
+            "tradebook_path": tradebook_path,
+            "optimization_focus": [],
+            "code_findings": ["tradebook_path_missing"],
+        }
+
+    try:
+        tradebook = pd.read_csv(path)
+        tradebook["trade_type"] = tradebook["trade_type"].astype(str).str.upper().str.strip()
+        tradebook["symbol"] = tradebook["symbol"].astype(str).str.upper().str.strip()
+        tradebook["trade_date"] = pd.to_datetime(tradebook["trade_date"], errors="coerce")
+        tradebook["order_execution_time"] = pd.to_datetime(tradebook["order_execution_time"], errors="coerce")
+        tradebook["quantity"] = pd.to_numeric(tradebook["quantity"], errors="coerce")
+        tradebook["price"] = pd.to_numeric(tradebook["price"], errors="coerce")
+        tradebook = tradebook.dropna(subset=["trade_type", "symbol", "order_execution_time", "quantity", "price"])
+
+        grouped = tradebook.groupby(["order_id", "symbol", "trade_type", "order_execution_time"], as_index=False).agg(
+            quantity=("quantity", "sum"),
+            avg_price=("price", lambda s: (s * tradebook.loc[s.index, "quantity"]).sum() / tradebook.loc[s.index, "quantity"].sum()),
+        )
+        grouped = grouped.sort_values(["order_execution_time", "order_id"]).reset_index(drop=True)
+
+        open_lots: dict[str, list[dict]] = {}
+        closed_rows: list[dict] = []
+        for row in grouped.to_dict("records"):
+            symbol = row["symbol"]
+            open_lots.setdefault(symbol, [])
+            if row["trade_type"] == "BUY":
+                open_lots[symbol].append({
+                    "qty": float(row["quantity"]),
+                    "price": float(row["avg_price"]),
+                    "ts": row["order_execution_time"],
+                })
+                continue
+
+            remaining = float(row["quantity"])
+            while remaining > 1e-9 and open_lots[symbol]:
+                lot = open_lots[symbol][0]
+                matched = min(remaining, lot["qty"])
+                hold_days = (row["order_execution_time"] - lot["ts"]).total_seconds() / 86400.0
+                closed_rows.append({
+                    "symbol": symbol,
+                    "hold_days": hold_days,
+                    "pnl": (float(row["avg_price"]) - float(lot["price"])) * matched,
+                })
+                lot["qty"] -= matched
+                remaining -= matched
+                if lot["qty"] <= 1e-9:
+                    open_lots[symbol].pop(0)
+
+        closed = pd.DataFrame(closed_rows)
+        if closed.empty:
+            return {
+                "tradebook_found": True,
+                "tradebook_path": str(path),
+                "optimization_focus": [],
+                "code_findings": ["tradebook_has_no_closed_round_trips"],
+            }
+
+        buckets = pd.cut(
+            closed["hold_days"],
+            bins=[-1, 2, 5, 10, 30, 9999],
+            labels=["0-2d", "2-5d", "5-10d", "10-30d", "30d+"],
+        )
+        hold_stats = closed.groupby(buckets, observed=False)["pnl"].sum().to_dict()
+        weak_mid_hold = float(hold_stats.get("5-10d", 0.0) or 0.0) < min(
+            float(hold_stats.get("0-2d", 0.0) or 0.0),
+            float(hold_stats.get("2-5d", 0.0) or 0.0),
+        )
+
+        optimization_focus = []
+        if weak_mid_hold:
+            optimization_focus.append("tighten_mid_hold_exits")
+
+        return {
+            "tradebook_found": True,
+            "tradebook_path": str(path),
+            "closed_round_trips": int(len(closed)),
+            "hold_bucket_pnl": {k: round(float(v), 2) for k, v in hold_stats.items()},
+            "weak_mid_hold_window": bool(weak_mid_hold),
+            "optimization_focus": optimization_focus,
+            "code_findings": [],
+        }
+    except Exception as exc:
+        return {
+            "tradebook_found": False,
+            "tradebook_path": str(path),
+            "optimization_focus": [],
+            "code_findings": [f"tradebook_parse_failed: {exc}"],
+        }
+
+
 def prioritized_values(values, current):
     current_f = float(current)
     uniq = []
@@ -148,7 +252,7 @@ def prioritized_values(values, current):
     return sorted(uniq, key=lambda v: (abs(float(v) - current_f), float(v)))
 
 
-def build_grids(scorecard_context: dict) -> tuple[dict, dict]:
+def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict, dict]:
     buy_cfg = RULE_SET_7.CONFIG
     sell_cfg = RULE_SET_2.CONFIG
 
@@ -163,6 +267,8 @@ def build_grids(scorecard_context: dict) -> tuple[dict, dict]:
         "ema_break_atr_mult": prioritized_values([0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
         "breakeven_trigger_pct": prioritized_values([1.5, 2.0, 2.5, 3.0], sell_cfg["breakeven_trigger_pct"]),
         "relative_volume_exit": prioritized_values([1.1, 1.2, 1.3], sell_cfg["relative_volume_exit"]),
+        "fund_time_stop_bars": prioritized_values([10, 12, 14, 16], sell_cfg["fund_time_stop_bars"]),
+        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 1.0, 1.5], sell_cfg["fund_time_stop_min_profit_pct"]),
     }
 
     if scorecard_context.get("no_trade_day"):
@@ -170,6 +276,10 @@ def build_grids(scorecard_context: dict) -> tuple[dict, dict]:
         buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0], buy_cfg["max_obv_zscore"])
         buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.2], buy_cfg["max_extension_atr"])
         buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70], buy_cfg["mmi_risk_off"])
+
+    if tradebook_context.get("weak_mid_hold_window"):
+        sell_grid["fund_time_stop_bars"] = prioritized_values([8, *sell_grid["fund_time_stop_bars"]], sell_cfg["fund_time_stop_bars"])
+        sell_grid["fund_time_stop_min_profit_pct"] = prioritized_values([0.5, 0.75, *sell_grid["fund_time_stop_min_profit_pct"]], sell_cfg["fund_time_stop_min_profit_pct"])
 
     return buy_grid, sell_grid
 
@@ -199,6 +309,7 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
             cash = 100000.0
             qty = 0
             avg = 0.0
+            entry_idx = None
             trades = 0
             wins = 0
             equity_curve = []
@@ -227,6 +338,7 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
                             qty = buy_qty
                             cash -= qty * price
                             avg = price
+                            entry_idx = i
                             trades += 1
                 else:
                     hold_df = pd.DataFrame(
@@ -237,7 +349,7 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
                                 "average_price": avg,
                                 "quantity": qty,
                                 "t1_quantity": 0,
-                                "bars_in_trade": i,
+                                "bars_in_trade": max(0, i - entry_idx) if entry_idx is not None else 0,
                             }
                         ]
                     )
@@ -248,6 +360,7 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
                             wins += 1
                         qty = 0
                         avg = 0.0
+                        entry_idx = None
                         trades += 1
 
                 port = cash + (qty * price)
@@ -277,8 +390,8 @@ def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict
     )
 
 
-def variants(scorecard_context: dict) -> list[tuple[str, dict, dict]]:
-    buy_grid, sell_grid = build_grids(scorecard_context)
+def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict]]:
+    buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
 
     out = []
     idx = 0
@@ -299,9 +412,10 @@ def variants(scorecard_context: dict) -> list[tuple[str, dict, dict]]:
 
 def main():
     scorecard_context = load_scorecard_context()
+    tradebook_context = load_tradebook_context()
     df = load_data()
     results = []
-    for name, b, s in variants(scorecard_context):
+    for name, b, s in variants(scorecard_context, tradebook_context):
         results.append(run_variant(name, df, b, s))
 
     rank = sorted(
@@ -316,6 +430,7 @@ def main():
         "generated_at": datetime.now().isoformat(),
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
         "scorecard_context": scorecard_context,
+        "tradebook_context": tradebook_context,
         "baseline": asdict(baseline),
         "best": asdict(best),
         "tested_variants": len(rank),
