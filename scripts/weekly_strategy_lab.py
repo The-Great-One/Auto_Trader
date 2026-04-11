@@ -2,14 +2,13 @@
 """
 Strategy lab:
 - tweaks RULE_SET_7 (BUY) + RULE_SET_2 (SELL)
-- backtests variants on NIFTYBEES daily data
-- uses latest daily scorecard to bias the search when useful
+- backtests variants on a small basket, not just one ETF
+- uses latest daily scorecard + tradebook context to bias the search
 - writes ranked reports; does NOT auto-deploy winners
 """
 
 from __future__ import annotations
 
-import itertools
 import json
 import os
 import sys
@@ -17,6 +16,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import yfinance as yf
@@ -35,6 +35,18 @@ at_logger.setLevel("WARNING")
 
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
+HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
+
+DEFAULT_LAB_SYMBOLS = [
+    "NIFTYETF",
+    "INFY",
+    "WIPRO",
+    "HAL",
+    "NTPC",
+    "CANBK",
+    "HINDPETRO",
+    "HEROMOTOCO",
+]
 
 
 @dataclass
@@ -46,33 +58,120 @@ class BacktestResult:
     win_rate_pct: float
     max_drawdown_pct: float
     params: dict
+    symbols_tested: list[str]
+    selection_score: float
 
 
-def load_data() -> pd.DataFrame:
-    df = yf.download(
-        "NIFTYBEES.NS",
-        period="3y",
-        interval="1d",
-        auto_adjust=False,
-        progress=False,
-    )
-    if df is None or df.empty:
-        raise RuntimeError("Could not fetch NIFTYBEES.NS data")
+def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     if hasattr(df.columns, "levels"):
         df.columns = [str(c[0]) for c in df.columns]
     df = df.reset_index()
+    cmap = {str(c).lower(): c for c in df.columns}
     use = pd.DataFrame(
         {
-            "Date": pd.to_datetime(df["Date"], errors="coerce"),
-            "Open": pd.to_numeric(df["Open"], errors="coerce"),
-            "High": pd.to_numeric(df["High"], errors="coerce"),
-            "Low": pd.to_numeric(df["Low"], errors="coerce"),
-            "Close": pd.to_numeric(df["Close"], errors="coerce"),
-            "Volume": pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0),
+            "Date": pd.to_datetime(df[cmap.get("date", "Date")], errors="coerce"),
+            "Open": pd.to_numeric(df[cmap.get("open", "Open")], errors="coerce"),
+            "High": pd.to_numeric(df[cmap.get("high", "High")], errors="coerce"),
+            "Low": pd.to_numeric(df[cmap.get("low", "Low")], errors="coerce"),
+            "Close": pd.to_numeric(df[cmap.get("close", "Close")], errors="coerce"),
+            "Volume": pd.to_numeric(df.get(cmap.get("volume", "Volume"), 0), errors="coerce").fillna(0),
         }
     ).dropna(subset=["Date", "Open", "High", "Low", "Close"])
-    use = use.sort_values("Date").reset_index(drop=True)
-    return at_utils.Indicators(use)
+    return use.sort_values("Date").reset_index(drop=True)
+
+
+def _load_symbol_history(symbol: str) -> pd.DataFrame | None:
+    symbol = str(symbol or "").strip().upper()
+    if not symbol:
+        return None
+
+    local_path = HIST_DIR / f"{symbol}.feather"
+    if local_path.exists():
+        try:
+            return _normalize_ohlcv(pd.read_feather(local_path))
+        except Exception:
+            pass
+
+    y_symbol = symbol if "." in symbol else f"{symbol}.NS"
+    try:
+        df = yf.download(
+            y_symbol,
+            period="3y",
+            interval="1d",
+            auto_adjust=False,
+            progress=False,
+        )
+        if df is None or df.empty:
+            return None
+        return _normalize_ohlcv(df)
+    except Exception:
+        return None
+
+
+def _parse_symbol_list(value: str) -> list[str]:
+    return [x.strip().upper() for x in value.split(",") if x.strip()]
+
+
+def _looks_etf_like(symbol: str) -> bool:
+    text = str(symbol or "").upper()
+    return ("ETF" in text) or ("BEES" in text)
+
+
+def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> list[str]:
+    explicit = os.getenv("AT_LAB_SYMBOLS", "").strip()
+    if explicit:
+        requested = _parse_symbol_list(explicit)
+    else:
+        requested = list(DEFAULT_LAB_SYMBOLS)
+        requested.extend(tradebook_context.get("top_symbols", [])[:8])
+
+    approved_equities = set(fundamental_context.get("approved_equities", []))
+    approved_etfs = set(fundamental_context.get("approved_etfs", []))
+
+    out: list[str] = []
+    seen = set()
+    for symbol in requested:
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+
+        if fundamental_context.get("fundamentals_found"):
+            if _looks_etf_like(symbol) or symbol in approved_etfs:
+                out.append(symbol)
+                continue
+            if symbol not in approved_equities:
+                continue
+
+        out.append(symbol)
+    return out
+
+
+def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[str, pd.DataFrame], dict]:
+    symbols = build_lab_symbols(tradebook_context, fundamental_context)
+    data_map: dict[str, pd.DataFrame] = {}
+    skipped: dict[str, str] = {}
+
+    for symbol in symbols:
+        df = _load_symbol_history(symbol)
+        if df is None or df.empty:
+            skipped[symbol] = "missing_or_empty"
+            continue
+        if len(df) < 260:
+            skipped[symbol] = f"too_short:{len(df)}"
+            continue
+        try:
+            data_map[symbol] = at_utils.Indicators(df)
+        except Exception as exc:
+            skipped[symbol] = f"indicator_failed:{exc}"
+
+    if not data_map:
+        raise RuntimeError("Could not load any lab symbols with usable history")
+
+    return data_map, {
+        "requested_symbols": symbols,
+        "loaded_symbols": list(data_map.keys()),
+        "skipped_symbols": skipped,
+    }
 
 
 def load_scorecard_context() -> dict:
@@ -104,10 +203,7 @@ def load_scorecard_context() -> dict:
     optimization_focus = []
     code_findings = []
 
-    if no_trade_day:
-        optimization_focus.append("expand_buy_sensitivity")
-    else:
-        optimization_focus.append("balanced_search")
+    optimization_focus.append("expand_buy_sensitivity" if no_trade_day else "balanced_search")
 
     if ws_close > 0:
         code_findings.append("websocket_reconnect_review")
@@ -135,6 +231,42 @@ def load_scorecard_context() -> dict:
     }
 
 
+def load_fundamental_context() -> dict:
+    try:
+        from Auto_Trader.StrongFundamentalsStockList import goodStocks
+
+        df = goodStocks()
+        if df is None or df.empty:
+            return {
+                "fundamentals_found": False,
+                "code_findings": ["fundamental_screener_empty"],
+                "approved_equities": [],
+                "approved_etfs": [],
+            }
+
+        df["Symbol"] = df["Symbol"].astype(str).str.upper().str.strip()
+        df["AssetClass"] = df["AssetClass"].astype(str).str.upper().str.strip()
+        approved_equities = df[df["AssetClass"] == "EQUITY"]["Symbol"].dropna().unique().tolist()
+        approved_etfs = df[df["AssetClass"] == "ETF"]["Symbol"].dropna().unique().tolist()
+        sector_map = dict(zip(df["Symbol"], df.get("Sector", "")))
+        return {
+            "fundamentals_found": True,
+            "approved_equities": approved_equities,
+            "approved_etfs": approved_etfs,
+            "approved_symbol_count": int(len(df)),
+            "sample_symbols": df["Symbol"].head(12).tolist(),
+            "sector_map": sector_map,
+            "code_findings": [],
+        }
+    except Exception as exc:
+        return {
+            "fundamentals_found": False,
+            "code_findings": [f"fundamental_screener_failed: {exc}"],
+            "approved_equities": [],
+            "approved_etfs": [],
+        }
+
+
 def load_tradebook_context() -> dict:
     tradebook_path = os.getenv("AT_LAB_TRADEBOOK_PATH", "").strip()
     if not tradebook_path:
@@ -142,6 +274,7 @@ def load_tradebook_context() -> dict:
             "tradebook_found": False,
             "optimization_focus": [],
             "code_findings": [],
+            "top_symbols": [],
         }
 
     path = Path(tradebook_path)
@@ -151,6 +284,7 @@ def load_tradebook_context() -> dict:
             "tradebook_path": tradebook_path,
             "optimization_focus": [],
             "code_findings": ["tradebook_path_missing"],
+            "top_symbols": [],
         }
 
     try:
@@ -169,17 +303,19 @@ def load_tradebook_context() -> dict:
         )
         grouped = grouped.sort_values(["order_execution_time", "order_id"]).reset_index(drop=True)
 
-        open_lots: dict[str, list[dict]] = {}
-        closed_rows: list[dict] = []
+        open_lots: dict[str, list[dict[str, Any]]] = {}
+        closed_rows: list[dict[str, Any]] = []
         for row in grouped.to_dict("records"):
             symbol = row["symbol"]
             open_lots.setdefault(symbol, [])
             if row["trade_type"] == "BUY":
-                open_lots[symbol].append({
-                    "qty": float(row["quantity"]),
-                    "price": float(row["avg_price"]),
-                    "ts": row["order_execution_time"],
-                })
+                open_lots[symbol].append(
+                    {
+                        "qty": float(row["quantity"]),
+                        "price": float(row["avg_price"]),
+                        "ts": row["order_execution_time"],
+                    }
+                )
                 continue
 
             remaining = float(row["quantity"])
@@ -187,11 +323,13 @@ def load_tradebook_context() -> dict:
                 lot = open_lots[symbol][0]
                 matched = min(remaining, lot["qty"])
                 hold_days = (row["order_execution_time"] - lot["ts"]).total_seconds() / 86400.0
-                closed_rows.append({
-                    "symbol": symbol,
-                    "hold_days": hold_days,
-                    "pnl": (float(row["avg_price"]) - float(lot["price"])) * matched,
-                })
+                closed_rows.append(
+                    {
+                        "symbol": symbol,
+                        "hold_days": hold_days,
+                        "pnl": (float(row["avg_price"]) - float(lot["price"])) * matched,
+                    }
+                )
                 lot["qty"] -= matched
                 remaining -= matched
                 if lot["qty"] <= 1e-9:
@@ -204,6 +342,7 @@ def load_tradebook_context() -> dict:
                 "tradebook_path": str(path),
                 "optimization_focus": [],
                 "code_findings": ["tradebook_has_no_closed_round_trips"],
+                "top_symbols": [],
             }
 
         buckets = pd.cut(
@@ -215,6 +354,10 @@ def load_tradebook_context() -> dict:
         weak_mid_hold = float(hold_stats.get("5-10d", 0.0) or 0.0) < min(
             float(hold_stats.get("0-2d", 0.0) or 0.0),
             float(hold_stats.get("2-5d", 0.0) or 0.0),
+        )
+
+        top_symbols = (
+            closed.groupby("symbol").size().sort_values(ascending=False).head(12).index.tolist()
         )
 
         optimization_focus = []
@@ -229,6 +372,7 @@ def load_tradebook_context() -> dict:
             "weak_mid_hold_window": bool(weak_mid_hold),
             "optimization_focus": optimization_focus,
             "code_findings": [],
+            "top_symbols": top_symbols,
         }
     except Exception as exc:
         return {
@@ -236,6 +380,7 @@ def load_tradebook_context() -> dict:
             "tradebook_path": str(path),
             "optimization_focus": [],
             "code_findings": [f"tradebook_parse_failed: {exc}"],
+            "top_symbols": [],
         }
 
 
@@ -258,17 +403,26 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
 
     buy_grid = {
         "adx_min": prioritized_values([14, 16, 18, 20, 22], buy_cfg["adx_min"]),
+        "adx_strong_min": prioritized_values([22, 25, 28, 30], buy_cfg["adx_strong_min"]),
         "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5], buy_cfg["max_obv_zscore"]),
+        "obv_min_zscore": prioritized_values([0.0, 0.25, 0.5, 0.75], buy_cfg["obv_min_zscore"]),
         "max_extension_atr": prioritized_values([1.8, 2.0, 2.2, 2.5, 2.8], buy_cfg["max_extension_atr"]),
         "mmi_risk_off": prioritized_values([60, 62, 65, 68], buy_cfg["mmi_risk_off"]),
+        "volume_confirm_mult": prioritized_values([1.0, 1.05, 1.1, 1.2], buy_cfg["volume_confirm_mult"]),
+        "cmf_base_min": prioritized_values([0.02, 0.05, 0.08], buy_cfg["cmf_base_min"]),
+        "rsi_floor": prioritized_values([42, 45, 48], buy_cfg["rsi_floor"]),
+        "stoch_pull_max": prioritized_values([65, 75, 85], buy_cfg["stoch_pull_max"]),
+        "stoch_momo_max": prioritized_values([80, 85, 90], buy_cfg["stoch_momo_max"]),
     }
     sell_grid = {
         "momentum_exit_rsi": prioritized_values([38.0, 40.0, 42.0, 45.0], sell_cfg["momentum_exit_rsi"]),
         "ema_break_atr_mult": prioritized_values([0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
         "breakeven_trigger_pct": prioritized_values([1.5, 2.0, 2.5, 3.0], sell_cfg["breakeven_trigger_pct"]),
         "relative_volume_exit": prioritized_values([1.1, 1.2, 1.3], sell_cfg["relative_volume_exit"]),
+        "equity_time_stop_bars": prioritized_values([6, 8, 10], sell_cfg["equity_time_stop_bars"]),
+        "equity_review_rsi": prioritized_values([48.0, 50.0, 52.0], sell_cfg["equity_review_rsi"]),
         "fund_time_stop_bars": prioritized_values([10, 12, 14, 16], sell_cfg["fund_time_stop_bars"]),
-        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 1.0, 1.5], sell_cfg["fund_time_stop_min_profit_pct"]),
+        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 0.75, 1.0, 1.5], sell_cfg["fund_time_stop_min_profit_pct"]),
     }
 
     if scorecard_context.get("no_trade_day"):
@@ -276,12 +430,69 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
         buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0], buy_cfg["max_obv_zscore"])
         buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.2], buy_cfg["max_extension_atr"])
         buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70], buy_cfg["mmi_risk_off"])
+        buy_grid["volume_confirm_mult"] = prioritized_values([0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
 
     if tradebook_context.get("weak_mid_hold_window"):
+        sell_grid["equity_time_stop_bars"] = prioritized_values([5, 6, *sell_grid["equity_time_stop_bars"]], sell_cfg["equity_time_stop_bars"])
+        sell_grid["equity_review_rsi"] = prioritized_values([46.0, 48.0, *sell_grid["equity_review_rsi"]], sell_cfg["equity_review_rsi"])
         sell_grid["fund_time_stop_bars"] = prioritized_values([8, *sell_grid["fund_time_stop_bars"]], sell_cfg["fund_time_stop_bars"])
         sell_grid["fund_time_stop_min_profit_pct"] = prioritized_values([0.5, 0.75, *sell_grid["fund_time_stop_min_profit_pct"]], sell_cfg["fund_time_stop_min_profit_pct"])
 
     return buy_grid, sell_grid
+
+
+def _current_param_values(grid: dict, config: dict) -> dict:
+    return {key: config[key] for key in grid.keys()}
+
+
+def _variant_key(buy_params: dict, sell_params: dict) -> str:
+    return json.dumps({"buy": buy_params, "sell": sell_params}, sort_keys=True)
+
+
+def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict]]:
+    buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
+    base_buy = _current_param_values(buy_grid, RULE_SET_7.CONFIG)
+    base_sell = _current_param_values(sell_grid, RULE_SET_2.CONFIG)
+
+    out: list[tuple[str, dict, dict]] = []
+    seen: set[str] = set()
+
+    def add(name: str, buy_patch: dict, sell_patch: dict):
+        key = _variant_key(buy_patch, sell_patch)
+        if key in seen:
+            return
+        seen.add(key)
+        out.append((name, buy_patch, sell_patch))
+
+    add("baseline_current", {}, {})
+
+    for key, values in buy_grid.items():
+        for value in values:
+            if float(value) == float(base_buy[key]):
+                continue
+            add(f"buy_{key}_{value}", {key: value}, {})
+
+    for key, values in sell_grid.items():
+        for value in values:
+            if float(value) == float(base_sell[key]):
+                continue
+            add(f"sell_{key}_{value}", {}, {key: value})
+
+    focus_buy = ["adx_min", "volume_confirm_mult", "obv_min_zscore", "cmf_base_min", "rsi_floor"]
+    focus_sell = ["equity_time_stop_bars", "equity_review_rsi", "momentum_exit_rsi", "breakeven_trigger_pct"]
+
+    combo_idx = 0
+    for bkey in focus_buy:
+        for skey in focus_sell:
+            bvals = [v for v in buy_grid[bkey] if float(v) != float(base_buy[bkey])][:2]
+            svals = [v for v in sell_grid[skey] if float(v) != float(base_sell[skey])][:2]
+            for bval in bvals:
+                for sval in svals:
+                    combo_idx += 1
+                    add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval})
+
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "220"))
+    return out[:max_variants]
 
 
 def _set_temp_state(rule2_module, d: str):
@@ -290,137 +501,141 @@ def _set_temp_state(rule2_module, d: str):
     rule2_module.LOCK_FILE_PATH = os.path.join(d, "Holdings.lock")
 
 
-def run_variant(name: str, df: pd.DataFrame, buy_params: dict, sell_params: dict) -> BacktestResult:
-    # avoid DB dependency in RULE_SET_7 market regime check
-    at_utils.get_mmi_now = lambda: None
+def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
+    cash = 100000.0
+    qty = 0
+    avg = 0.0
+    entry_idx = None
+    trades = 0
+    wins = 0
+    equity_curve = []
 
-    r2 = RULE_SET_2
-    r7 = RULE_SET_7
+    for i in range(250, len(df)):
+        part = df.iloc[: i + 1].copy()
+        row = part.iloc[-1].to_dict()
+        row.setdefault("instrument_token", 1626369)
+        price = float(part.iloc[-1]["Close"])
 
-    old_r2 = dict(r2.CONFIG)
-    old_r7 = dict(r7.CONFIG)
-    r2.CONFIG.update(sell_params)
-    r7.CONFIG.update(buy_params)
+        if qty == 0:
+            hold_df = pd.DataFrame(
+                columns=[
+                    "instrument_token",
+                    "tradingsymbol",
+                    "average_price",
+                    "quantity",
+                    "t1_quantity",
+                    "bars_in_trade",
+                ]
+            )
+            sig = RULE_SET_7.buy_or_sell(part, row, hold_df)
+            if str(sig).upper() == "BUY":
+                buy_qty = int(cash // price)
+                if buy_qty > 0:
+                    qty = buy_qty
+                    cash -= qty * price
+                    avg = price
+                    entry_idx = i
+                    trades += 1
+        else:
+            hold_df = pd.DataFrame(
+                [
+                    {
+                        "instrument_token": int(row.get("instrument_token", 1626369)),
+                        "tradingsymbol": symbol,
+                        "average_price": avg,
+                        "quantity": qty,
+                        "t1_quantity": 0,
+                        "bars_in_trade": max(0, i - entry_idx) if entry_idx is not None else 0,
+                    }
+                ]
+            )
+            sig = RULE_SET_2.buy_or_sell(part, row, hold_df)
+            if str(sig).upper() == "SELL":
+                cash += qty * price
+                if price > avg:
+                    wins += 1
+                qty = 0
+                avg = 0.0
+                entry_idx = None
+                trades += 1
 
-    try:
-        with tempfile.TemporaryDirectory(prefix="at_state_") as td:
-            _set_temp_state(r2, td)
-
-            cash = 100000.0
-            qty = 0
-            avg = 0.0
-            entry_idx = None
-            trades = 0
-            wins = 0
-            equity_curve = []
-
-            for i in range(250, len(df)):
-                part = df.iloc[: i + 1].copy()
-                row = part.iloc[-1].to_dict()
-                row.setdefault("instrument_token", 1626369)
-                price = float(part.iloc[-1]["Close"])
-
-                if qty == 0:
-                    hold_df = pd.DataFrame(
-                        columns=[
-                            "instrument_token",
-                            "tradingsymbol",
-                            "average_price",
-                            "quantity",
-                            "t1_quantity",
-                            "bars_in_trade",
-                        ]
-                    )
-                    sig = r7.buy_or_sell(part, row, hold_df)
-                    if str(sig).upper() == "BUY":
-                        buy_qty = int(cash // price)
-                        if buy_qty > 0:
-                            qty = buy_qty
-                            cash -= qty * price
-                            avg = price
-                            entry_idx = i
-                            trades += 1
-                else:
-                    hold_df = pd.DataFrame(
-                        [
-                            {
-                                "instrument_token": int(row.get("instrument_token", 1626369)),
-                                "tradingsymbol": "NIFTYETF",
-                                "average_price": avg,
-                                "quantity": qty,
-                                "t1_quantity": 0,
-                                "bars_in_trade": max(0, i - entry_idx) if entry_idx is not None else 0,
-                            }
-                        ]
-                    )
-                    sig = r2.buy_or_sell(part, row, hold_df)
-                    if str(sig).upper() == "SELL":
-                        cash += qty * price
-                        if price > avg:
-                            wins += 1
-                        qty = 0
-                        avg = 0.0
-                        entry_idx = None
-                        trades += 1
-
-                port = cash + (qty * price)
-                equity_curve.append(port)
-    finally:
-        r2.CONFIG.clear()
-        r2.CONFIG.update(old_r2)
-        r7.CONFIG.clear()
-        r7.CONFIG.update(old_r7)
+        port = cash + (qty * price)
+        equity_curve.append(port)
 
     final_val = equity_curve[-1] if equity_curve else 100000.0
-    ret = (final_val / 100000.0 - 1.0) * 100.0
-    win_rate = (wins / max(1, trades // 2)) * 100.0
-
     s = pd.Series(equity_curve if equity_curve else [100000.0], dtype=float)
     peak = s.cummax()
     dd = ((s - peak) / peak * 100.0).min()
+    return {
+        "final_value": float(final_val),
+        "trades": int(trades),
+        "wins": int(wins),
+        "max_drawdown_pct": float(dd),
+    }
+
+
+def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict) -> BacktestResult:
+    # avoid DB dependency in RULE_SET_7 market regime check
+    at_utils.get_mmi_now = lambda: None
+
+    old_r2 = dict(RULE_SET_2.CONFIG)
+    old_r7 = dict(RULE_SET_7.CONFIG)
+    RULE_SET_2.CONFIG.update(sell_params)
+    RULE_SET_7.CONFIG.update(buy_params)
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="at_state_") as td:
+            _set_temp_state(RULE_SET_2, td)
+            total_final_value = 0.0
+            total_trades = 0
+            total_wins = 0
+            worst_dd = 0.0
+            tested_symbols: list[str] = []
+
+            for symbol, df in data_map.items():
+                stats = _simulate_symbol(symbol, df)
+                total_final_value += stats["final_value"]
+                total_trades += stats["trades"]
+                total_wins += stats["wins"]
+                worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+                tested_symbols.append(symbol)
+    finally:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+
+    start_capital = 100000.0 * max(1, len(tested_symbols))
+    ret = (total_final_value / start_capital - 1.0) * 100.0
+    round_trips = max(1, total_trades // 2)
+    win_rate = (total_wins / round_trips) * 100.0
+    selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, worst_dd))))
 
     return BacktestResult(
         name=name,
-        final_value=round(float(final_val), 2),
+        final_value=round(float(total_final_value), 2),
         total_return_pct=round(float(ret), 2),
-        trades=int(trades),
+        trades=int(total_trades),
         win_rate_pct=round(float(win_rate), 2),
-        max_drawdown_pct=round(float(dd), 2),
+        max_drawdown_pct=round(float(worst_dd), 2),
         params={"buy": buy_params, "sell": sell_params},
+        symbols_tested=tested_symbols,
+        selection_score=round(selection_score, 3),
     )
-
-
-def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict]]:
-    buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
-
-    out = []
-    idx = 0
-    for bvals in itertools.product(*buy_grid.values()):
-        b = dict(zip(buy_grid.keys(), bvals))
-        for svals in itertools.product(*sell_grid.values()):
-            s = dict(zip(sell_grid.keys(), svals))
-            idx += 1
-            out.append((f"variant_{idx:04d}", b, s))
-
-    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "700"))
-    if len(out) > max_variants:
-        out = out[:max_variants]
-
-    out.insert(0, ("baseline_current", {}, {}))
-    return out
 
 
 def main():
     scorecard_context = load_scorecard_context()
     tradebook_context = load_tradebook_context()
-    df = load_data()
+    fundamental_context = load_fundamental_context()
+    data_map, data_context = load_data(tradebook_context, fundamental_context)
     results = []
     for name, b, s in variants(scorecard_context, tradebook_context):
-        results.append(run_variant(name, df, b, s))
+        results.append(run_variant(name, data_map, b, s))
 
     rank = sorted(
         results,
-        key=lambda r: (r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct),
+        key=lambda r: (r.selection_score, r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct),
         reverse=True,
     )
     baseline = next(r for r in rank if r.name == "baseline_current")
@@ -431,13 +646,21 @@ def main():
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
         "scorecard_context": scorecard_context,
         "tradebook_context": tradebook_context,
+        "fundamental_context": {
+            k: v
+            for k, v in fundamental_context.items()
+            if k != "sector_map"
+        },
+        "data_context": data_context,
         "baseline": asdict(baseline),
         "best": asdict(best),
         "tested_variants": len(rank),
         "improvement_return_pct": round(best.total_return_pct - baseline.total_return_pct, 2),
+        "improvement_score": round(best.selection_score - baseline.selection_score, 3),
         "should_promote": bool(
             best.name != baseline.name
-            and best.total_return_pct > baseline.total_return_pct
+            and best.total_return_pct > baseline.total_return_pct + 0.25
+            and best.selection_score > baseline.selection_score + 0.2
             and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + 2.0
         ),
     }

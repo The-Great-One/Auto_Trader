@@ -13,6 +13,14 @@ CONFIG = {
     "max_atr_pct": float(os.getenv("AT_BUY_MAX_ATR_PCT", "0.09")),
     "max_extension_atr": float(os.getenv("AT_BUY_MAX_EXTENSION_ATR", "2.2")),
     "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "2.5")),
+    "obv_min_zscore": float(os.getenv("AT_BUY_OBV_MIN_ZSCORE", "0.5")),
+    "volume_confirm_mult": float(os.getenv("AT_BUY_VOLUME_CONFIRM_MULT", "1.1")),
+    "cmf_strong_min": float(os.getenv("AT_BUY_CMF_STRONG_MIN", "0.03")),
+    "cmf_base_min": float(os.getenv("AT_BUY_CMF_BASE_MIN", "0.05")),
+    "cmf_weak_min": float(os.getenv("AT_BUY_CMF_WEAK_MIN", "0.10")),
+    "rsi_floor": float(os.getenv("AT_BUY_RSI_FLOOR", "45")),
+    "stoch_pull_max": float(os.getenv("AT_BUY_STOCH_PULL_MAX", "75")),
+    "stoch_momo_max": float(os.getenv("AT_BUY_STOCH_MOMO_MAX", "85")),
 }
 
 
@@ -56,22 +64,23 @@ def buy_or_sell(df, row, holdings):
     # Volume
     vol = latest["Volume"]
     vol_sma = latest["SMA_20_Volume"]
-    vol_ok = vol > 1.1 * vol_sma
+    vol_ok = vol > CONFIG["volume_confirm_mult"] * vol_sma
 
     # CMF regime-aware
     cmf = latest["CMF"]
     if adx_strong:
-        cmf_ok = (cmf >= 0.03) and (cmf > prev["CMF"])
+        cmf_gate = CONFIG["cmf_strong_min"]
     elif not adx_ok:
-        cmf_ok = (cmf >= 0.10) and (cmf > prev["CMF"])
+        cmf_gate = CONFIG["cmf_weak_min"]
     else:
-        cmf_ok = (cmf >= 0.05) and (cmf > prev["CMF"])
+        cmf_gate = CONFIG["cmf_base_min"]
+    cmf_ok = (cmf >= cmf_gate) and (cmf > prev["CMF"])
 
     # OBV
     z = latest.get("OBV_ZScore20", np.nan)
     obv_trend = latest["OBV"] > latest["OBV_EMA20"]
     obv_slope = slope_up(df["OBV_EMA20"].values)
-    obv_ok = (np.isfinite(z) and z >= 0.5 and obv_trend) or (obv_trend and obv_slope)
+    obv_ok = (np.isfinite(z) and z >= CONFIG["obv_min_zscore"] and obv_trend) or (obv_trend and obv_slope)
     if np.isfinite(z) and z > CONFIG["max_obv_zscore"]:
         return "HOLD"
 
@@ -88,8 +97,13 @@ def buy_or_sell(df, row, holdings):
     # RSI with adaptive gates
     rsi = latest["RSI"]
     rsi_slope_up = rsi >= prev["RSI"]
+    stoch_k = latest.get("Stochastic_%K", np.nan)
+    supertrend_dir = latest.get("Supertrend_Direction", True)
+    supertrend = latest.get("Supertrend", np.nan)
+    weekly_sma_20 = latest.get("Weekly_SMA_20", np.nan)
+    weekly_sma_200 = latest.get("Weekly_SMA_200", np.nan)
 
-    if rsi < 45:
+    if rsi < CONFIG["rsi_floor"]:
         return "HOLD"
     if np.isfinite(z) and z >= 2.0 and rsi >= 75:
         return "HOLD"
@@ -102,6 +116,13 @@ def buy_or_sell(df, row, holdings):
         extension_atr = (close - ema20) / max(float(atr), 1e-9)
         if extension_atr > CONFIG["max_extension_atr"]:
             return "HOLD"
+
+    if np.isfinite(supertrend) and close < float(supertrend):
+        return "HOLD"
+    if not bool(supertrend_dir):
+        return "HOLD"
+    if np.isfinite(weekly_sma_20) and np.isfinite(weekly_sma_200) and weekly_sma_20 < weekly_sma_200:
+        return "HOLD"
 
     rsi_pull_gate = 55
     rsi_momo_gate = 60
@@ -128,6 +149,9 @@ def buy_or_sell(df, row, holdings):
         return "HOLD"
 
     # --- Modes ---
+    stoch_pull_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_pull_max"])
+    stoch_momo_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_momo_max"])
+
     pullback_mode = all(
         (
             trend_ok,
@@ -138,6 +162,7 @@ def buy_or_sell(df, row, holdings):
             obv_ok,
             macd_rising,
             rsi_pullback_trigger,
+            stoch_pull_ok,
             close >= ema20,
         )
     )
@@ -150,6 +175,7 @@ def buy_or_sell(df, row, holdings):
             cmf_ok,
             obv_ok,
             macd_rising,
+            stoch_momo_ok,
             (rsi_momo_trigger or highN_break or prior_high_break),
         )
     )
