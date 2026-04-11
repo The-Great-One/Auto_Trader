@@ -83,7 +83,7 @@ def build_access_token():
             for item in os.listdir("intermediary_files"):
                 item_path = os.path.join("intermediary_files", item)
                 # Skip the file you want to keep
-                if item != "Holdings.json":
+                if item not in ["Holdings.json", "HITECH.feather"]:
                     # Remove files or directories
                     if os.path.isfile(item_path):
                         os.remove(item_path)
