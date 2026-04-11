@@ -77,23 +77,17 @@ def build_access_token():
             "access_token": data["access_token"],
             "date": datetime.now().strftime("%Y-%m-%d"),
         }
-        # Check if the directory exists
-        if os.path.isdir("intermediary_files"):
-            # Loop through each item in intermediary_files
-            for item in os.listdir("intermediary_files"):
-                item_path = os.path.join("intermediary_files", item)
-                # Skip the file you want to keep
-                if item not in ["Holdings.json", "HITECH.feather"]:
-                    # Remove files or directories
-                    if os.path.isfile(item_path):
-                        os.remove(item_path)
-                    elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
 
+        # Token refresh must not wipe cached market data, holdings, or other
+        # intermediary state. Just ensure the directory exists and replace the
+        # token file atomically.
         os.makedirs("intermediary_files", exist_ok=True)
+        token_path = "intermediary_files/access_token.json"
+        temp_token_path = f"{token_path}.tmp"
 
-        with open("intermediary_files/access_token.json", "w") as json_file:
+        with open(temp_token_path, "w") as json_file:
             json.dump(session_data, json_file, indent=4)
+        os.replace(temp_token_path, token_path)
         return data["access_token"]
     except Exception as e:
         logger.error(
@@ -571,13 +565,21 @@ def process_stock_and_decide(row):
     return None
 
 
-# Initialize Kite
-kite = initialize_kite()
+# Lazily initialize Kite so research / backtest imports do not hit the broker
+# API or write intermediary files at module import time.
+kite = None
+
+
+def get_kite_client():
+    global kite
+    if kite is None:
+        kite = initialize_kite()
+    return kite
 
 
 # Retry decorator, with exponential backoff and jitter
 @retry(tries=3, delay=2, backoff=2, jitter=(0, 1), exceptions=(Exception,))
-def fetch_holdings(kite=kite):
+def fetch_holdings(kite=None):
     """
     Fetch the list of instruments and holdings from the Kite API,
     and save the holdings to a CSV file.
@@ -589,6 +591,8 @@ def fetch_holdings(kite=kite):
         pd.DataFrame: DataFrame containing NSE stocks with instrument tokens.
     """
     try:
+        kite = kite or get_kite_client()
+
         # Fetch holdings
         holdings = kite.holdings()
         if holdings:
@@ -639,7 +643,7 @@ def fetch_holdings(kite=kite):
 
 # Retry decorator, with exponential backoff and jitter
 @retry(tries=3, delay=2, backoff=2, jitter=(0, 1), exceptions=(Exception,))
-def fetch_instruments_list(kite=kite):
+def fetch_instruments_list(kite=None):
     """
     Fetch the list of instruments and holdings from the Kite API,
     and save the holdings to a CSV file.
@@ -651,6 +655,8 @@ def fetch_instruments_list(kite=kite):
         pd.DataFrame: DataFrame containing NSE stocks with instrument tokens.
     """
     try:
+        kite = kite or get_kite_client()
+
         # Fetch instruments
         instruments = kite.instruments()
 
@@ -791,7 +797,7 @@ def load_instruments_data():
         sys.exit(1)  # Exit if we cannot load instruments data
 
 
-def cleanup_stop_loss_json(holdings=fetch_holdings()):
+def cleanup_stop_loss_json(holdings=None):
     """
     Cleans up the stop-loss JSON file by removing any entries that
     do not correspond to currently held tradingsymbols.
@@ -836,6 +842,9 @@ def cleanup_stop_loss_json(holdings=fetch_holdings()):
     except Exception as e:
         logger.error(f"Error loading stop-loss from JSON: {str(e)}")
         return
+
+    if holdings is None:
+        holdings = fetch_holdings()
 
     # Verify holdings DataFrame has the required column
     if "tradingsymbol" not in holdings.columns:
