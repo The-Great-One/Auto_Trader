@@ -119,6 +119,8 @@ def evaluate_signal(df, row, holdings):
     ema_stack = np.isfinite(ema5) and np.isfinite(ema10) and close > ema5 > ema10
     rsi_ok = np.isfinite(rsi) and rsi >= CONFIG["option_rsi_min"] and rsi >= prev_rsi
     macd_ok = np.isfinite(macd_hist) and macd_hist > 0 and macd_hist >= prev_macd_hist
+    rsi_available = np.isfinite(rsi)
+    macd_available = np.isfinite(macd_hist)
     volume_ok = volume_sma <= 0 or volume >= CONFIG["volume_confirm_mult"] * volume_sma
     oi_ok = (oi_sma5 <= 0 and oi > 0) or (oi_sma5 > 0 and oi >= CONFIG["oi_sma_mult"] * oi_sma5 and oi_pct >= CONFIG["oi_change_min_pct"])
     atr_ok = np.isfinite(atr_pct) and CONFIG["atr_pct_min"] <= atr_pct <= CONFIG["atr_pct_max"]
@@ -138,9 +140,13 @@ def evaluate_signal(df, row, holdings):
     if rsi_ok:
         score += 1.0
         reasons.append("option_rsi")
+    elif not rsi_available:
+        reasons.append("rsi_unavailable")
     if macd_ok:
         score += 1.0
         reasons.append("macd_hist_rising")
+    elif not macd_available:
+        reasons.append("macd_unavailable")
     if volume_ok:
         score += 1.0
         reasons.append("volume_confirm")
@@ -182,7 +188,18 @@ def evaluate_signal(df, row, holdings):
             },
         )
 
-    should_buy = all((underlying_ok, price_momo, rsi_ok, macd_ok, volume_ok, oi_ok, atr_ok, score >= CONFIG["buy_score_min"]))
+    should_buy = all(
+        (
+            underlying_ok,
+            price_momo,
+            volume_ok,
+            oi_ok,
+            atr_ok,
+            score >= CONFIG["buy_score_min"],
+            (rsi_ok or not rsi_available),
+            (macd_ok or not macd_available),
+        )
+    )
     return (
         "BUY" if should_buy else "HOLD",
         {
