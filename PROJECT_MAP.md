@@ -167,7 +167,8 @@ In `scripts/options_strategy_lab.py`:
 - prefers symbols from `intermediary_files/options/nifty_options_universe.json` when present, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
 - defaults to `NIFTY` options with optional `AT_OPTIONS_LAB_SIDE`
 - enriches each option contract with underlying NIFTY context from `NIFTY50_INDEX.feather`
-- iterates parameter variants around `Auto_Trader/RULE_SET_OPTIONS_1.py`
+- builds a context-aware search space around `Auto_Trader/RULE_SET_OPTIONS_1.py`, similar in style to the equity lab
+- uses scorecard/tradebook context to loosen entry sensitivity on no-trade days and tighten exits when mid-hold behavior looks weak
 - uses shorter warmup/min-bar defaults suitable for short-lived weekly option contracts
 - never auto-promotes into live trading; output is for research only
 
