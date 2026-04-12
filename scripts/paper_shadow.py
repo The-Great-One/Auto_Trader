@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -86,7 +87,11 @@ def run_equity_shadow() -> dict:
                 "bars_in_trade": 20,
             }
         ])
-        decision = RULE_SET_2.buy_or_sell(df, row, holdings)
+        with tempfile.TemporaryDirectory(prefix="paper_shadow_state_") as td:
+            RULE_SET_2.BASE_DIR = td
+            RULE_SET_2.HOLDINGS_FILE_PATH = str(Path(td) / "Holdings.json")
+            RULE_SET_2.LOCK_FILE_PATH = str(Path(td) / "Holdings.lock")
+            decision = RULE_SET_2.buy_or_sell(df, row, holdings)
         mode = "SELL_RULE_ONLY"
     else:
         holdings = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
