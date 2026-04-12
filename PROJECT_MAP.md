@@ -33,6 +33,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `README.md` - setup and ops notes
 - `requirements.txt` - Python deps
 - `PROJECT_MAP.md` - this file
+- `dashboard/ops_dashboard.py` - Streamlit ops dashboard for labs, live/paper snapshots, sentiment cache, and Oracle server visibility
 
 ### `Auto_Trader/`
 - `__init__.py` - exports runtime entrypoints and sets up logging

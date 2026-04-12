@@ -8,6 +8,8 @@ pandas_market_calendars
 python-telegram-bot
 requests
 retry
+streamlit
+plotly
 TA-Lib
 timedelta
 tqdm
