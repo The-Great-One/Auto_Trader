@@ -300,6 +300,53 @@ Suggested cron (example):
 25 16 * * 1-5 DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...' /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/send_discord_health_alert.py >> /home/ubuntu/Auto_Trader/reports/discord_alert_cron.log 2>&1
 ```
 
+## 🐦 X/Twitter Sentiment Pipeline
+
+New pieces:
+
+- `Auto_Trader/twitter_sentiment.py`
+  - fetches recent tweets for tracked symbols using X recent-search API
+  - classifies tweet types (`bullish`, `bearish`, `earnings_*`, `news`, `risk`, `regulatory`, `rumor`, `meme`)
+  - computes cached per-symbol sentiment snapshots
+  - exposes a guarded trade overlay for live decisions
+
+- `scripts/fetch_twitter_sentiment.py`
+  - refreshes symbol sentiment snapshots
+  - writes `reports/twitter_sentiment_latest.json`
+
+Behavior:
+
+- Trading overlay is **off by default**.
+- Enable live influence with `AT_TWITTER_SENTIMENT_ENABLED=1`.
+- The bot only uses **cached** sentiment in live trading, so the decision loop does not depend on live Twitter API calls.
+- Current overlay is intentionally conservative:
+  - can block a technically-valid `BUY` if social flow turns credibly bearish
+  - can force a `SELL` for already-held symbols on strong negative sentiment
+  - can confirm, but not create, bullish buys
+
+Required env for fetching:
+
+- `AT_TWITTER_BEARER_TOKEN`
+
+Useful optional envs:
+
+- `AT_TWITTER_EXTRA_SYMBOLS`
+- `AT_TWITTER_SYMBOL_ALIASES_JSON`
+- `AT_TWITTER_SENTIMENT_TTL_MINUTES`
+- `AT_TWITTER_MIN_TWEETS`
+- `AT_TWITTER_BUY_BLOCK_THRESHOLD`
+- `AT_TWITTER_SELL_FORCE_THRESHOLD`
+
+Example:
+
+```bash
+# refresh cached sentiment for holdings + extra symbols
+AT_TWITTER_BEARER_TOKEN='...' python scripts/fetch_twitter_sentiment.py --hours-back 6 --max-results 25
+
+# enable live overlay once you trust the output
+AT_TWITTER_SENTIMENT_ENABLED=1 python wednesday.py
+```
+
 ## 🛠️ Future Enhancements
 
 - **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
