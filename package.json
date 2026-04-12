@@ -1,0 +1,8 @@
+{
+  "name": "auto-trader",
+  "version": "1.0.0",
+  "scripts": {
+    "strategy-lab": "node strategy-lab.js",
+    "dashboard": "streamlit run dashboard/ops_dashboard.py"
+  }
+}

@@ -379,6 +379,33 @@ Example:
 AT_LAB_RNN_ENABLED=1 python scripts/weekly_strategy_lab.py
 ```
 
+## 📊 Ops Dashboard
+
+A local Streamlit dashboard is available for operational visibility across the system.
+
+File:
+- `dashboard/ops_dashboard.py`
+
+What it shows:
+- latest strategy lab runs and top variants
+- RNN-vs-baseline lab outcomes
+- paper trader snapshots
+- live paper-shadow snapshots
+- cached Twitter sentiment by symbol
+- Oracle server state and recent reports over SSH
+
+Run it locally:
+
+```bash
+streamlit run dashboard/ops_dashboard.py
+# or
+npm run dashboard
+```
+
+Notes:
+- server panel uses the configured Oracle SSH key already used for Auto_Trader ops
+- the dashboard reads existing JSON/CSV artifacts, so it stays lightweight and does not interfere with trading runtime
+
 ## 🛠️ Future Enhancements
 
 - **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
