@@ -125,6 +125,7 @@ def option_variants() -> list[tuple[str, dict]]:
         "volume_confirm_mult": [1.0, 1.1, 1.25],
         "oi_sma_mult": [1.0, 1.02, 1.05],
         "oi_change_min_pct": [0.0, 1.0, 3.0],
+        "atr_pct_max": [0.6, 1.0, 1.5],
         "buy_score_min": [5.5, 6.0, 6.5],
         "take_profit_pct": [18.0, 25.0, 35.0],
         "stop_loss_pct": [8.0, 12.0, 15.0],
