@@ -356,7 +356,12 @@ A lab-only recurrent model layer now exists for research runs.
   - estimates next-bar upside probability per symbol
 - `scripts/weekly_strategy_lab.py`
   - can test baseline strategy variants with and without the RNN overlay
+  - writes a persistent status file consumed by the dashboard while the lab is running
   - uses the RNN conservatively: it can filter marginal BUY entries and trigger earlier SELL exits in the lab
+
+- `scripts/run_full_rnn_equity_lab.py`
+  - expands the lab to the full approved equity universe
+  - launches the weekly lab with the equity-tuned RNN defaults
 
 Important:
 
