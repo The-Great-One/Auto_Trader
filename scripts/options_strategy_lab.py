@@ -43,6 +43,7 @@ at_logger.setLevel("WARNING")
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
 HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
+OPTIONS_MANIFEST = ROOT / "intermediary_files" / "options" / "nifty_options_universe.json"
 OPTION_SYMBOL_RE = re.compile(r"^[A-Z0-9]+\d+(CE|PE)$")
 
 
@@ -76,13 +77,29 @@ def _looks_like_option_symbol(symbol: str) -> bool:
     return bool(OPTION_SYMBOL_RE.match(str(symbol or "").upper()))
 
 
+def _load_manifest_symbols() -> list[str]:
+    try:
+        if not OPTIONS_MANIFEST.exists():
+            return []
+        payload = json.loads(OPTIONS_MANIFEST.read_text())
+        contracts = payload.get("contracts") or []
+        return [str(c.get("tradingsymbol") or "").upper() for c in contracts if c.get("tradingsymbol")]
+    except Exception:
+        return []
+
+
+
 def discover_option_symbols() -> list[str]:
     explicit = os.getenv("AT_OPTIONS_LAB_SYMBOLS", "").strip()
     if explicit:
         return _parse_symbol_list(explicit)
 
+    manifest_symbols = _load_manifest_symbols()
+    if manifest_symbols:
+        return manifest_symbols
+
     underlyings = _parse_symbol_list(
-        os.getenv("AT_OPTIONS_LAB_UNDERLYINGS", "NIFTY,BANKNIFTY,FINNIFTY")
+        os.getenv("AT_OPTIONS_LAB_UNDERLYINGS", "NIFTY")
     )
     side_filter = os.getenv("AT_OPTIONS_LAB_SIDE", "BOTH").strip().upper()
     max_symbols = max(1, int(os.getenv("AT_OPTIONS_LAB_MAX_SYMBOLS", "12")))
@@ -146,8 +163,9 @@ def load_option_data() -> tuple[dict[str, pd.DataFrame], dict]:
         "skipped_symbols": skipped,
         "side_filter": os.getenv("AT_OPTIONS_LAB_SIDE", "BOTH").strip().upper(),
         "underlyings": _parse_symbol_list(
-            os.getenv("AT_OPTIONS_LAB_UNDERLYINGS", "NIFTY,BANKNIFTY,FINNIFTY")
+            os.getenv("AT_OPTIONS_LAB_UNDERLYINGS", "NIFTY")
         ),
+        "manifest_path": str(OPTIONS_MANIFEST),
         "min_bars": min_bars,
     }
 

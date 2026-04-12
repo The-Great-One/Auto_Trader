@@ -57,6 +57,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for cached option OHLCV using the same BUY/SELL rules, with no live auto-promotion
+- `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
@@ -159,10 +160,24 @@ In `scripts/weekly_strategy_lab.py`:
 - disables file logging during lab runs to avoid noisy permission issues
 
 In `scripts/options_strategy_lab.py`:
-- discovers cached option symbols from `intermediary_files/Hist_Data/*.feather` using option-like symbol patterns, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
-- defaults to index-option underlyings via `AT_OPTIONS_LAB_UNDERLYINGS` and optional `AT_OPTIONS_LAB_SIDE`
+- prefers symbols from `intermediary_files/options/nifty_options_universe.json` when present, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
+- defaults to `NIFTY` options with optional `AT_OPTIONS_LAB_SIDE`
 - uses shorter warmup/min-bar defaults suitable for option contracts
 - never auto-promotes into live trading; output is for research only
+
+In `scripts/fetch_nifty_options_data.py`:
+- fetches NFO instrument metadata for `NIFTY` option contracts
+- selects near-ATM contracts across configurable nearby strikes and expiries
+- downloads contract OHLCV with `oi=True`
+- stores underlying `^NSEI` context in `intermediary_files/Hist_Data/NIFTY50_INDEX.feather`
+- writes a manifest to `intermediary_files/options/nifty_options_universe.json`
+- key env knobs:
+  - `AT_OPTIONS_FETCH_INTERVAL`
+  - `AT_NIFTY_OPTIONS_EXPIRY_COUNT`
+  - `AT_NIFTY_OPTIONS_STRIKES_EACH_SIDE`
+  - `AT_NIFTY_OPTIONS_SIDE`
+  - `AT_NIFTY_OPTIONS_DAILY_LOOKBACK_YEARS`
+  - `AT_NIFTY_OPTIONS_INTRADAY_LOOKBACK_DAYS`
 
 Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
