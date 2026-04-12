@@ -354,6 +354,12 @@ def maybe_auto_promote(strategy: dict, market_open: bool) -> dict:
         result["reason"] = "candidate_has_no_env_mappable_params"
         return result
 
+    effective_candidate = _current_effective_candidate(candidate)
+    if effective_candidate == {"buy": candidate.get("buy") or {}, "sell": candidate.get("sell") or {}}:
+        result["reason"] = "already_active_effective_config"
+        result["env_updates"] = candidate.get("env_updates")
+        return result
+
     min_return_gain = _safe_float(os.getenv("AT_LAB_AUTOPROMOTE_MIN_RETURN_GAIN", "1.0"), 1.0)
     min_score_gain = _safe_float(os.getenv("AT_LAB_AUTOPROMOTE_MIN_SCORE_GAIN", "1.0"), 1.0)
     lookback = max(1, int(os.getenv("AT_LAB_AUTOPROMOTE_LOOKBACK", "3")))
@@ -379,12 +385,6 @@ def maybe_auto_promote(strategy: dict, market_open: bool) -> dict:
     result["lookback"] = lookback
     if repeat_hits < min_repeat:
         result["reason"] = "repeat_guard_not_met"
-        return result
-
-    effective_candidate = _current_effective_candidate(candidate)
-    if effective_candidate == {"buy": candidate.get("buy") or {}, "sell": candidate.get("sell") or {}}:
-        result["reason"] = "already_active_effective_config"
-        result["env_updates"] = candidate.get("env_updates")
         return result
 
     state = _load_promotion_state()
