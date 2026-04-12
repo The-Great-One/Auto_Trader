@@ -172,9 +172,14 @@ def _load_nfo_instruments(kite: KiteConnect, refresh: bool = False) -> pd.DataFr
         df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce")
     if "strike" in df.columns:
         df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
+    cache_df = df.copy()
+    if "expiry" in cache_df.columns:
+        cache_df["expiry"] = cache_df["expiry"].apply(
+            lambda x: "" if pd.isna(x) else pd.Timestamp(x).isoformat()
+        )
     payload = {
         "generated_at": datetime.now().isoformat(),
-        "rows": df.to_dict(orient="records"),
+        "rows": cache_df.to_dict(orient="records"),
     }
     _save_json(NFO_CACHE_PATH, payload)
     return df
