@@ -55,7 +55,8 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
-- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2
+- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
+- `options_strategy_lab.py` - research-only parameter sweep / backtest harness for cached option OHLCV using the same BUY/SELL rules, with no live auto-promotion
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
@@ -83,6 +84,19 @@ Backtests, permutations, historical analysis, ad hoc research helpers.
 
 - BUY: `RULE_SET_7`
 - SELL: `RULE_SET_2`
+
+## Current options support status
+
+Live base code is not yet options-ready end to end.
+
+Main blockers:
+- `Auto_Trader/utils.py` currently filters instrument master to `instrument_type == "EQ"`
+- `Auto_Trader/Build_Master.py` builds the watchlist from fundamentals-approved equities/ETFs only
+- `Auto_Trader/KITE_TRIGGER_ORDER.py` hardcodes cash-delivery style order defaults (`PRODUCT_CNC`) and only maps exchanges to NSE/BSE in `trigger(...)`
+- `Auto_Trader/KITE_TRIGGER_ORDER.py` sell execution path primarily anchors on holdings snapshots, while options typically live in positions
+
+Implication:
+- `scripts/options_strategy_lab.py` is research-only until live universe building, decision plumbing, and order routing are extended for NFO/options
 
 ## Mutual fund support
 
@@ -143,6 +157,12 @@ In `scripts/weekly_strategy_lab.py`:
 - if tradebook analysis shows weak 5 to 10 day holds, it biases sell-side search toward tighter time stops
 - records scorecard context and tradebook context in the strategy lab JSON output
 - disables file logging during lab runs to avoid noisy permission issues
+
+In `scripts/options_strategy_lab.py`:
+- discovers cached option symbols from `intermediary_files/Hist_Data/*.feather` using option-like symbol patterns, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
+- defaults to index-option underlyings via `AT_OPTIONS_LAB_UNDERLYINGS` and optional `AT_OPTIONS_LAB_SIDE`
+- uses shorter warmup/min-bar defaults suitable for option contracts
+- never auto-promotes into live trading; output is for research only
 
 Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
