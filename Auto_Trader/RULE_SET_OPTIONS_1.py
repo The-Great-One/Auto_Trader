@@ -115,6 +115,7 @@ def evaluate_signal(df, row, holdings):
     underlying_ok = bullish_underlying or bearish_underlying
 
     atr_pct = atr / close if np.isfinite(atr) and close > 0 else np.nan
+    atr_available = np.isfinite(atr_pct)
     price_momo = np.isfinite(close) and np.isfinite(ema10) and close > ema10 and close >= prev_close and ema10 >= prev_ema10
     ema_stack = np.isfinite(ema5) and np.isfinite(ema10) and close > ema5 > ema10
     rsi_ok = np.isfinite(rsi) and rsi >= CONFIG["option_rsi_min"] and rsi >= prev_rsi
@@ -123,7 +124,7 @@ def evaluate_signal(df, row, holdings):
     macd_available = np.isfinite(macd_hist)
     volume_ok = volume_sma <= 0 or volume >= CONFIG["volume_confirm_mult"] * volume_sma
     oi_ok = (oi_sma5 <= 0 and oi > 0) or (oi_sma5 > 0 and oi >= CONFIG["oi_sma_mult"] * oi_sma5 and oi_pct >= CONFIG["oi_change_min_pct"])
-    atr_ok = np.isfinite(atr_pct) and CONFIG["atr_pct_min"] <= atr_pct <= CONFIG["atr_pct_max"]
+    atr_ok = (not atr_available) or (CONFIG["atr_pct_min"] <= atr_pct <= CONFIG["atr_pct_max"])
     breakout_ok = np.isfinite(prev.get("High", np.nan)) and close > _finite(prev.get("High"), np.inf)
 
     score = 0.0
@@ -158,6 +159,8 @@ def evaluate_signal(df, row, holdings):
         reasons.append("breakout")
     if not atr_ok:
         reasons.append("atr_filter_fail")
+    elif not atr_available:
+        reasons.append("atr_unavailable")
 
     holding = _holding_for_symbol(holdings, symbol)
     in_position = not holding.empty and int(_finite(holding.iloc[0].get("quantity"), 0)) > 0
