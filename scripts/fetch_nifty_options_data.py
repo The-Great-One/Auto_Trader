@@ -137,12 +137,23 @@ def _get_kite() -> KiteConnect:
 
 
 
+def _finalize_instruments_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    if "expiry" in df.columns:
+        df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce")
+    if "strike" in df.columns:
+        df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
+    return df
+
+
+
 def _load_nfo_instruments(kite: KiteConnect, refresh: bool = False) -> pd.DataFrame:
     if not refresh and NFO_CACHE_PATH.exists():
         cached = _load_json(NFO_CACHE_PATH, {})
         rows = cached.get("rows") or []
         if rows:
-            return pd.DataFrame(rows)
+            return _finalize_instruments_df(pd.DataFrame(rows))
 
     try:
         instruments = kite.instruments("NFO")
@@ -168,10 +179,7 @@ def _load_nfo_instruments(kite: KiteConnect, refresh: bool = False) -> pd.DataFr
         "exchange",
     ]
     df = df[[c for c in keep if c in df.columns]].copy()
-    if "expiry" in df.columns:
-        df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce")
-    if "strike" in df.columns:
-        df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
+    df = _finalize_instruments_df(df)
     cache_df = df.copy()
     if "expiry" in cache_df.columns:
         cache_df["expiry"] = cache_df["expiry"].apply(
