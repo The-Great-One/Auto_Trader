@@ -15,7 +15,7 @@ CONFIG = {
     "oi_sma_mult": float(os.getenv("AT_OPTIONS_OI_SMA_MULT", "1.02")),
     "oi_change_min_pct": float(os.getenv("AT_OPTIONS_OI_CHANGE_MIN_PCT", "1.0")),
     "atr_pct_min": float(os.getenv("AT_OPTIONS_ATR_PCT_MIN", "0.03")),
-    "atr_pct_max": float(os.getenv("AT_OPTIONS_ATR_PCT_MAX", "0.45")),
+    "atr_pct_max": float(os.getenv("AT_OPTIONS_ATR_PCT_MAX", "1.5")),
     "buy_score_min": float(os.getenv("AT_OPTIONS_BUY_SCORE_MIN", "6.0")),
     "take_profit_pct": float(os.getenv("AT_OPTIONS_TAKE_PROFIT_PCT", "25.0")),
     "stop_loss_pct": float(os.getenv("AT_OPTIONS_STOP_LOSS_PCT", "12.0")),
