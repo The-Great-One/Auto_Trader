@@ -347,6 +347,38 @@ AT_TWITTER_BEARER_TOKEN='...' python scripts/fetch_twitter_sentiment.py --hours-
 AT_TWITTER_SENTIMENT_ENABLED=1 python wednesday.py
 ```
 
+## 🧠 RNN Lab Overlay
+
+A lab-only recurrent model layer now exists for research runs.
+
+- `Auto_Trader/rnn_lab.py`
+  - trains a small PyTorch GRU on rolling indicator sequences
+  - estimates next-bar upside probability per symbol
+- `scripts/weekly_strategy_lab.py`
+  - can test baseline strategy variants with and without the RNN overlay
+  - uses the RNN conservatively: it can filter marginal BUY entries and trigger earlier SELL exits in the lab
+
+Important:
+
+- this is **research-only** right now
+- it does **not** change live trading behavior
+- enable it in the lab with `AT_LAB_RNN_ENABLED=1`
+
+Useful envs:
+
+- `AT_LAB_RNN_ENABLED`
+- `AT_LAB_RNN_SEQ_LEN`
+- `AT_LAB_RNN_EPOCHS`
+- `AT_LAB_RNN_HIDDEN`
+- `AT_LAB_RNN_BUY_THRESHOLD`
+- `AT_LAB_RNN_SELL_THRESHOLD`
+
+Example:
+
+```bash
+AT_LAB_RNN_ENABLED=1 python scripts/weekly_strategy_lab.py
+```
+
 ## 🛠️ Future Enhancements
 
 - **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
