@@ -124,7 +124,7 @@ def discover_option_symbols() -> list[str]:
 
 def load_option_data() -> tuple[dict[str, pd.DataFrame], dict]:
     symbols = discover_option_symbols()
-    min_bars = max(30, int(os.getenv("AT_OPTIONS_LAB_MIN_BARS", "60")))
+    min_bars = max(12, int(os.getenv("AT_OPTIONS_LAB_MIN_BARS", "15")))
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
 
@@ -184,7 +184,7 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
     trades = 0
     wins = 0
     equity_curve = []
-    warmup = max(20, int(os.getenv("AT_OPTIONS_LAB_WARMUP_BARS", "40")))
+    warmup = max(8, int(os.getenv("AT_OPTIONS_LAB_WARMUP_BARS", "10")))
 
     for i in range(min(warmup, len(df)), len(df)):
         part = df.iloc[: i + 1].copy()
