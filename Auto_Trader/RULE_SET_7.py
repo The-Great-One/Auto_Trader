@@ -12,7 +12,7 @@ CONFIG = {
     "min_atr_pct": float(os.getenv("AT_BUY_MIN_ATR_PCT", "0.006")),
     "max_atr_pct": float(os.getenv("AT_BUY_MAX_ATR_PCT", "0.09")),
     "max_extension_atr": float(os.getenv("AT_BUY_MAX_EXTENSION_ATR", "2.2")),
-    "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "2.5")),
+    "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "3.5")),
     "obv_min_zscore": float(os.getenv("AT_BUY_OBV_MIN_ZSCORE", "0.5")),
     "volume_confirm_mult": float(os.getenv("AT_BUY_VOLUME_CONFIRM_MULT", "1.1")),
     "cmf_strong_min": float(os.getenv("AT_BUY_CMF_STRONG_MIN", "0.03")),
