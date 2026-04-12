@@ -54,6 +54,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `daily_portfolio_report.py` - holdings + allocation intelligence
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
+- `options_research_supervisor.py` - weekday options fetch + options paper-shadow supervisor for NIFTY research automation
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
@@ -68,7 +69,9 @@ Generated outputs, especially:
 - `daily_ops_supervisor_YYYY-MM-DD.{json,md}` - daily ops summary
 - `daily_scorecard_YYYY-MM-DD.{json,md}` - daily trading scorecard
 - `paper_shadow_latest.json` - cron/self-heal paper decision
+- `paper_shadow_options_latest.json` - latest NIFTY options paper-shadow ranking
 - `paper_shadow_live_latest.json` - live service paper decision snapshot
+- `options_research_supervisor_YYYY-MM-DD.{json,md}` - daily options fetch + paper-shadow supervisor summary
 - `portfolio_intel_YYYY-MM-DD.{json,md}` - portfolio intelligence
 
 ### `log/`
@@ -132,6 +135,7 @@ Implication:
 - env overrides: `~/.autotrader_env`
 
 ### Current cron jobs on server
+- `15:50` weekdays: `scripts/options_research_supervisor.py`
 - `16:10` daily: `scripts/daily_ops_supervisor.py`
 - `16:20` weekdays: `scripts/daily_scorecard.py`
 
@@ -190,6 +194,11 @@ In `Auto_Trader/RULE_SET_OPTIONS_1.py`:
 In `scripts/paper_shadow.py`:
 - continues writing the existing equity/ETF snapshot to `paper_shadow_latest.json`
 - now also writes NIFTY options paper candidates to `paper_shadow_options_latest.json`
+
+In `scripts/options_research_supervisor.py`:
+- runs `fetch_nifty_options_data.py` and then `paper_shadow.py` on market-open NSE days
+- writes `options_research_supervisor_YYYY-MM-DD.{json,md}` for cron visibility
+- skips fetch/paper cleanly on NSE holidays
 
 Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
