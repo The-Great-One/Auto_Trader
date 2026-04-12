@@ -36,6 +36,20 @@ def looks_like_option_symbol(symbol: str) -> bool:
 
 
 
+def _normalize_date_series(series: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(series, errors="coerce")
+    try:
+        if getattr(dt.dt, "tz", None) is not None:
+            dt = dt.dt.tz_convert(None)
+    except Exception:
+        try:
+            dt = dt.dt.tz_localize(None)
+        except Exception:
+            pass
+    return dt
+
+
+
 def normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     if hasattr(df.columns, "levels"):
         df.columns = [str(c[0]) for c in df.columns]
@@ -43,7 +57,7 @@ def normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     cmap = {str(c).lower(): c for c in df.columns}
     out = pd.DataFrame(
         {
-            "Date": pd.to_datetime(df[cmap.get("date", "Date")], errors="coerce"),
+            "Date": _normalize_date_series(df[cmap.get("date", "Date")]),
             "Open": pd.to_numeric(df[cmap.get("open", "Open")], errors="coerce"),
             "High": pd.to_numeric(df[cmap.get("high", "High")], errors="coerce"),
             "Low": pd.to_numeric(df[cmap.get("low", "Low")], errors="coerce"),
