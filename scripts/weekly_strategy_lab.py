@@ -38,6 +38,9 @@ at_logger.setLevel("WARNING")
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
 HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
+STATUS_DIR = ROOT / "intermediary_files" / "lab_status"
+STATUS_DIR.mkdir(exist_ok=True)
+STATUS_PATH = STATUS_DIR / "weekly_strategy_lab_status.json"
 
 DEFAULT_LAB_SYMBOLS = [
     "NIFTYETF",
@@ -150,12 +153,33 @@ def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> lis
     return out
 
 
+def write_status(**updates) -> dict:
+    current = {}
+    if STATUS_PATH.exists():
+        try:
+            current = json.loads(STATUS_PATH.read_text())
+        except Exception:
+            current = {}
+    current.update(updates)
+    current["updated_at"] = datetime.now().isoformat()
+    STATUS_PATH.write_text(json.dumps(current, indent=2))
+    return current
+
+
 def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[str, pd.DataFrame], dict]:
     symbols = build_lab_symbols(tradebook_context, fundamental_context)
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
 
-    for symbol in symbols:
+    total_symbols = max(1, len(symbols))
+    for idx, symbol in enumerate(symbols, start=1):
+        write_status(
+            phase="loading_history",
+            current_symbol=symbol,
+            symbols_total=total_symbols,
+            symbols_loaded=len(data_map),
+            symbols_index=idx,
+        )
         df = _load_symbol_history(symbol)
         if df is None or df.empty:
             skipped[symbol] = "missing_or_empty"
@@ -675,14 +699,36 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
 
 
 def main():
+    write_status(status="running", phase="initializing", message="starting weekly strategy lab")
     scorecard_context = load_scorecard_context()
     tradebook_context = load_tradebook_context()
     fundamental_context = load_fundamental_context()
     data_map, data_context = load_data(tradebook_context, fundamental_context)
     rnn_config = rnn_lab.load_config()
+    write_status(
+        phase="training_rnn",
+        message="building RNN overlay models",
+        rnn_enabled=bool(rnn_config.enabled),
+        universe_size=len(data_map),
+        universe_symbols=list(data_map.keys()),
+    )
     rnn_models = rnn_lab.build_overlay_models(data_map, config=rnn_config)
+    variant_list = variants(scorecard_context, tradebook_context)
+    write_status(
+        phase="evaluating_variants",
+        message="running strategy variants",
+        variants_total=len(variant_list),
+        rnn_models_built=len(rnn_models),
+    )
     results = []
-    for name, b, s, rnn_params in variants(scorecard_context, tradebook_context):
+    for idx, (name, b, s, rnn_params) in enumerate(variant_list, start=1):
+        write_status(
+            phase="evaluating_variants",
+            current_variant=name,
+            variants_done=idx - 1,
+            variants_total=len(variant_list),
+            progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
+        )
         results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
 
     rank = sorted(
@@ -734,10 +780,29 @@ def main():
     out_json.write_text(json.dumps(payload, indent=2))
     pd.DataFrame([asdict(r) for r in rank]).to_csv(out_csv, index=False)
 
+    write_status(
+        status="done",
+        phase="completed",
+        progress_pct=100.0,
+        current_variant=None,
+        variants_done=len(variant_list),
+        variants_total=len(variant_list),
+        latest_report_json=str(out_json),
+        latest_report_csv=str(out_csv),
+        best_variant=best.name,
+        best_return_pct=best.total_return_pct,
+        best_score=best.selection_score,
+        best_rnn_enabled=best.rnn_enabled,
+    )
+
     print(json.dumps(recommendation, indent=2))
     print(f"Saved: {out_json}")
     print(f"Saved: {out_csv}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        write_status(status="failed", phase="failed", error=str(exc))
+        raise

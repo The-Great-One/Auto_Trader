@@ -60,7 +60,8 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `fetch_twitter_sentiment.py` - refresh cached X/Twitter sentiment snapshots and tweet-type analysis for tracked symbols
 - `options_research_supervisor.py` - weekday options fetch + options paper-shadow supervisor for NIFTY research automation
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
-- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
+- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now with persistent lab-status updates for the dashboard
+- `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
 - `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
