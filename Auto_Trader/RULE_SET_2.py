@@ -19,10 +19,10 @@ CONFIG = {
     "bb_period": 20,
     "adx_period": 14,
     "trend_adx_min": 20.0,  # regime: trending if ADX >= this
-    "ema_break_atr_mult": 0.5,  # close below EMA10 by > 0.5*ATR
+    "ema_break_atr_mult": float(os.getenv("AT_SELL_EMA_BREAK_ATR_MULT", "0.5")),  # close below EMA10 by > 0.5*ATR
     "ema_confirm_bars": 2,  # need 2 closes below EMA10
     "hist_bearish_threshold": 0.0,  # MACD histogram < 0 is bearish
-    "relative_volume_exit": 1.3,  # exits that need RVOL
+    "relative_volume_exit": float(os.getenv("AT_SELL_RELATIVE_VOLUME_EXIT", "1.3")),  # exits that need RVOL
     "time_stop_bars": 20,  # legacy fallback if asset-specific settings are unavailable
     "time_stop_min_profit_pct": 3.0,
     "equity_time_stop_bars": int(os.getenv("AT_EQUITY_TIME_STOP_BARS", "8")),
@@ -35,9 +35,9 @@ CONFIG = {
     "equity_review_rsi": float(os.getenv("AT_EQUITY_REVIEW_RSI", "50.0")),
     "equity_review_macd_hist": float(os.getenv("AT_EQUITY_REVIEW_MACD_HIST", "0.0")),
     "min_atr_fallback_frac": 0.02,  # if ATR missing, fallback = max(0.01, frac * price)
-    "breakeven_trigger_pct": 2.5,  # once crossed, SL should protect principal
+    "breakeven_trigger_pct": float(os.getenv("AT_SELL_BREAKEVEN_TRIGGER_PCT", "2.5")),  # once crossed, SL should protect principal
     "breakeven_buffer_pct": 0.2,  # lock at least +0.2% above avg after trigger
-    "momentum_exit_rsi": 42.0,
+    "momentum_exit_rsi": float(os.getenv("AT_SELL_MOMENTUM_EXIT_RSI", "42.0")),
     "profit_ladder": [  # (profit% threshold, trail = max(last - k*ATR, entry*floor_mult))
         (30, {"k": 0.25, "floor_mult": 1.18}),
         (20, {"k": 0.40, "floor_mult": 1.12}),

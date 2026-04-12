@@ -126,6 +126,15 @@ In `scripts/daily_ops_supervisor.py`:
 - weekdays: 50 requested variants
 - weekends: 200 requested variants
 - baseline is included in results, so tested count is usually requested + 1
+- can auto-promote lab winners with guardrails instead of one-run blind promotion
+- auto-promotion writes a managed block into `~/.autotrader_env`, records state in `reports/strategy_autopromote_state.json`, and restarts `auto_trade.service` only when repeat, score, return-gain, and cooldown checks pass
+- key env knobs:
+  - `AT_LAB_AUTOPROMOTE_ENABLED`
+  - `AT_LAB_AUTOPROMOTE_MIN_RETURN_GAIN`
+  - `AT_LAB_AUTOPROMOTE_MIN_SCORE_GAIN`
+  - `AT_LAB_AUTOPROMOTE_LOOKBACK`
+  - `AT_LAB_AUTOPROMOTE_MIN_REPEAT`
+  - `AT_LAB_AUTOPROMOTE_COOLDOWN_HOURS`
 
 In `scripts/weekly_strategy_lab.py`:
 - reads latest `daily_scorecard_*.json` when available
