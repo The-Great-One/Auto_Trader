@@ -472,6 +472,28 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     add("baseline_current", {}, {}, {"enabled": False})
 
+    if base_rnn_cfg.enabled:
+        add(
+            "baseline_with_rnn",
+            {},
+            {},
+            {
+                "enabled": True,
+                "buy_threshold": base_rnn_cfg.buy_threshold,
+                "sell_threshold": base_rnn_cfg.sell_threshold,
+            },
+        )
+        for buy_t in [0.52, 0.54, 0.56, 0.58]:
+            for sell_t in [0.42, 0.44, 0.46, 0.48]:
+                if buy_t <= sell_t:
+                    continue
+                add(
+                    f"rnn_overlay_b{buy_t:.2f}_s{sell_t:.2f}",
+                    {},
+                    {},
+                    {"enabled": True, "buy_threshold": buy_t, "sell_threshold": sell_t},
+                )
+
     for key, values in buy_grid.items():
         for value in values:
             if float(value) == float(base_buy[key]):
@@ -496,28 +518,6 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                 for sval in svals:
                     combo_idx += 1
                     add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval}, {"enabled": False})
-
-    if base_rnn_cfg.enabled:
-        add(
-            "baseline_with_rnn",
-            {},
-            {},
-            {
-                "enabled": True,
-                "buy_threshold": base_rnn_cfg.buy_threshold,
-                "sell_threshold": base_rnn_cfg.sell_threshold,
-            },
-        )
-        for buy_t in [0.54, 0.56, 0.58]:
-            for sell_t in [0.42, 0.44, 0.46]:
-                if buy_t <= sell_t:
-                    continue
-                add(
-                    f"rnn_overlay_b{buy_t:.2f}_s{sell_t:.2f}",
-                    {},
-                    {},
-                    {"enabled": True, "buy_threshold": buy_t, "sell_threshold": sell_t},
-                )
 
     max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "220"))
     return out[:max_variants]
