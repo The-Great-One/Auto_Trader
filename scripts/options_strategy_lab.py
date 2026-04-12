@@ -67,6 +67,19 @@ BASE_CONFIG_KEYS = [
 ]
 
 
+def prioritized_values(values, current):
+    current_f = float(current)
+    uniq = []
+    seen = set()
+    for value in values:
+        key = float(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(value)
+    return sorted(uniq, key=lambda v: (abs(float(v) - current_f), float(v)))
+
+
 def load_option_data() -> tuple[dict[str, pd.DataFrame], dict]:
     symbols = opt_support.discover_option_symbols()
     min_bars = max(12, int(os.getenv("AT_OPTIONS_LAB_MIN_BARS", "15")))
@@ -114,43 +127,100 @@ def base_params() -> dict:
 
 
 
-def option_variants() -> list[tuple[str, dict]]:
-    base = base_params()
-    out: list[tuple[str, dict]] = [("baseline_current", {})]
-
-    grids = {
-        "underlying_rsi_bull_min": [53, 55, 58],
-        "underlying_rsi_bear_max": [47, 45, 42],
-        "option_rsi_min": [54, 56, 60],
-        "volume_confirm_mult": [1.0, 1.1, 1.25],
-        "oi_sma_mult": [1.0, 1.02, 1.05],
-        "oi_change_min_pct": [0.0, 1.0, 3.0],
-        "atr_pct_max": [0.6, 1.0, 1.5],
-        "buy_score_min": [5.5, 6.0, 6.5],
-        "take_profit_pct": [18.0, 25.0, 35.0],
-        "stop_loss_pct": [8.0, 12.0, 15.0],
-        "max_hold_bars": [2, 4, 6],
-        "exit_rsi": [40.0, 45.0, 50.0],
+def build_grids(scorecard_context: dict, tradebook_context: dict) -> dict:
+    cfg = RULE_SET_OPTIONS_1.CONFIG
+    grid = {
+        "underlying_rsi_bull_min": prioritized_values([52, 55, 58, 60], cfg["underlying_rsi_bull_min"]),
+        "underlying_rsi_bear_max": prioritized_values([40, 42, 45, 48], cfg["underlying_rsi_bear_max"]),
+        "underlying_adx_min": prioritized_values([14, 18, 22, 26], cfg["underlying_adx_min"]),
+        "option_rsi_min": prioritized_values([50, 54, 56, 60], cfg["option_rsi_min"]),
+        "volume_confirm_mult": prioritized_values([0.95, 1.0, 1.1, 1.25], cfg["volume_confirm_mult"]),
+        "oi_sma_mult": prioritized_values([1.0, 1.02, 1.05, 1.1], cfg["oi_sma_mult"]),
+        "oi_change_min_pct": prioritized_values([0.0, 1.0, 2.0, 3.0], cfg["oi_change_min_pct"]),
+        "atr_pct_min": prioritized_values([0.0, 0.02, 0.03, 0.05], cfg["atr_pct_min"]),
+        "atr_pct_max": prioritized_values([0.8, 1.0, 1.5, 2.0], cfg["atr_pct_max"]),
+        "buy_score_min": prioritized_values([5.0, 5.5, 6.0, 6.5], cfg["buy_score_min"]),
+        "take_profit_pct": prioritized_values([15.0, 18.0, 25.0, 35.0], cfg["take_profit_pct"]),
+        "stop_loss_pct": prioritized_values([8.0, 10.0, 12.0, 15.0], cfg["stop_loss_pct"]),
+        "max_hold_bars": prioritized_values([2, 3, 4, 6], cfg["max_hold_bars"]),
+        "exit_rsi": prioritized_values([38.0, 42.0, 45.0, 50.0], cfg["exit_rsi"]),
     }
 
-    for key, values in grids.items():
+    if scorecard_context.get("no_trade_day"):
+        grid["option_rsi_min"] = prioritized_values([48, *grid["option_rsi_min"]], cfg["option_rsi_min"])
+        grid["volume_confirm_mult"] = prioritized_values([0.9, *grid["volume_confirm_mult"]], cfg["volume_confirm_mult"])
+        grid["oi_change_min_pct"] = prioritized_values([-1.0, *grid["oi_change_min_pct"]], cfg["oi_change_min_pct"])
+        grid["buy_score_min"] = prioritized_values([4.5, *grid["buy_score_min"]], cfg["buy_score_min"])
+
+    if tradebook_context.get("weak_mid_hold_window"):
+        grid["take_profit_pct"] = prioritized_values([12.0, 15.0, *grid["take_profit_pct"]], cfg["take_profit_pct"])
+        grid["max_hold_bars"] = prioritized_values([1, 2, *grid["max_hold_bars"]], cfg["max_hold_bars"])
+        grid["exit_rsi"] = prioritized_values([40.0, *grid["exit_rsi"]], cfg["exit_rsi"])
+
+    return grid
+
+
+
+def _variant_key(params: dict) -> str:
+    return json.dumps(params, sort_keys=True)
+
+
+
+def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict]]:
+    base = base_params()
+    grid = build_grids(scorecard_context, tradebook_context)
+
+    out: list[tuple[str, dict]] = []
+    seen: set[str] = set()
+
+    def add(name: str, patch: dict):
+        key = _variant_key(patch)
+        if key in seen:
+            return
+        seen.add(key)
+        out.append((name, patch))
+
+    add("baseline_current", {})
+
+    for key, values in grid.items():
         for value in values:
             if float(value) == float(base[key]):
                 continue
-            out.append((f"{key}_{value}", {key: value}))
+            add(f"{key}_{value}", {key: value})
 
-    combos = [
-        {"option_rsi_min": 54, "volume_confirm_mult": 1.0, "buy_score_min": 5.5},
-        {"option_rsi_min": 56, "oi_change_min_pct": 0.0, "take_profit_pct": 18.0},
-        {"underlying_rsi_bull_min": 53, "underlying_rsi_bear_max": 47, "max_hold_bars": 2},
-        {"volume_confirm_mult": 1.25, "oi_sma_mult": 1.05, "buy_score_min": 6.5},
-        {"take_profit_pct": 35.0, "stop_loss_pct": 8.0, "exit_rsi": 50.0},
-        {"take_profit_pct": 18.0, "stop_loss_pct": 15.0, "max_hold_bars": 6},
+    focus_groups = [
+        ("underlying_rsi_bull_min", "underlying_adx_min", "buy_score_min"),
+        ("option_rsi_min", "volume_confirm_mult", "oi_change_min_pct"),
+        ("take_profit_pct", "stop_loss_pct", "max_hold_bars"),
+        ("atr_pct_min", "atr_pct_max", "exit_rsi"),
     ]
-    for idx, combo in enumerate(combos, start=1):
-        out.append((f"combo_{idx:02d}", combo))
 
-    max_variants = int(os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", "60"))
+    combo_idx = 0
+    for keys in focus_groups:
+        value_lists = []
+        for key in keys:
+            vals = [v for v in grid[key] if float(v) != float(base[key])][:2]
+            if not vals:
+                vals = [base[key]]
+            value_lists.append(vals)
+        for a in value_lists[0]:
+            for b in value_lists[1]:
+                for c in value_lists[2]:
+                    combo_idx += 1
+                    add(f"focus_combo_{combo_idx:03d}", {keys[0]: a, keys[1]: b, keys[2]: c})
+
+    prebuilt = [
+        {"option_rsi_min": 50, "volume_confirm_mult": 0.95, "buy_score_min": 5.0},
+        {"underlying_rsi_bull_min": 52, "underlying_rsi_bear_max": 48, "underlying_adx_min": 14},
+        {"oi_sma_mult": 1.0, "oi_change_min_pct": 0.0, "buy_score_min": 5.5},
+        {"take_profit_pct": 15.0, "stop_loss_pct": 10.0, "max_hold_bars": 2},
+        {"take_profit_pct": 35.0, "stop_loss_pct": 8.0, "exit_rsi": 50.0},
+        {"atr_pct_min": 0.0, "atr_pct_max": 2.0, "buy_score_min": 5.5},
+    ]
+    for idx, patch in enumerate(prebuilt, start=1):
+        add(f"prebuilt_combo_{idx:02d}", patch)
+
+    max_variants = int(os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "120")))
     return out[:max_variants]
 
 
@@ -277,7 +347,7 @@ def main():
     data_map, data_context = load_option_data()
 
     results = []
-    for name, params in option_variants():
+    for name, params in option_variants(scorecard_context, tradebook_context):
         results.append(run_variant(name, data_map, params))
 
     rank = sorted(
@@ -304,6 +374,7 @@ def main():
         "should_promote": False,
         "notes": [
             "Research-only NIFTY options lab using RULE_SET_OPTIONS_1.",
+            "Search space is context-aware, similar to the equity lab, but still never auto-promotes into live trading.",
             "Use results to refine options paper trading before any live NFO execution work.",
         ],
     }
