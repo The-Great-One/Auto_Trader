@@ -14,11 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Auto_Trader import RULE_SET_2, RULE_SET_7
+from Auto_Trader import RULE_SET_2, RULE_SET_7, RULE_SET_OPTIONS_1
+from Auto_Trader import options_support as opt_support
 from Auto_Trader import utils as at_utils
 
 OUT = ROOT / "reports"
 OUT.mkdir(exist_ok=True)
+OPTIONS_OUT = OUT / "paper_shadow_options_latest.json"
 
 
 def load_hist(symbol="NIFTYETF"):
@@ -64,7 +66,7 @@ def load_qty(symbol="NIFTYETF") -> int:
     return int(float(df.iloc[0].get("quantity", 0) + df.iloc[0].get("t1_quantity", 0)))
 
 
-def main():
+def run_equity_shadow() -> dict:
     at_utils.get_mmi_now = lambda: None
     symbol = "NIFTYETF"
     df = load_hist(symbol)
@@ -101,9 +103,73 @@ def main():
         "decision": str(decision).upper(),
         "last_close": float(df.iloc[-1]["Close"]),
     }
-
     (OUT / "paper_shadow_latest.json").write_text(json.dumps(payload, indent=2))
-    print(json.dumps(payload, indent=2))
+    return payload
+
+
+
+def run_options_shadow() -> dict:
+    symbols = opt_support.discover_option_symbols()
+    candidates = []
+    skipped = {}
+
+    for symbol in symbols:
+        path = ROOT / "intermediary_files" / "Hist_Data" / f"{symbol}.feather"
+        if not path.exists():
+            skipped[symbol] = "missing_file"
+            continue
+        try:
+            df = opt_support.enrich_option_frame(pd.read_feather(path))
+        except Exception as exc:
+            skipped[symbol] = f"enrich_failed:{exc}"
+            continue
+        if df is None or df.empty or len(df) < 10:
+            skipped[symbol] = "too_short"
+            continue
+
+        row = df.iloc[-1].to_dict()
+        holdings = pd.DataFrame(columns=["tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
+        decision, details = RULE_SET_OPTIONS_1.evaluate_signal(df, row, holdings)
+        candidates.append(
+            {
+                "symbol": symbol,
+                "decision": str(decision).upper(),
+                "score": float(details.get("score", 0.0) or 0.0),
+                "side": details.get("side"),
+                "reason": details.get("reason", []),
+                "last_close": float(df.iloc[-1]["Close"]),
+                "volume": float(df.iloc[-1].get("Volume", 0.0) or 0.0),
+                "oi": float(df.iloc[-1].get("OI", 0.0) or 0.0),
+                "underlying_close": float(df.iloc[-1].get("UL_Close", 0.0) or 0.0),
+                "expiry": str(df.iloc[-1].get("expiry", "")),
+                "strike": float(df.iloc[-1].get("strike", 0.0) or 0.0),
+            }
+        )
+
+    ranked = sorted(candidates, key=lambda x: (x["decision"] == "BUY", x["score"]), reverse=True)
+    buy_candidates = [x for x in ranked if x["decision"] == "BUY"]
+    payload = {
+        "generated_at": datetime.now().isoformat(),
+        "paper_mode": True,
+        "production_rule_model": "OPTIONS=RULE_SET_OPTIONS_1",
+        "manifest_path": str(opt_support.OPTIONS_MANIFEST),
+        "underlying_context_path": str(opt_support.HIST_DIR / "NIFTY50_INDEX.feather"),
+        "universe_size": len(symbols),
+        "evaluated": len(candidates),
+        "skipped": skipped,
+        "buy_candidates": buy_candidates[:5],
+        "top_candidate": buy_candidates[0] if buy_candidates else (ranked[0] if ranked else None),
+        "all_ranked": ranked[:10],
+    }
+    OPTIONS_OUT.write_text(json.dumps(payload, indent=2))
+    return payload
+
+
+
+def main():
+    equity_payload = run_equity_shadow()
+    options_payload = run_options_shadow()
+    print(json.dumps({"equity_shadow": equity_payload, "options_shadow": options_payload}, indent=2))
 
 
 if __name__ == "__main__":

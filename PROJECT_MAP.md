@@ -56,8 +56,8 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `paper_shadow.py` - offline paper-trader decision snapshot
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
-- `options_strategy_lab.py` - research-only parameter sweep / backtest harness for cached option OHLCV using the same BUY/SELL rules, with no live auto-promotion
-- `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab
+- `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
+- `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
@@ -88,7 +88,7 @@ Backtests, permutations, historical analysis, ad hoc research helpers.
 
 ## Current options support status
 
-Live base code is not yet options-ready end to end.
+Live base code is not yet options-ready end to end, but research and paper-shadow support now exist for NIFTY options.
 
 Main blockers:
 - `Auto_Trader/utils.py` currently filters instrument master to `instrument_type == "EQ"`
@@ -97,7 +97,7 @@ Main blockers:
 - `Auto_Trader/KITE_TRIGGER_ORDER.py` sell execution path primarily anchors on holdings snapshots, while options typically live in positions
 
 Implication:
-- `scripts/options_strategy_lab.py` is research-only until live universe building, decision plumbing, and order routing are extended for NFO/options
+- `scripts/options_strategy_lab.py` and the options section in `scripts/paper_shadow.py` are research-only until live universe building, decision plumbing, and order routing are extended for NFO/options
 
 ## Mutual fund support
 
@@ -162,6 +162,8 @@ In `scripts/weekly_strategy_lab.py`:
 In `scripts/options_strategy_lab.py`:
 - prefers symbols from `intermediary_files/options/nifty_options_universe.json` when present, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
 - defaults to `NIFTY` options with optional `AT_OPTIONS_LAB_SIDE`
+- enriches each option contract with underlying NIFTY context from `NIFTY50_INDEX.feather`
+- iterates parameter variants around `Auto_Trader/RULE_SET_OPTIONS_1.py`
 - uses shorter warmup/min-bar defaults suitable for short-lived weekly option contracts
 - never auto-promotes into live trading; output is for research only
 
@@ -171,6 +173,7 @@ In `scripts/fetch_nifty_options_data.py`:
 - downloads contract OHLCV with `oi=True`
 - stores underlying `^NSEI` context in `intermediary_files/Hist_Data/NIFTY50_INDEX.feather`
 - writes a manifest to `intermediary_files/options/nifty_options_universe.json`
+- provides the options data required for `RULE_SET_OPTIONS_1` buy/sell computation in the lab and paper shadow
 - key env knobs:
   - `AT_OPTIONS_FETCH_INTERVAL`
   - `AT_NIFTY_OPTIONS_EXPIRY_COUNT`
@@ -178,6 +181,15 @@ In `scripts/fetch_nifty_options_data.py`:
   - `AT_NIFTY_OPTIONS_SIDE`
   - `AT_NIFTY_OPTIONS_DAILY_LOOKBACK_YEARS`
   - `AT_NIFTY_OPTIONS_INTRADAY_LOOKBACK_DAYS`
+
+In `Auto_Trader/RULE_SET_OPTIONS_1.py`:
+- base NIFTY options rule that combines underlying trend alignment, option premium momentum, volume confirmation, and OI confirmation
+- supports both CE and PE long entries
+- exit logic uses profit target, stop loss, time stop, and momentum deterioration
+
+In `scripts/paper_shadow.py`:
+- continues writing the existing equity/ETF snapshot to `paper_shadow_latest.json`
+- now also writes NIFTY options paper candidates to `paper_shadow_options_latest.json`
 
 Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
