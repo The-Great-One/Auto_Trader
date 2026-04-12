@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -29,6 +30,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader import RULE_SET_2, RULE_SET_7, logger as at_logger
+from Auto_Trader import rnn_lab
 from Auto_Trader import utils as at_utils
 
 at_logger.setLevel("WARNING")
@@ -60,6 +62,8 @@ class BacktestResult:
     params: dict
     symbols_tested: list[str]
     selection_score: float
+    rnn_enabled: bool = False
+    rnn_avg_test_accuracy: float = 0.0
 
 
 def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
@@ -449,34 +453,36 @@ def _variant_key(buy_params: dict, sell_params: dict) -> str:
     return json.dumps({"buy": buy_params, "sell": sell_params}, sort_keys=True)
 
 
-def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict]]:
+def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict, dict]]:
     buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
     base_buy = _current_param_values(buy_grid, RULE_SET_7.CONFIG)
     base_sell = _current_param_values(sell_grid, RULE_SET_2.CONFIG)
 
-    out: list[tuple[str, dict, dict]] = []
+    out: list[tuple[str, dict, dict, dict]] = []
     seen: set[str] = set()
+    base_rnn_cfg = rnn_lab.load_config()
 
-    def add(name: str, buy_patch: dict, sell_patch: dict):
-        key = _variant_key(buy_patch, sell_patch)
+    def add(name: str, buy_patch: dict, sell_patch: dict, rnn_patch: dict | None = None):
+        rnn_patch = rnn_patch or {}
+        key = json.dumps({"buy": buy_patch, "sell": sell_patch, "rnn": rnn_patch}, sort_keys=True)
         if key in seen:
             return
         seen.add(key)
-        out.append((name, buy_patch, sell_patch))
+        out.append((name, buy_patch, sell_patch, rnn_patch))
 
-    add("baseline_current", {}, {})
+    add("baseline_current", {}, {}, {"enabled": False})
 
     for key, values in buy_grid.items():
         for value in values:
             if float(value) == float(base_buy[key]):
                 continue
-            add(f"buy_{key}_{value}", {key: value}, {})
+            add(f"buy_{key}_{value}", {key: value}, {}, {"enabled": False})
 
     for key, values in sell_grid.items():
         for value in values:
             if float(value) == float(base_sell[key]):
                 continue
-            add(f"sell_{key}_{value}", {}, {key: value})
+            add(f"sell_{key}_{value}", {}, {key: value}, {"enabled": False})
 
     focus_buy = ["adx_min", "volume_confirm_mult", "obv_min_zscore", "cmf_base_min", "rsi_floor"]
     focus_sell = ["equity_time_stop_bars", "equity_review_rsi", "momentum_exit_rsi", "breakeven_trigger_pct"]
@@ -489,7 +495,29 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
             for bval in bvals:
                 for sval in svals:
                     combo_idx += 1
-                    add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval})
+                    add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval}, {"enabled": False})
+
+    if base_rnn_cfg.enabled:
+        add(
+            "baseline_with_rnn",
+            {},
+            {},
+            {
+                "enabled": True,
+                "buy_threshold": base_rnn_cfg.buy_threshold,
+                "sell_threshold": base_rnn_cfg.sell_threshold,
+            },
+        )
+        for buy_t in [0.54, 0.56, 0.58]:
+            for sell_t in [0.42, 0.44, 0.46]:
+                if buy_t <= sell_t:
+                    continue
+                add(
+                    f"rnn_overlay_b{buy_t:.2f}_s{sell_t:.2f}",
+                    {},
+                    {},
+                    {"enabled": True, "buy_threshold": buy_t, "sell_threshold": sell_t},
+                )
 
     max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "220"))
     return out[:max_variants]
@@ -501,7 +529,7 @@ def _set_temp_state(rule2_module, d: str):
     rule2_module.LOCK_FILE_PATH = os.path.join(d, "Holdings.lock")
 
 
-def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
+def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dict | None = None) -> dict[str, float]:
     cash = 100000.0
     qty = 0
     avg = 0.0
@@ -509,6 +537,10 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
     trades = 0
     wins = 0
     equity_curve = []
+    rnn_cfg = rnn_cfg or {"enabled": False}
+    rnn_enabled = bool(rnn_cfg.get("enabled")) and rnn_model is not None
+    buy_threshold = float(rnn_cfg.get("buy_threshold", 0.56))
+    sell_threshold = float(rnn_cfg.get("sell_threshold", 0.44))
 
     for i in range(250, len(df)):
         part = df.iloc[: i + 1].copy()
@@ -528,6 +560,10 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
                 ]
             )
             sig = RULE_SET_7.buy_or_sell(part, row, hold_df)
+            if rnn_enabled and str(sig).upper() == "BUY":
+                prob_up = rnn_model.prob_at(i)
+                if prob_up is None or prob_up < buy_threshold:
+                    sig = "HOLD"
             if str(sig).upper() == "BUY":
                 buy_qty = int(cash // price)
                 if buy_qty > 0:
@@ -550,6 +586,10 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
                 ]
             )
             sig = RULE_SET_2.buy_or_sell(part, row, hold_df)
+            if rnn_enabled and str(sig).upper() != "SELL":
+                prob_up = rnn_model.prob_at(i)
+                if prob_up is not None and prob_up <= sell_threshold:
+                    sig = "SELL"
             if str(sig).upper() == "SELL":
                 cash += qty * price
                 if price > avg:
@@ -574,7 +614,7 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame) -> dict[str, float]:
     }
 
 
-def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict) -> BacktestResult:
+def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict, rnn_params: dict | None = None, rnn_models: dict | None = None) -> BacktestResult:
     # avoid DB dependency in RULE_SET_7 market regime check
     at_utils.get_mmi_now = lambda: None
 
@@ -582,6 +622,8 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     old_r7 = dict(RULE_SET_7.CONFIG)
     RULE_SET_2.CONFIG.update(sell_params)
     RULE_SET_7.CONFIG.update(buy_params)
+    rnn_params = rnn_params or {"enabled": False}
+    rnn_models = rnn_models or {}
 
     try:
         with tempfile.TemporaryDirectory(prefix="at_state_") as td:
@@ -591,14 +633,18 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
             total_wins = 0
             worst_dd = 0.0
             tested_symbols: list[str] = []
+            rnn_accuracies: list[float] = []
 
             for symbol, df in data_map.items():
-                stats = _simulate_symbol(symbol, df)
+                stats = _simulate_symbol(symbol, df, rnn_model=rnn_models.get(symbol), rnn_cfg=rnn_params)
                 total_final_value += stats["final_value"]
                 total_trades += stats["trades"]
                 total_wins += stats["wins"]
                 worst_dd = min(worst_dd, stats["max_drawdown_pct"])
                 tested_symbols.append(symbol)
+                model = rnn_models.get(symbol)
+                if rnn_params.get("enabled") and model is not None:
+                    rnn_accuracies.append(float(model.metrics.get("test_accuracy", 0.0)))
     finally:
         RULE_SET_2.CONFIG.clear()
         RULE_SET_2.CONFIG.update(old_r2)
@@ -610,6 +656,8 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     round_trips = max(1, total_trades // 2)
     win_rate = (total_wins / round_trips) * 100.0
     selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, worst_dd))))
+    if rnn_params.get("enabled"):
+        selection_score += 0.05 * float(np.mean(rnn_accuracies) if rnn_accuracies else 0.0)
 
     return BacktestResult(
         name=name,
@@ -618,9 +666,11 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
         trades=int(total_trades),
         win_rate_pct=round(float(win_rate), 2),
         max_drawdown_pct=round(float(worst_dd), 2),
-        params={"buy": buy_params, "sell": sell_params},
+        params={"buy": buy_params, "sell": sell_params, "rnn": rnn_params},
         symbols_tested=tested_symbols,
         selection_score=round(selection_score, 3),
+        rnn_enabled=bool(rnn_params.get("enabled")),
+        rnn_avg_test_accuracy=round(float(np.mean(rnn_accuracies) if rnn_accuracies else 0.0), 4),
     )
 
 
@@ -629,9 +679,11 @@ def main():
     tradebook_context = load_tradebook_context()
     fundamental_context = load_fundamental_context()
     data_map, data_context = load_data(tradebook_context, fundamental_context)
+    rnn_config = rnn_lab.load_config()
+    rnn_models = rnn_lab.build_overlay_models(data_map, config=rnn_config)
     results = []
-    for name, b, s in variants(scorecard_context, tradebook_context):
-        results.append(run_variant(name, data_map, b, s))
+    for name, b, s, rnn_params in variants(scorecard_context, tradebook_context):
+        results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
 
     rank = sorted(
         results,
@@ -652,6 +704,11 @@ def main():
             if k != "sector_map"
         },
         "data_context": data_context,
+        "rnn_context": {
+            "enabled": bool(rnn_config.enabled),
+            "models_built": int(len(rnn_models)),
+            "symbols": {k: v.metrics for k, v in rnn_models.items()},
+        },
         "baseline": asdict(baseline),
         "best": asdict(best),
         "tested_variants": len(rank),

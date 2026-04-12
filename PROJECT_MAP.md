@@ -44,6 +44,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
 - `twitter_sentiment.py` - X/Twitter fetch, tweet-type classification, cached sentiment snapshots, and trading-decision overlay
+- `rnn_lab.py` - lab-only PyTorch GRU/RNN overlay that scores next-bar direction from indicator sequences for research backtests
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker
 - `TelegramLink.py` - Telegram delivery with retry/backoff
@@ -144,6 +145,10 @@ Implication:
 - Twitter sentiment fetch is available via `scripts/fetch_twitter_sentiment.py`, but no cron is wired yet in this map
 
 ## Strategy lab scope
+
+- `scripts/weekly_strategy_lab.py` can optionally evaluate a lab-only RNN overlay when `AT_LAB_RNN_ENABLED=1`
+- current RNN behavior is research-only: it filters BUY entries and can accelerate SELL exits inside the lab simulator, but does not affect live trading
+
 
 In `scripts/daily_ops_supervisor.py`:
 - weekdays: 50 requested variants

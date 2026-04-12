@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ MODULE_PATH = ROOT / "Auto_Trader" / "twitter_sentiment.py"
 SPEC = importlib.util.spec_from_file_location("twitter_sentiment", MODULE_PATH)
 ts = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
+sys.modules[SPEC.name] = ts
 SPEC.loader.exec_module(ts)
 
 
