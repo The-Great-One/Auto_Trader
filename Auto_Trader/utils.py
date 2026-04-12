@@ -23,6 +23,7 @@ from sqlalchemy import create_engine
 
 # Import rule set modules
 from . import RULE_SET_2, RULE_SET_7
+from .twitter_sentiment import apply_sentiment_overlay
 from .my_secrets import (
     API_KEY,
     API_SECRET,
@@ -460,7 +461,7 @@ def process_single_stock(row):
     return df
 
 
-def apply_trading_rules(df, row):
+def apply_trading_rules(df, row, holdings=None):
     """
     Apply all trading rules from the RULE_SETS dictionary to the stock data
     and return the strongest trading signal (e.g., SELL > BUY > HOLD) along with contributing rules.
@@ -476,13 +477,14 @@ def apply_trading_rules(df, row):
     # Initialize a dictionary to track the decisions and their contributing rules
     decisions = {"SELL": [], "BUY": [], "HOLD": []}
 
-    try:
-        holdings = pd.read_feather("intermediary_files/Holdings.feather")
-    except Exception as e:
-        logger.error(
-            f"Error loading holdings for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}"
-        )
-        holdings = pd.DataFrame()
+    if holdings is None:
+        try:
+            holdings = pd.read_feather("intermediary_files/Holdings.feather")
+        except Exception as e:
+            logger.error(
+                f"Error loading holdings for {row['Symbol']}: {e}, Traceback: {traceback.format_exc()}"
+            )
+            holdings = pd.DataFrame()
 
     def apply_rule(rule_set_name, rule_set_module):
         try:
@@ -545,18 +547,37 @@ def process_stock_and_decide(row):
         # Process the stock data
         df = process_single_stock(row)
         if df is not None:
+            holdings = pd.DataFrame()
+            try:
+                holdings = pd.read_feather("intermediary_files/Holdings.feather")
+            except Exception:
+                holdings = pd.DataFrame()
+
             # Apply the trading rules
-            decision, contributing_rules = apply_trading_rules(df, row)
-            if decision != "HOLD":
-                return {
+            decision, contributing_rules = apply_trading_rules(df, row, holdings=holdings)
+
+            final_decision, sentiment_overlay = apply_sentiment_overlay(
+                decision,
+                row.get("Symbol"),
+                holdings=holdings,
+            )
+
+            if final_decision != "HOLD":
+                payload = {
                     "Symbol": row["Symbol"],
-                    "Decision": decision,
+                    "Decision": final_decision,
                     "ContributingRules": contributing_rules,
                     "Exchange": row["exchange"],
                     "Close": row["last_price"],
                     "AssetClass": row.get("AssetClass", "EQUITY"),
                     "ETFTheme": row.get("ETFTheme", ""),
                 }
+                if sentiment_overlay:
+                    payload["SentimentOverlay"] = sentiment_overlay
+                    payload["ContributingRules"] = dict(contributing_rules or {})
+                    payload["ContributingRules"].setdefault(final_decision, [])
+                    payload["ContributingRules"][final_decision].append("TWITTER_SENTIMENT")
+                return payload
     except Exception as e:
         # Log exceptions with stock symbol for easier debugging
         logger.error(

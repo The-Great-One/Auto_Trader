@@ -43,6 +43,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_7.py` - current BUY rule
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
+- `twitter_sentiment.py` - X/Twitter fetch, tweet-type classification, cached sentiment snapshots, and trading-decision overlay
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker
 - `TelegramLink.py` - Telegram delivery with retry/backoff
@@ -54,6 +55,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `daily_portfolio_report.py` - holdings + allocation intelligence
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
+- `fetch_twitter_sentiment.py` - refresh cached X/Twitter sentiment snapshots and tweet-type analysis for tracked symbols
 - `options_research_supervisor.py` - weekday options fetch + options paper-shadow supervisor for NIFTY research automation
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs
@@ -88,6 +90,7 @@ Backtests, permutations, historical analysis, ad hoc research helpers.
 
 - BUY: `RULE_SET_7`
 - SELL: `RULE_SET_2`
+- Optional overlay: cached X/Twitter sentiment can veto risky BUYs or force SELL on held names when `AT_TWITTER_SENTIMENT_ENABLED=1`
 
 ## Current options support status
 
@@ -138,6 +141,7 @@ Implication:
 - `15:50` weekdays: `scripts/options_research_supervisor.py`
 - `16:10` daily: `scripts/daily_ops_supervisor.py`
 - `16:20` weekdays: `scripts/daily_scorecard.py`
+- Twitter sentiment fetch is available via `scripts/fetch_twitter_sentiment.py`, but no cron is wired yet in this map
 
 ## Strategy lab scope
 
