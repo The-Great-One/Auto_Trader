@@ -162,7 +162,7 @@ In `scripts/weekly_strategy_lab.py`:
 In `scripts/options_strategy_lab.py`:
 - prefers symbols from `intermediary_files/options/nifty_options_universe.json` when present, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
 - defaults to `NIFTY` options with optional `AT_OPTIONS_LAB_SIDE`
-- uses shorter warmup/min-bar defaults suitable for option contracts
+- uses shorter warmup/min-bar defaults suitable for short-lived weekly option contracts
 - never auto-promotes into live trading; output is for research only
 
 In `scripts/fetch_nifty_options_data.py`:
