@@ -165,6 +165,11 @@ def run_options_shadow() -> dict:
         row = df.iloc[-1].to_dict()
         holdings = pd.DataFrame(columns=["tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
         decision, details = RULE_SET_OPTIONS_1.evaluate_signal(df, row, holdings)
+        gate_failures = list(details.get("entry_gate_failures", []) or [])
+        score_gap = float(details.get("score_gap_to_buy", 0.0) or 0.0)
+        metric_snapshot = details.get("metric_snapshot", {}) or {}
+        threshold_snapshot = details.get("threshold_snapshot", {}) or {}
+        gate_status = details.get("gate_status", {}) or {}
         candidates.append(
             {
                 "symbol": symbol,
@@ -172,6 +177,12 @@ def run_options_shadow() -> dict:
                 "score": float(details.get("score", 0.0) or 0.0),
                 "side": details.get("side"),
                 "reason": details.get("reason", []),
+                "gate_failures": gate_failures,
+                "gate_failures_count": len(gate_failures),
+                "score_gap_to_buy": score_gap,
+                "gate_status": gate_status,
+                "metric_snapshot": metric_snapshot,
+                "threshold_snapshot": threshold_snapshot,
                 "last_close": float(df.iloc[-1]["Close"]),
                 "volume": float(df.iloc[-1].get("Volume", 0.0) or 0.0),
                 "oi": float(df.iloc[-1].get("OI", 0.0) or 0.0),
@@ -183,6 +194,10 @@ def run_options_shadow() -> dict:
 
     ranked = sorted(candidates, key=lambda x: (x["decision"] == "BUY", x["score"]), reverse=True)
     buy_candidates = [x for x in ranked if x["decision"] == "BUY"]
+    near_miss_candidates = sorted(
+        [x for x in ranked if x["decision"] != "BUY"],
+        key=lambda x: (x["gate_failures_count"], x["score_gap_to_buy"], -x["score"]),
+    )[:5]
     payload = {
         "generated_at": datetime.now().isoformat(),
         "paper_mode": True,
@@ -193,6 +208,7 @@ def run_options_shadow() -> dict:
         "evaluated": len(candidates),
         "skipped": skipped,
         "buy_candidates": buy_candidates[:5],
+        "near_miss_candidates": near_miss_candidates,
         "top_candidate": buy_candidates[0] if buy_candidates else (ranked[0] if ranked else None),
         "all_ranked": ranked[:10],
     }
