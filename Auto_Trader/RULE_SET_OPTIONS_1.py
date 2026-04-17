@@ -162,6 +162,67 @@ def evaluate_signal(df, row, holdings):
     elif not atr_available:
         reasons.append("atr_unavailable")
 
+    gate_status = {
+        "underlying_alignment": bool(underlying_ok),
+        "price_momentum": bool(price_momo),
+        "ema_stack": bool(ema_stack),
+        "rsi_ok": bool(rsi_ok),
+        "rsi_available": bool(rsi_available),
+        "macd_ok": bool(macd_ok),
+        "macd_available": bool(macd_available),
+        "volume_ok": bool(volume_ok),
+        "oi_ok": bool(oi_ok),
+        "atr_ok": bool(atr_ok),
+        "atr_available": bool(atr_available),
+        "breakout_ok": bool(breakout_ok),
+    }
+    entry_gate_failures = []
+    if not underlying_ok:
+        entry_gate_failures.append("underlying_alignment")
+    if not price_momo:
+        entry_gate_failures.append("price_momentum")
+    if not volume_ok:
+        entry_gate_failures.append("volume_confirm")
+    if not oi_ok:
+        entry_gate_failures.append("oi_confirm")
+    if not atr_ok:
+        entry_gate_failures.append("atr_filter")
+    if not (rsi_ok or not rsi_available):
+        entry_gate_failures.append("option_rsi")
+    if not (macd_ok or not macd_available):
+        entry_gate_failures.append("macd_hist")
+    score_gap_to_buy = max(0.0, float(CONFIG["buy_score_min"]) - float(score))
+    metrics_snapshot = {
+        "close": round(close, 4) if np.isfinite(close) else None,
+        "prev_close": round(prev_close, 4) if np.isfinite(prev_close) else None,
+        "ema5": round(ema5, 4) if np.isfinite(ema5) else None,
+        "ema10": round(ema10, 4) if np.isfinite(ema10) else None,
+        "rsi": round(rsi, 4) if np.isfinite(rsi) else None,
+        "macd_hist": round(macd_hist, 4) if np.isfinite(macd_hist) else None,
+        "atr_pct": round(atr_pct, 4) if np.isfinite(atr_pct) else None,
+        "volume": round(volume, 2) if np.isfinite(volume) else None,
+        "volume_sma20": round(volume_sma, 2) if np.isfinite(volume_sma) else None,
+        "oi": round(oi, 2) if np.isfinite(oi) else None,
+        "oi_sma5": round(oi_sma5, 2) if np.isfinite(oi_sma5) else None,
+        "oi_pct_change": round(oi_pct, 4) if np.isfinite(oi_pct) else None,
+        "underlying_close": round(ul_close, 4) if np.isfinite(ul_close) else None,
+        "underlying_rsi": round(ul_rsi, 4) if np.isfinite(ul_rsi) else None,
+        "underlying_adx": round(ul_adx, 4) if np.isfinite(ul_adx) else None,
+        "underlying_macd_hist": round(ul_macd_hist, 4) if np.isfinite(ul_macd_hist) else None,
+    }
+    threshold_snapshot = {
+        "buy_score_min": CONFIG["buy_score_min"],
+        "option_rsi_min": CONFIG["option_rsi_min"],
+        "volume_confirm_mult": CONFIG["volume_confirm_mult"],
+        "oi_sma_mult": CONFIG["oi_sma_mult"],
+        "oi_change_min_pct": CONFIG["oi_change_min_pct"],
+        "atr_pct_min": CONFIG["atr_pct_min"],
+        "atr_pct_max": CONFIG["atr_pct_max"],
+        "underlying_rsi_bull_min": CONFIG["underlying_rsi_bull_min"],
+        "underlying_rsi_bear_max": CONFIG["underlying_rsi_bear_max"],
+        "underlying_adx_min": CONFIG["underlying_adx_min"],
+    }
+
     holding = _holding_for_symbol(holdings, symbol)
     in_position = not holding.empty and int(_finite(holding.iloc[0].get("quantity"), 0)) > 0
 
@@ -188,6 +249,11 @@ def evaluate_signal(df, row, holdings):
                 "profit_pct": round(profit_pct, 3),
                 "bars_in_trade": bars_in_trade,
                 "reason": reasons,
+                "entry_gate_failures": entry_gate_failures,
+                "score_gap_to_buy": round(score_gap_to_buy, 3),
+                "gate_status": gate_status,
+                "metric_snapshot": metrics_snapshot,
+                "threshold_snapshot": threshold_snapshot,
             },
         )
 
@@ -211,6 +277,11 @@ def evaluate_signal(df, row, holdings):
             "profit_pct": None,
             "bars_in_trade": 0,
             "reason": reasons,
+            "entry_gate_failures": entry_gate_failures,
+            "score_gap_to_buy": round(score_gap_to_buy, 3),
+            "gate_status": gate_status,
+            "metric_snapshot": metrics_snapshot,
+            "threshold_snapshot": threshold_snapshot,
         },
     )
 
