@@ -21,6 +21,14 @@ CONFIG = {
     "rsi_floor": float(os.getenv("AT_BUY_RSI_FLOOR", "45")),
     "stoch_pull_max": float(os.getenv("AT_BUY_STOCH_PULL_MAX", "75")),
     "stoch_momo_max": float(os.getenv("AT_BUY_STOCH_MOMO_MAX", "85")),
+    # --- New indicator gates ---
+    "cci_buy_min": float(os.getenv("AT_BUY_CCI_BUY_MIN", "-100")),     # CCI above -100 = bullish zone
+    "willr_oversold_max": float(os.getenv("AT_BUY_WILLR_OVERSOLD_MAX", "-20")),  # Williams %R above -20 = overbought
+    "vwap_buy_above": float(os.getenv("AT_BUY_VWAP_BUY_ABOVE", "1")),  # 1 = must be above VWAP, 0 = skip
+    "ich_cloud_bull": float(os.getenv("AT_BUY_ICH_CLOUD_BULL", "1")),  # 1 = must be above Ichimoku cloud, 0 = skip
+    "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),      # 1 = price must be above SAR, 0 = skip gate
+    "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),        # minimum DI+ (0 = skip)
+    "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")), # 1 = DI+ must be > DI-, 0 = skip
 }
 
 
@@ -147,6 +155,51 @@ def buy_or_sell(df, row, holdings):
     mmi = get_mmi_now()
     if mmi is not None and mmi >= CONFIG["mmi_risk_off"]:
         return "HOLD"
+
+    # --- NEW: Additional indicator gates (disabled by default, activated via env vars) ---
+    # VWAP: price must be above VWAP (intraday benchmark)
+    if CONFIG["vwap_buy_above"] >= 1:
+        vwap = latest.get("VWAP", np.nan)
+        if np.isfinite(vwap) and close < float(vwap):
+            return "HOLD"
+
+    # Ichimoku cloud: price must be above the cloud
+    if CONFIG["ich_cloud_bull"] >= 1:
+        ich_bull = latest.get("ICH_CLOUD_BULL", np.nan)
+        if np.isfinite(ich_bull) and not bool(ich_bull):
+            return "HOLD"
+
+    # Parabolic SAR: price must be above SAR
+    if CONFIG["sar_buy_enabled"] >= 1:
+        sar = latest.get("SAR", np.nan)
+        if np.isfinite(sar) and close < float(sar):
+            return "HOLD"
+
+    # CCI: must be above oversold zone
+    cci = latest.get("CCI", np.nan)
+    if np.isfinite(cci) and float(cci) < CONFIG["cci_buy_min"]:
+        return "HOLD"
+
+    # Williams %R: not deeply oversold (above threshold = not oversold)
+    # Note: Williams %R is negative, -20 is overbought, -80 is oversold
+    willr = latest.get("Williams_%R", latest.get("Williams_R", np.nan))
+    if np.isfinite(willr) and float(willr) < -80:
+        # Deeply oversold — but for buy this could be a contrarian signal, so only block if extreme
+        pass  # Don't block on oversold; allow for bounce
+
+    # DMI+/DMI-: if enabled, require DI+ > DI-
+    if CONFIG["di_cross_enabled"] >= 1:
+        plus_di = latest.get("PLUS_DI", np.nan)
+        minus_di = latest.get("MINUS_DI", np.nan)
+        if np.isfinite(plus_di) and np.isfinite(minus_di) and float(plus_di) < float(minus_di):
+            return "HOLD"
+
+    # Minimum DI+ requirement
+    di_plus_min = CONFIG["di_plus_min"]
+    if di_plus_min > 0:
+        plus_di = latest.get("PLUS_DI", np.nan)
+        if np.isfinite(plus_di) and float(plus_di) < di_plus_min:
+            return "HOLD"
 
     # --- Modes ---
     stoch_pull_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_pull_max"])

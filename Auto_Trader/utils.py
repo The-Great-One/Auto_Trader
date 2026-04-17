@@ -162,6 +162,12 @@ def compute_supertrend(
     up = hl2 + multiplier * atr
     dn = hl2 - multiplier * atr
 
+    n = len(df)
+    if n == 0:
+        df[sup_col] = np.nan
+        df[sup_dir] = True
+        return
+
     up_shift = np.roll(up, 1)
     dn_shift = np.roll(dn, 1)
     up_shift[0] = dn_shift[0] = np.nan
@@ -238,6 +244,13 @@ def Indicators(
     required = {"High", "Low", "Close", "Volume"}
     if not required.issubset(df.columns):
         raise KeyError(f"DataFrame missing: {', '.join(required - set(df.columns))}")
+
+    if len(df) < 2:
+        # Not enough data for indicators; return with minimal columns
+        df["RSI"] = np.nan
+        df["ADX"] = np.nan
+        df["ATR"] = np.nan
+        return df
 
     # Coerce numeric dtypes once
     df[["High", "Low", "Close", "Volume"]] = (
@@ -316,6 +329,84 @@ def Indicators(
 
     CMF = compute_cmf(df["High"], df["Low"], df["Close"], df["Volume"], period=5)
 
+    # --- NEW: Additional indicators for broader lab coverage ---
+    # VWAP (Volume-Weighted Average Price) — intraday benchmark
+    typical_price = (high + low + close) / 3.0
+    cum_vol = np.cumsum(vol)
+    cum_tp_vol = np.cumsum(typical_price * vol)
+    VWAP = np.where(cum_vol > 0, cum_tp_vol / cum_vol, typical_price)
+
+    # CCI (Commodity Channel Index)
+    CCI = talib.CCI(high, low, close, timeperiod=20)
+
+    # Williams %R
+    WILLR = talib.WILLR(high, low, close, timeperiod=14)
+
+    # Parabolic SAR
+    SAR = talib.SAR(high, low, acceleration=0.02, maximum=0.2)
+
+    # DMI+ and DMI- (Directional Movement)
+    PLUS_DI = talib.PLUS_DI(high, low, close, timeperiod=14)
+    MINUS_DI = talib.MINUS_DI(high, low, close, timeperiod=14)
+    DX = talib.DX(high, low, close, timeperiod=14)
+
+    # Ichimoku Cloud components
+    # Tenkan-sen (Conversion Line): (9-period high + 9-period low) / 2
+    period9_high = df["High"].rolling(window=9, min_periods=9).max()
+    period9_low = df["Low"].rolling(window=9, min_periods=9).min()
+    ICH_TENKAN = (period9_high + period9_low) / 2.0
+
+    # Kijun-sen (Base Line): (26-period high + 26-period low) / 2
+    period26_high = df["High"].rolling(window=26, min_periods=26).max()
+    period26_low = df["Low"].rolling(window=26, min_periods=26).min()
+    ICH_KIJUN = (period26_high + period26_low) / 2.0
+
+    # Senkou Span A (Leading Span A): (Tenkan + Kijun) / 2, shifted forward 26
+    ICH_SPAN_A = ((ICH_TENKAN + ICH_KIJUN) / 2.0).shift(26)
+
+    # Senkou Span B (Leading Span B): (52-period high + low) / 2, shifted forward 26
+    period52_high = df["High"].rolling(window=52, min_periods=52).max()
+    period52_low = df["Low"].rolling(window=52, min_periods=52).min()
+    ICH_SPAN_B = ((period52_high + period52_low) / 2.0).shift(26)
+
+    # Cloud color: green (bullish) when Span A > Span B
+    ICH_CLOUD_BULL = ICH_SPAN_A > ICH_SPAN_B
+
+    # Chikou Span (Lagging Span): close shifted back 26
+    ICH_CHIKOU = pd.Series(close, index=df.index).shift(-26)
+
+    # Bollinger Band %B (where price is within the bands: 0=lower, 1=upper)
+    BB_PercentB = np.where(
+        (UpperBand - LowerBand) > 0,
+        (close - LowerBand) / (UpperBand - LowerBand),
+        np.nan,
+    )
+
+    # Bollinger Band Width (normalised volatility squeeze detector)
+    BB_Width = np.where(
+        MiddleBand > 0, (UpperBand - LowerBand) / MiddleBand, np.nan
+    )
+
+    # EMA crossover signals (short-term)
+    EMA_CROSS_5_20 = np.where(
+        np.isnan(EMA_values["EMA5"]) | np.isnan(EMA_values["EMA20"]),
+        np.nan,
+        np.where(EMA_values["EMA5"] > EMA_values["EMA20"], 1.0, -1.0),
+    )
+    EMA_CROSS_9_21 = np.where(
+        np.isnan(EMA_values["EMA9"]) | np.isnan(EMA_values["EMA21"]),
+        np.nan,
+        np.where(EMA_values["EMA9"] > EMA_values["EMA21"], 1.0, -1.0),
+    )
+
+    # ATR as percentage of close (volatility normaliser)
+    ATR_Pct = np.where(close > 0, ATR / close, np.nan)
+
+    # MACD histogram slope (rising = bullish momentum)
+    MACD_Hist_Prev = np.roll(MACD_Hist, 1)
+    MACD_Hist_Prev[0] = np.nan
+    MACD_Hist_Rising = MACD_Hist > MACD_Hist_Prev
+
     # Collect into single dict for assign
     assign_kwargs = {
         # momentum
@@ -365,6 +456,26 @@ def Indicators(
         **EMA_values,
         # Fibonacci
         **fib,
+        # --- NEW indicators ---
+        "VWAP": VWAP,
+        "CCI": CCI,
+        "Williams_R": WILLR,
+        "SAR": SAR,
+        "PLUS_DI": PLUS_DI,
+        "MINUS_DI": MINUS_DI,
+        "DX": DX,
+        "ICH_TENKAN": ICH_TENKAN,
+        "ICH_KIJUN": ICH_KIJUN,
+        "ICH_SPAN_A": ICH_SPAN_A,
+        "ICH_SPAN_B": ICH_SPAN_B,
+        "ICH_CLOUD_BULL": ICH_CLOUD_BULL,
+        "ICH_CHIKOU": ICH_CHIKOU,
+        "BB_PercentB": BB_PercentB,
+        "BB_Width": BB_Width,
+        "EMA_CROSS_5_20": EMA_CROSS_5_20,
+        "EMA_CROSS_9_21": EMA_CROSS_9_21,
+        "ATR_Pct": ATR_Pct,
+        "MACD_Hist_Rising": MACD_Hist_Rising,
     }
 
     # Bulk assign
