@@ -152,7 +152,13 @@ def _extract_candidate(rec: dict) -> dict:
     }
 
 
-def run_strategy_lab(max_variants: int | None = None) -> dict:
+def _date_matches_trade_date(value: str | None, trade_date: str) -> bool:
+    text = str(value or "")
+    return text.startswith(trade_date)
+
+
+
+def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
     requested_variants = int(max_variants or resolve_strategy_lab_max_variants())
     env = os.environ.copy()
     env["AT_LAB_MAX_VARIANTS"] = str(requested_variants)
@@ -175,19 +181,31 @@ def run_strategy_lab(max_variants: int | None = None) -> dict:
         "should_promote": False,
         "best_name": None,
         "candidate": None,
+        "report_generated_at": None,
+        "stale_report": False,
+        "stale_reason": None,
     }
 
     if latest:
         payload = json.loads(latest[-1].read_text())
         rec = payload.get("recommendation", {})
-        out["tested_variants"] = int(rec.get("tested_variants", 0) or 0)
-        out["baseline_return_pct"] = rec.get("baseline", {}).get("total_return_pct")
-        out["best_return_pct"] = rec.get("best", {}).get("total_return_pct")
-        out["improvement_return_pct"] = rec.get("improvement_return_pct")
-        out["improvement_score"] = rec.get("improvement_score")
-        out["should_promote"] = bool(rec.get("should_promote", False))
-        out["best_name"] = rec.get("best", {}).get("name")
-        out["candidate"] = _extract_candidate(rec)
+        out["report_generated_at"] = rec.get("generated_at")
+        out["stale_report"] = not _date_matches_trade_date(rec.get("generated_at"), trade_date)
+        out["stale_reason"] = None if not out["stale_report"] else "latest_strategy_lab_report_not_from_trade_date"
+        if not out["stale_report"]:
+            out["tested_variants"] = int(rec.get("tested_variants", 0) or 0)
+            out["baseline_return_pct"] = rec.get("baseline", {}).get("total_return_pct")
+            out["best_return_pct"] = rec.get("best", {}).get("total_return_pct")
+            out["improvement_return_pct"] = rec.get("improvement_return_pct")
+            out["improvement_score"] = rec.get("improvement_score")
+            out["should_promote"] = bool(rec.get("should_promote", False)) and proc.returncode == 0
+            out["best_name"] = rec.get("best", {}).get("name")
+            out["candidate"] = _extract_candidate(rec)
+        else:
+            out["should_promote"] = False
+            if out["ok"]:
+                out["ok"] = False
+                out["stale_reason"] = "strategy_lab_completed_but_no_fresh_report_found"
 
     return out
 
@@ -433,7 +451,7 @@ def main():
     now = ist_now()
     market_open, trade_date = is_market_open_today()
 
-    strategy = run_strategy_lab()
+    strategy = run_strategy_lab(trade_date)
     paper = check_and_fix_paper_execution(market_open, trade_date)
     autopromote = maybe_auto_promote(strategy, market_open)
 
@@ -457,6 +475,7 @@ def main():
         "",
         f"- Market open: **{market_open}** (NSE calendar)",
         f"- Strategies tested: **{strategy.get('tested_variants', 0)}**",
+        f"- Strategy report stale: **{strategy.get('stale_report')}**",
         f"- Baseline return %: **{strategy.get('baseline_return_pct')}**",
         f"- Best return %: **{strategy.get('best_return_pct')}**",
         f"- Improvement return %: **{strategy.get('improvement_return_pct')}**",

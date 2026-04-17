@@ -75,6 +75,25 @@ def _run_json_script(script_name: str) -> dict:
     }
 
 
+def _date_matches_trade_date(value: str | None, trade_date: str) -> bool:
+    return str(value or "").startswith(trade_date)
+
+
+
+def _mark_stale(run_result: dict, trade_date: str, payload_path: list[str] | None = None):
+    payload = run_result.get("payload") or {}
+    generated_at = payload
+    for key in payload_path or []:
+        generated_at = (generated_at or {}).get(key, {})
+    if isinstance(generated_at, dict):
+        generated_at = generated_at.get("generated_at")
+    run_result["generated_at"] = generated_at
+    run_result["stale_report"] = False if generated_at is None else (not _date_matches_trade_date(generated_at, trade_date))
+    run_result["stale_reason"] = None if not run_result["stale_report"] else "payload_not_from_trade_date"
+    return run_result
+
+
+
 def _render_markdown(summary: dict) -> str:
     fetch = summary.get("fetch", {})
     paper = summary.get("paper_shadow", {})
@@ -93,7 +112,9 @@ def _render_markdown(summary: dict) -> str:
         f"- Market open: **{summary['market_open']}** (NSE calendar)",
         f"- Fetch ran: **{fetch.get('ok', False)}**",
         f"- Paper shadow ran: **{paper.get('ok', False)}**",
+        f"- Paper shadow stale: **{paper.get('stale_report', False)}**",
         f"- Options lab ran: **{lab.get('ok', False)}**",
+        f"- Options lab stale: **{lab.get('stale_report', False)}**",
     ]
 
     if summary["market_open"]:
@@ -167,11 +188,11 @@ def main():
         if fetch.get("ok"):
             paper = _run_json_script("paper_shadow.py")
             paper["reason"] = None if paper.get("ok") else f"failed_rc_{paper.get('returncode')}"
-            summary["paper_shadow"] = paper
+            summary["paper_shadow"] = _mark_stale(paper, trade_date, ["options_shadow"])
 
             lab = _run_json_script("options_strategy_lab.py")
             lab["reason"] = None if lab.get("ok") else f"failed_rc_{lab.get('returncode')}"
-            summary["options_lab"] = lab
+            summary["options_lab"] = _mark_stale(lab, trade_date)
         else:
             summary["paper_shadow"]["reason"] = "skipped_due_to_fetch_failure"
             summary["options_lab"]["reason"] = "skipped_due_to_fetch_failure"
