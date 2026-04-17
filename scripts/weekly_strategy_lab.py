@@ -205,19 +205,27 @@ def _looks_etf_like(symbol: str) -> bool:
 
 def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> list[str]:
     explicit = os.getenv("AT_LAB_SYMBOLS", "").strip()
+    use_approved_universe = os.getenv("AT_LAB_USE_APPROVED_UNIVERSE", "1").strip().lower() not in {"0", "false", "no"}
+
+    approved_equities_list = [str(x).upper().strip() for x in fundamental_context.get("approved_equities", []) if str(x).strip()]
+    approved_etfs_list = [str(x).upper().strip() for x in fundamental_context.get("approved_etfs", []) if str(x).strip()]
+    approved_equities = set(approved_equities_list)
+    approved_etfs = set(approved_etfs_list)
+
     if explicit:
         requested = _parse_symbol_list(explicit)
+    elif use_approved_universe and fundamental_context.get("fundamentals_found"):
+        requested = approved_equities_list + approved_etfs_list
+        requested.extend(tradebook_context.get("top_symbols", [])[:8])
     else:
         requested = list(DEFAULT_LAB_SYMBOLS)
         requested.extend(tradebook_context.get("top_symbols", [])[:8])
 
-    approved_equities = set(fundamental_context.get("approved_equities", []))
-    approved_etfs = set(fundamental_context.get("approved_etfs", []))
-
     out: list[str] = []
     seen = set()
     for symbol in requested:
-        if symbol in seen:
+        symbol = str(symbol or "").upper().strip()
+        if not symbol or symbol in seen:
             continue
         seen.add(symbol)
 
@@ -312,11 +320,14 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
 
     return data_map, {
         "requested_symbols": symbols,
+        "requested_symbol_count": len(symbols),
         "loaded_symbols": list(data_map.keys()),
+        "loaded_symbol_count": len(data_map),
         "skipped_symbols": skipped,
         "fallback_symbols": fallback_symbols,
         "history_period": configured_history_period(),
         "min_history_bars": min_history_bars,
+        "use_approved_universe": os.getenv("AT_LAB_USE_APPROVED_UNIVERSE", "1").strip().lower() not in {"0", "false", "no"},
     }
 
 
