@@ -68,8 +68,9 @@ def analyze_bucket(name: str, label: str, bucket_df: pd.DataFrame, data_map: dic
         }
 
     subset_map = {symbol: data_map[symbol] for symbol in tested_symbols}
-    result, details = pack.run_baseline_detailed(subset_map)
-    portfolio_equity, daily_returns, trades_df, curve_meta = pack.build_validation_curves(details)
+    subset_universe_df = bucket_df[bucket_df["Symbol"].isin(tested_symbols)].copy()
+    result, details, sim_meta = pack.run_baseline_detailed(subset_map, universe_df=subset_universe_df)
+    portfolio_equity, daily_returns, trades_df, curve_meta = pack.build_validation_curves(details, sim_meta=sim_meta)
     metrics = pack.compute_validation_metrics(portfolio_equity, daily_returns, trades_df)
     monthly_returns = metrics.pop("monthly_returns")
     walkforward = pack.walkforward_validation(monthly_returns)
@@ -78,13 +79,10 @@ def analyze_bucket(name: str, label: str, bucket_df: pd.DataFrame, data_map: dic
     symbol_rows = []
     for symbol in tested_symbols:
         stats = details[symbol]
-        equity = stats["equity_curve"]
-        start_value = float(equity.iloc[0]) if len(equity) else 100000.0
-        end_value = float(equity.iloc[-1]) if len(equity) else 100000.0
         symbol_rows.append(
             {
                 "symbol": symbol,
-                "total_return_pct": ((end_value / start_value) - 1.0) * 100.0 if start_value > 0 else 0.0,
+                "total_return_pct": float(stats.get("total_return_pct", 0.0) or 0.0),
                 "closed_trades": int(len(stats.get("closed_trades", []))),
                 "avg_hold_days": float(stats.get("avg_hold_days", 0.0) or 0.0),
                 "exposure_pct": float(stats.get("exposure_pct", 0.0) or 0.0),
@@ -94,7 +92,8 @@ def analyze_bucket(name: str, label: str, bucket_df: pd.DataFrame, data_map: dic
 
     spans = [symbol_span_years(subset_map[symbol]) for symbol in tested_symbols]
     median_years = float(median(spans)) if spans else 0.0
-    start_capital = 100000.0 * max(1, len(result.symbols_tested))
+    simulation_cfg = ((getattr(result, "params", {}) or {}).get("simulation", {}) or {})
+    start_capital = float(simulation_cfg.get("starting_capital", 100000.0 * max(1, len(result.symbols_tested))))
     cagr_pct = None
     if median_years > 0 and start_capital > 0 and result.final_value > 0:
         cagr_pct = round((((result.final_value / start_capital) ** (1.0 / median_years)) - 1.0) * 100.0, 2)

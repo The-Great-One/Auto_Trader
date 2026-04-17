@@ -61,15 +61,15 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
 - `daily_improvement_audit.py` - read-only daily audit of reports/logs that identifies concrete improvement areas without auto-editing trading code
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
-- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now with persistent lab-status updates for the dashboard
+- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now defaulting non-RNN variants to the same live-parity execution engine used by weekly validation
 - `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
 - `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
-- `weekly_universe_cagr_check.py` - weekly 5 year validation pack for the live RULE_SET_7/RULE_SET_2 strategy across the current fundamentals-approved universe, including risk metrics, walk-forward checks, and Monte Carlo analysis
-- `strategy_bucket_diagnostic.py` - bucketed validation helper that splits current strategy performance across Nifty 50, large cap, mid cap, and small cap slices
+- `weekly_universe_cagr_check.py` - weekly 5 year validation pack for the live RULE_SET_7/RULE_SET_2 strategy, now using live watchlist parity (`Instruments.feather` when available), local cached history first (`intermediary_files/Hist_Data`), and next-open execution after close-of-bar signals to reduce look-ahead
+- `strategy_bucket_diagnostic.py` - bucketed validation helper that splits current strategy performance across Nifty 50, large cap, mid cap, and small cap slices using the same live-parity validation engine as the weekly CAGR pack
 
 ### `reports/`
 Generated outputs, especially:
@@ -161,6 +161,7 @@ Implication:
 ## Strategy lab scope
 
 - `scripts/weekly_strategy_lab.py` can optionally evaluate a lab-only RNN overlay when `AT_LAB_RNN_ENABLED=1`
+- non-RNN lab variants now default to live-parity execution (`AT_LAB_MATCH_LIVE=1`) so tuning is scored on the same mechanics as deployment
 - current RNN behavior is research-only: it filters BUY entries and can accelerate SELL exits inside the lab simulator, but does not affect live trading
 
 
@@ -183,11 +184,13 @@ In `scripts/daily_ops_supervisor.py`:
 In `scripts/weekly_strategy_lab.py`:
 - reads latest `daily_scorecard_*.json` when available
 - supports env overrides for history depth via `AT_LAB_HISTORY_PERIOD` and `AT_LAB_MIN_BARS`
+- non-RNN variants now route through the live-parity baseline simulator by default; set `AT_LAB_MATCH_LIVE=0` to fall back to the older per-symbol simulator
 - can also read a tradebook CSV via `AT_LAB_TRADEBOOK_PATH`
 - if the day had zero trades, it expands buy-side search space automatically
 - if tradebook analysis shows weak 5 to 10 day holds, it biases sell-side search toward tighter time stops
 - records scorecard context and tradebook context in the strategy lab JSON output
 - disables file logging during lab runs to avoid noisy permission issues
+- weekly validation and bucket diagnostics prefer `intermediary_files/Hist_Data/*.feather` for parity with live and only fall back to Yahoo when `AT_BACKTEST_ALLOW_YF_FALLBACK=1`
 
 In `scripts/options_strategy_lab.py`:
 - prefers symbols from `intermediary_files/options/nifty_options_universe.json` when present, or accepts explicit `AT_OPTIONS_LAB_SYMBOLS`
