@@ -8,6 +8,23 @@ import traceback
 logger = logging.getLogger("Auto_Trade_Logger")
 ETF_PREFS_PATH = "intermediary_files/etf_preferences.json"
 
+NIFTY50_SYMBOLS = {
+    "ADANIENT", "ADANIPORTS", "APOLLOHOSP", "ASIANPAINT", "AXISBANK",
+    "BAJAJ-AUTO", "BAJFINANCE", "BAJAJFINSV", "BEL", "BHARTIARTL",
+    "CIPLA", "COALINDIA", "DRREDDY", "EICHERMOT", "ETERNAL",
+    "GRASIM", "HCLTECH", "HDFCBANK", "HDFCLIFE", "HINDALCO",
+    "HINDUNILVR", "ICICIBANK", "INDIGO", "INFY", "ITC",
+    "JIOFIN", "JSWSTEEL", "KOTAKBANK", "LT", "M&M",
+    "MARUTI", "MAXHEALTH", "NESTLEIND", "NTPC", "ONGC",
+    "POWERGRID", "RELIANCE", "SBILIFE", "SHRIRAMFIN", "SBIN",
+    "SUNPHARMA", "TCS", "TATACONSUM", "TMPV", "TATASTEEL",
+    "TECHM", "TITAN", "TRENT", "ULTRACEMCO", "WIPRO",
+}
+
+LARGE_CAP_THRESHOLD_CR = 50000
+MID_CAP_THRESHOLD_CR = 5000
+SMALL_CAP_THRESHOLD_CR = 500
+
 
 def _normalize_text(value) -> str:
     return str(value or "").strip().upper()
@@ -32,6 +49,22 @@ def _infer_etf_theme(symbol: str, sector: str) -> str:
     if "IT" in text:
         return "IT"
     return _normalize_text(sector) or "ETF_GENERIC"
+
+
+def _classify_cap_bucket(market_cap_cr) -> str:
+    try:
+        value = float(market_cap_cr)
+    except Exception:
+        return "UNKNOWN"
+    if not pd.notna(value):
+        return "UNKNOWN"
+    if value > LARGE_CAP_THRESHOLD_CR:
+        return "LARGE_CAP"
+    if value > MID_CAP_THRESHOLD_CR:
+        return "MID_CAP"
+    if value > SMALL_CAP_THRESHOLD_CR:
+        return "SMALL_CAP"
+    return "MICRO_CAP"
 
 
 def _load_etf_preferences() -> dict:
@@ -84,6 +117,13 @@ def _select_persistent_etfs(etf_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(selected_rows)
 
 
+def _parse_csv_env(name: str) -> set[str]:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return set()
+    return {_normalize_text(part) for part in raw.split(",") if part.strip()}
+
+
 def goodStocks():
     ttp = Tickertape()
 
@@ -120,7 +160,7 @@ def goodStocks():
                 filtered_list_df["advancedRatios.apef"]
                 <= filtered_list_df["advancedRatios.indpe"]
             )
-        ][["info.ticker", "sid", "info.sector"]]
+        ][["info.ticker", "sid", "info.sector", "advancedRatios.mrktCapf"]]
         non_etf_df = non_etf_df.assign(ETFTheme="")
 
         # Combine both
@@ -128,15 +168,47 @@ def goodStocks():
 
         # Rename for clarity
         combined_df = combined_df.rename(
-            columns={"info.ticker": "Symbol", "info.sector": "Sector"}
+            columns={
+                "info.ticker": "Symbol",
+                "info.sector": "Sector",
+                "advancedRatios.mrktCapf": "MarketCapCr",
+            }
         )
         combined_df["AssetClass"] = combined_df["Sector"].apply(
             lambda x: "ETF" if "ETF" in _normalize_text(x) else "EQUITY"
         )
         combined_df["ETFTheme"] = combined_df["ETFTheme"].fillna("")
+        combined_df["MarketCapCr"] = pd.to_numeric(combined_df["MarketCapCr"], errors="coerce")
+        combined_df["CapBucket"] = combined_df.apply(
+            lambda row: "ETF" if row["AssetClass"] == "ETF" else _classify_cap_bucket(row["MarketCapCr"]),
+            axis=1,
+        )
+        combined_df["IsNifty50"] = combined_df["Symbol"].apply(lambda x: _normalize_text(x) in NIFTY50_SYMBOLS)
+
+        requested_buckets = _parse_csv_env("AT_UNIVERSE_CAP_BUCKETS")
+        if not requested_buckets:
+            requested_buckets = {"LARGE_CAP", "MID_CAP", "ETF"}
+        if requested_buckets:
+            combined_df = combined_df[
+                combined_df["CapBucket"].astype(str).str.upper().isin(requested_buckets)
+            ].copy()
+
+        if os.getenv("AT_UNIVERSE_NIFTY50_ONLY", "0").strip().lower() in {"1", "true", "yes"}:
+            combined_df = combined_df[combined_df["IsNifty50"]].copy()
+
+        min_mcap_raw = os.getenv("AT_UNIVERSE_MIN_MCAP_CR", "").strip()
+        if min_mcap_raw:
+            try:
+                min_mcap = float(min_mcap_raw)
+                combined_df = combined_df[
+                    (combined_df["AssetClass"] == "ETF")
+                    | (combined_df["MarketCapCr"].fillna(0) >= min_mcap)
+                ].copy()
+            except Exception:
+                logger.warning("Ignoring invalid AT_UNIVERSE_MIN_MCAP_CR=%r", min_mcap_raw)
 
         # Final clean output
-        return combined_df[["Symbol", "Sector", "AssetClass", "ETFTheme"]]
+        return combined_df[["Symbol", "Sector", "AssetClass", "ETFTheme", "MarketCapCr", "CapBucket", "IsNifty50"]]
 
     except Exception as e:
         logger.error(f"An error occurred: {e}, Traceback: {traceback.format_exc()}")
