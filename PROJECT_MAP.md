@@ -68,13 +68,13 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
-- `weekly_universe_cagr_check.py` - weekly 5 year backtest of the live RULE_SET_7/RULE_SET_2 strategy across the current fundamentals-approved universe
+- `weekly_universe_cagr_check.py` - weekly 5 year validation pack for the live RULE_SET_7/RULE_SET_2 strategy across the current fundamentals-approved universe, including risk metrics, walk-forward checks, and Monte Carlo analysis
 
 ### `reports/`
 Generated outputs, especially:
 - `strategy_lab_*.json/csv` - backtest sweep results
 - `daily_ops_supervisor_YYYY-MM-DD.{json,md}` - daily ops summary
-- `weekly_universe_cagr_<ISO_WEEK>.{json,md}` - weekly 5 year CAGR snapshot for the current live strategy across the current approved universe
+- `weekly_universe_cagr_<ISO_WEEK>.{json,md}` - weekly 5 year validation snapshot for the current live strategy across the current approved universe, including CAGR, risk metrics, walk-forward, and Monte Carlo
 - `daily_scorecard_YYYY-MM-DD.{json,md}` - daily trading scorecard
 - `paper_shadow_latest.json` - cron/self-heal paper decision
 - `paper_shadow_options_latest.json` - latest NIFTY options paper-shadow ranking
@@ -162,6 +162,7 @@ In `scripts/daily_ops_supervisor.py`:
 - weekdays: 50 requested variants
 - weekends: 200 requested variants
 - runs `weekly_universe_cagr_check.py` once per ISO week by default on Saturday (`AT_WEEKLY_CAGR_WEEKDAY=5`) and stores summary fields in the ops report
+- weekly validation output now includes validation-curve metrics, walk-forward windows, and Monte Carlo loss/drawdown distributions
 - baseline is included in results, so tested count is usually requested + 1
 - can auto-promote lab winners with guardrails instead of one-run blind promotion
 - auto-promotion writes a managed block into `~/.autotrader_env`, records state in `reports/strategy_autopromote_state.json`, and restarts `auto_trade.service` only when repeat, score, return-gain, and cooldown checks pass
@@ -238,6 +239,12 @@ Relevant env knobs:
 - `AT_WEEKLY_CAGR_WEEKDAY`
 - `AT_WEEKLY_CAGR_HISTORY_PERIOD`
 - `AT_WEEKLY_CAGR_MIN_BARS`
+- `AT_WEEKLY_CAGR_WF_TRAIN_MONTHS`
+- `AT_WEEKLY_CAGR_WF_TEST_MONTHS`
+- `AT_WEEKLY_CAGR_WF_STEP_MONTHS`
+- `AT_WEEKLY_CAGR_MC_SIMS`
+- `AT_WEEKLY_CAGR_MC_BLOCK_MONTHS`
+- `AT_WEEKLY_CAGR_MC_SEED`
 - `AT_LAB_SCORECARD_PATH`
 - `AT_LAB_TRADEBOOK_PATH`
 - `AT_DISABLE_FILE_LOGGING`
