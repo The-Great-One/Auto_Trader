@@ -30,8 +30,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader import RULE_SET_2, RULE_SET_7, logger as at_logger
-from Auto_Trader import rnn_lab
 from Auto_Trader import utils as at_utils
+
+try:
+    from Auto_Trader import rnn_lab
+except Exception:
+    rnn_lab = None
 
 at_logger.setLevel("WARNING")
 
@@ -530,6 +534,33 @@ def _variant_key(buy_params: dict, sell_params: dict) -> str:
     return json.dumps({"buy": buy_params, "sell": sell_params}, sort_keys=True)
 
 
+class _DisabledRNNConfig:
+    enabled = False
+    buy_threshold = 0.56
+    sell_threshold = 0.44
+
+
+
+def load_rnn_config():
+    if rnn_lab is None:
+        return _DisabledRNNConfig()
+    try:
+        return rnn_lab.load_config()
+    except Exception:
+        return _DisabledRNNConfig()
+
+
+
+def build_rnn_models(data_map: dict[str, pd.DataFrame], config):
+    if rnn_lab is None or not bool(getattr(config, "enabled", False)):
+        return {}
+    try:
+        return rnn_lab.build_overlay_models(data_map, config=config)
+    except Exception:
+        return {}
+
+
+
 def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict, dict]]:
     buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
     base_buy = _current_param_values(buy_grid, RULE_SET_7.CONFIG)
@@ -537,7 +568,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     out: list[tuple[str, dict, dict, dict]] = []
     seen: set[str] = set()
-    base_rnn_cfg = rnn_lab.load_config()
+    base_rnn_cfg = load_rnn_config()
 
     def add(name: str, buy_patch: dict, sell_patch: dict, rnn_patch: dict | None = None):
         rnn_patch = rnn_patch or {}
@@ -757,7 +788,7 @@ def main():
     tradebook_context = load_tradebook_context()
     fundamental_context = load_fundamental_context()
     data_map, data_context = load_data(tradebook_context, fundamental_context)
-    rnn_config = rnn_lab.load_config()
+    rnn_config = load_rnn_config()
     write_status(
         phase="training_rnn",
         message="building RNN overlay models",
@@ -765,7 +796,7 @@ def main():
         universe_size=len(data_map),
         universe_symbols=list(data_map.keys()),
     )
-    rnn_models = rnn_lab.build_overlay_models(data_map, config=rnn_config)
+    rnn_models = build_rnn_models(data_map, config=rnn_config)
     variant_list = variants(scorecard_context, tradebook_context)
     write_status(
         phase="evaluating_variants",
