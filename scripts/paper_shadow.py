@@ -61,6 +61,7 @@ def load_hist(symbol="NIFTYETF"):
     cache_paths = [
         ROOT / "intermediary_files" / "Hist_Data" / f"{symbol}.feather",
         ROOT / "intermediary_files" / "Hist_Data" / "NIFTYBEES.feather",
+        ROOT / "intermediary_files" / "Hist_Data" / "NIFTY50_INDEX.feather",
     ]
 
     for p in cache_paths:
@@ -201,9 +202,16 @@ def run_options_shadow() -> dict:
 
 
 def main():
-    equity_payload = run_equity_shadow()
-    options_payload = run_options_shadow()
-    print(json.dumps({"equity_shadow": equity_payload, "options_shadow": options_payload}, indent=2))
+    payload = {}
+    try:
+        payload["equity_shadow"] = run_equity_shadow()
+    except Exception as exc:
+        payload["equity_shadow_error"] = str(exc)
+    try:
+        payload["options_shadow"] = run_options_shadow()
+    except Exception as exc:
+        payload["options_shadow_error"] = str(exc)
+    print(json.dumps(payload, indent=2))
 
 
 if __name__ == "__main__":
