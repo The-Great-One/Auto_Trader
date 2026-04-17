@@ -68,11 +68,13 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
+- `weekly_universe_cagr_check.py` - weekly 5 year backtest of the live RULE_SET_7/RULE_SET_2 strategy across the current fundamentals-approved universe
 
 ### `reports/`
 Generated outputs, especially:
 - `strategy_lab_*.json/csv` - backtest sweep results
 - `daily_ops_supervisor_YYYY-MM-DD.{json,md}` - daily ops summary
+- `weekly_universe_cagr_<ISO_WEEK>.{json,md}` - weekly 5 year CAGR snapshot for the current live strategy across the current approved universe
 - `daily_scorecard_YYYY-MM-DD.{json,md}` - daily trading scorecard
 - `paper_shadow_latest.json` - cron/self-heal paper decision
 - `paper_shadow_options_latest.json` - latest NIFTY options paper-shadow ranking
@@ -145,6 +147,7 @@ Implication:
 ### Current cron jobs on server
 - `15:50` weekdays: `scripts/options_research_supervisor.py`
 - `16:10` daily: `scripts/daily_ops_supervisor.py`
+  - also runs `weekly_universe_cagr_check.py` once per ISO week on the configured weekday (default Saturday) when markets are closed
 - `16:20` weekdays: `scripts/daily_scorecard.py`
 - `16:40` weekdays: `scripts/daily_improvement_audit.py`
 - Twitter sentiment fetch is available via `scripts/fetch_twitter_sentiment.py`, but no cron is wired yet in this map
@@ -158,6 +161,7 @@ Implication:
 In `scripts/daily_ops_supervisor.py`:
 - weekdays: 50 requested variants
 - weekends: 200 requested variants
+- runs `weekly_universe_cagr_check.py` once per ISO week by default on Saturday (`AT_WEEKLY_CAGR_WEEKDAY=5`) and stores summary fields in the ops report
 - baseline is included in results, so tested count is usually requested + 1
 - can auto-promote lab winners with guardrails instead of one-run blind promotion
 - auto-promotion writes a managed block into `~/.autotrader_env`, records state in `reports/strategy_autopromote_state.json`, and restarts `auto_trade.service` only when repeat, score, return-gain, and cooldown checks pass
@@ -171,6 +175,7 @@ In `scripts/daily_ops_supervisor.py`:
 
 In `scripts/weekly_strategy_lab.py`:
 - reads latest `daily_scorecard_*.json` when available
+- supports env overrides for history depth via `AT_LAB_HISTORY_PERIOD` and `AT_LAB_MIN_BARS`
 - can also read a tradebook CSV via `AT_LAB_TRADEBOOK_PATH`
 - if the day had zero trades, it expands buy-side search space automatically
 - if tradebook analysis shows weak 5 to 10 day holds, it biases sell-side search toward tighter time stops
@@ -227,6 +232,12 @@ Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
 - `AT_WEEKEND_LAB_MAX_VARIANTS`
 - `AT_LAB_MAX_VARIANTS`
+- `AT_LAB_HISTORY_PERIOD`
+- `AT_LAB_MIN_BARS`
+- `AT_WEEKLY_CAGR_ENABLED`
+- `AT_WEEKLY_CAGR_WEEKDAY`
+- `AT_WEEKLY_CAGR_HISTORY_PERIOD`
+- `AT_WEEKLY_CAGR_MIN_BARS`
 - `AT_LAB_SCORECARD_PATH`
 - `AT_LAB_TRADEBOOK_PATH`
 - `AT_DISABLE_FILE_LOGGING`
