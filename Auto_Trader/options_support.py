@@ -46,6 +46,10 @@ def _normalize_date_series(series: pd.Series) -> pd.Series:
             dt = dt.dt.tz_localize(None)
         except Exception:
             pass
+    try:
+        dt = dt.astype("datetime64[ns]")
+    except Exception:
+        pass
     return dt
 
 
@@ -134,7 +138,7 @@ def load_underlying_context(underlying_symbol: str = "NIFTY50_INDEX") -> pd.Data
     df = df.ffill().dropna(subset=["Close"]).reset_index(drop=True)
     keep = pd.DataFrame(
         {
-            "Date": pd.to_datetime(df["Date"], errors="coerce"),
+            "Date": _normalize_date_series(df["Date"]),
             "UL_Close": pd.to_numeric(df["Close"], errors="coerce"),
             "UL_EMA10": pd.to_numeric(df.get("EMA10"), errors="coerce"),
             "UL_EMA20": pd.to_numeric(df.get("EMA20"), errors="coerce"),
