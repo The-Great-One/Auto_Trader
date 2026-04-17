@@ -24,36 +24,65 @@ OUT.mkdir(exist_ok=True)
 OPTIONS_OUT = OUT / "paper_shadow_options_latest.json"
 
 
-def load_hist(symbol="NIFTYETF"):
-    p = ROOT / "intermediary_files" / "Hist_Data" / f"{symbol}.feather"
-    if not p.exists():
-        p = ROOT / "intermediary_files" / "Hist_Data" / "NIFTYBEES.feather"
-
-    if p.exists():
-        df = pd.read_feather(p)
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-            df = df.sort_values("Date")
-        out = at_utils.Indicators(df)
-        out = out.ffill().dropna(subset=["Close"]).reset_index(drop=True)
-        return out
-
-    # fallback: fetch fresh data if cache was cleaned by runtime
-    import yfinance as yf
-
-    ysym = f"{symbol}.NS"
-    df = yf.download(ysym, period="2y", interval="1d", auto_adjust=False, progress=False)
+def _prepare_hist_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
-        df = yf.download("NIFTYBEES.NS", period="2y", interval="1d", auto_adjust=False, progress=False)
-    if df is None or df.empty:
-        raise SystemExit("No local historical data found for shadow mode and yfinance fallback failed")
+        return pd.DataFrame()
     if hasattr(df.columns, "levels"):
         df.columns = [str(c[0]) for c in df.columns]
-    df = df.reset_index()[["Date", "Open", "High", "Low", "Close", "Volume"]]
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-    out = at_utils.Indicators(df)
-    out = out.ffill().dropna(subset=["Close"]).reset_index(drop=True)
-    return out
+    cols = {str(c).lower(): c for c in df.columns}
+    required = ["date", "open", "high", "low", "close"]
+    if not all(k in cols for k in required):
+        return pd.DataFrame()
+    use = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(df[cols["date"]], errors="coerce"),
+            "Open": pd.to_numeric(df[cols["open"]], errors="coerce"),
+            "High": pd.to_numeric(df[cols["high"]], errors="coerce"),
+            "Low": pd.to_numeric(df[cols["low"]], errors="coerce"),
+            "Close": pd.to_numeric(df[cols["close"]], errors="coerce"),
+            "Volume": pd.to_numeric(df.get(cols.get("volume", "Volume"), 0), errors="coerce").fillna(0),
+        }
+    ).dropna(subset=["Date", "Open", "High", "Low", "Close"])
+    if use.empty:
+        return use
+    use = use.sort_values("Date").drop_duplicates(subset=["Date"], keep="last").reset_index(drop=True)
+    if len(use) < 5:
+        return pd.DataFrame()
+    try:
+        out = at_utils.Indicators(use)
+        out = out.ffill().dropna(subset=["Close"]).reset_index(drop=True)
+        return out if not out.empty else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+
+def load_hist(symbol="NIFTYETF"):
+    cache_paths = [
+        ROOT / "intermediary_files" / "Hist_Data" / f"{symbol}.feather",
+        ROOT / "intermediary_files" / "Hist_Data" / "NIFTYBEES.feather",
+    ]
+
+    for p in cache_paths:
+        if not p.exists():
+            continue
+        try:
+            out = _prepare_hist_df(pd.read_feather(p))
+            if not out.empty:
+                return out
+        except Exception:
+            pass
+
+    # fallback: fetch fresh data if cache was cleaned by runtime or cache is bad/empty
+    import yfinance as yf
+
+    for ysym in [f"{symbol}.NS", "NIFTYBEES.NS"]:
+        df = yf.download(ysym, period="2y", interval="1d", auto_adjust=False, progress=False)
+        out = _prepare_hist_df(df)
+        if not out.empty:
+            return out
+
+    raise SystemExit("No usable historical data found for shadow mode, local cache and yfinance fallback both failed")
 
 
 def load_qty(symbol="NIFTYETF") -> int:

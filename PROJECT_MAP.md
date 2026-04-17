@@ -58,7 +58,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
 - `fetch_twitter_sentiment.py` - refresh cached X/Twitter sentiment snapshots and tweet-type analysis for tracked symbols
-- `options_research_supervisor.py` - weekday options fetch + options paper-shadow supervisor for NIFTY research automation
+- `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
 - `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now with persistent lab-status updates for the dashboard
 - `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
@@ -76,7 +76,7 @@ Generated outputs, especially:
 - `paper_shadow_latest.json` - cron/self-heal paper decision
 - `paper_shadow_options_latest.json` - latest NIFTY options paper-shadow ranking
 - `paper_shadow_live_latest.json` - live service paper decision snapshot
-- `options_research_supervisor_YYYY-MM-DD.{json,md}` - daily options fetch + paper-shadow supervisor summary
+- `options_research_supervisor_YYYY-MM-DD.{json,md}` - daily options fetch + paper-shadow + options-lab supervisor summary
 - `portfolio_intel_YYYY-MM-DD.{json,md}` - portfolio intelligence
 
 ### `log/`
@@ -208,9 +208,10 @@ In `scripts/paper_shadow.py`:
 - now also writes NIFTY options paper candidates to `paper_shadow_options_latest.json`
 
 In `scripts/options_research_supervisor.py`:
-- runs `fetch_nifty_options_data.py` and then `paper_shadow.py` on market-open NSE days
+- runs `fetch_nifty_options_data.py`, `paper_shadow.py`, and `options_strategy_lab.py` on market-open NSE days
 - writes `options_research_supervisor_YYYY-MM-DD.{json,md}` for cron visibility
-- skips fetch/paper cleanly on NSE holidays
+- captures latest options lab recommendation in the supervisor output
+- skips fetch/paper/lab cleanly on NSE holidays
 
 Relevant env knobs:
 - `AT_DAILY_LAB_MAX_VARIANTS`
