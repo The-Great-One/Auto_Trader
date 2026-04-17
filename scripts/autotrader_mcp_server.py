@@ -17,8 +17,8 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORTS = ROOT / "reports"
-REPORTS.mkdir(exist_ok=True)
+REPORTS = Path(os.getenv("AT_MCP_REPORTS_DIR", str(ROOT / "reports")))
+REPORTS.mkdir(parents=True, exist_ok=True)
 
 mcp = FastMCP(
     name="Auto_Trader MCP",
@@ -179,5 +179,8 @@ def get_status_snapshot() -> dict[str, Any]:
 
 if __name__ == "__main__":
     transport = os.getenv("AT_MCP_TRANSPORT", "streamable-http")
-    mount_path = os.getenv("AT_MCP_PATH", "/mcp")
-    mcp.run(transport=transport, mount_path=mount_path)
+    if transport == "stdio":
+        mcp.run(transport="stdio")
+    else:
+        mount_path = os.getenv("AT_MCP_PATH", "/mcp")
+        mcp.run(transport=transport, mount_path=mount_path)
