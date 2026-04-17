@@ -795,8 +795,24 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     RULE_SET_7.CONFIG.update(buy_params)
     rnn_params = rnn_params or {"enabled": False}
     rnn_models = rnn_models or {}
+    match_live = os.getenv("AT_LAB_MATCH_LIVE", "1").strip().lower() not in {"0", "false", "no"}
 
     try:
+        if match_live and not rnn_params.get("enabled"):
+            from scripts import weekly_universe_cagr_check as parity_pack
+
+            result, _, _ = parity_pack.run_baseline_detailed(data_map)
+            result.name = name
+            result.params = {
+                "buy": buy_params,
+                "sell": sell_params,
+                "rnn": rnn_params,
+                **({"simulation": result.params.get("simulation", {})} if getattr(result, "params", None) else {}),
+            }
+            result.rnn_enabled = False
+            result.rnn_avg_test_accuracy = 0.0
+            return result
+
         with tempfile.TemporaryDirectory(prefix="at_state_") as td:
             _set_temp_state(RULE_SET_2, td)
             total_final_value = 0.0
