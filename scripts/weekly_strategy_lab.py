@@ -95,24 +95,41 @@ def _load_symbol_history(symbol: str) -> pd.DataFrame | None:
     local_path = HIST_DIR / f"{symbol}.feather"
     if local_path.exists():
         try:
-            return _normalize_ohlcv(pd.read_feather(local_path))
+            local_df = _normalize_ohlcv(pd.read_feather(local_path))
+            if local_df is not None and not local_df.empty:
+                return local_df
         except Exception:
             pass
 
-    y_symbol = symbol if "." in symbol else f"{symbol}.NS"
-    try:
-        df = yf.download(
-            y_symbol,
-            period="3y",
-            interval="1d",
-            auto_adjust=False,
-            progress=False,
-        )
-        if df is None or df.empty:
-            return None
-        return _normalize_ohlcv(df)
-    except Exception:
-        return None
+    y_symbols = []
+    if "." in symbol:
+        y_symbols.append(symbol)
+    else:
+        y_symbols.append(f"{symbol}.NS")
+    if symbol == "NIFTYETF":
+        y_symbols.extend(["NIFTYBEES.NS", "^NSEI"])
+
+    seen = set()
+    for y_symbol in y_symbols:
+        if y_symbol in seen:
+            continue
+        seen.add(y_symbol)
+        try:
+            df = yf.download(
+                y_symbol,
+                period="3y",
+                interval="1d",
+                auto_adjust=False,
+                progress=False,
+            )
+            if df is None or df.empty:
+                continue
+            out = _normalize_ohlcv(df)
+            if out is not None and not out.empty:
+                return out
+        except Exception:
+            continue
+    return None
 
 
 def _parse_symbol_list(value: str) -> list[str]:
@@ -166,31 +183,66 @@ def write_status(**updates) -> dict:
     return current
 
 
+def _candidate_fallback_symbols(limit: int = 8) -> list[str]:
+    candidates: list[tuple[int, str]] = []
+    for path in sorted(HIST_DIR.glob("*.feather")):
+        symbol = path.stem.upper()
+        try:
+            df = _normalize_ohlcv(pd.read_feather(path))
+            if df is None or len(df) < 260:
+                continue
+            candidates.append((len(df), symbol))
+        except Exception:
+            continue
+    candidates.sort(reverse=True)
+    seen = set()
+    out = []
+    for _, symbol in candidates:
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        out.append(symbol)
+        if len(out) >= limit:
+            break
+    return out
+
+
+
 def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[str, pd.DataFrame], dict]:
     symbols = build_lab_symbols(tradebook_context, fundamental_context)
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
 
-    total_symbols = max(1, len(symbols))
-    for idx, symbol in enumerate(symbols, start=1):
-        write_status(
-            phase="loading_history",
-            current_symbol=symbol,
-            symbols_total=total_symbols,
-            symbols_loaded=len(data_map),
-            symbols_index=idx,
-        )
-        df = _load_symbol_history(symbol)
-        if df is None or df.empty:
-            skipped[symbol] = "missing_or_empty"
-            continue
-        if len(df) < 260:
-            skipped[symbol] = f"too_short:{len(df)}"
-            continue
-        try:
-            data_map[symbol] = at_utils.Indicators(df)
-        except Exception as exc:
-            skipped[symbol] = f"indicator_failed:{exc}"
+    def _try_load(symbol_list: list[str], phase_label: str):
+        total_symbols = max(1, len(symbol_list))
+        for idx, symbol in enumerate(symbol_list, start=1):
+            if symbol in data_map:
+                continue
+            write_status(
+                phase=phase_label,
+                current_symbol=symbol,
+                symbols_total=total_symbols,
+                symbols_loaded=len(data_map),
+                symbols_index=idx,
+            )
+            df = _load_symbol_history(symbol)
+            if df is None or df.empty:
+                skipped[symbol] = "missing_or_empty"
+                continue
+            if len(df) < 260:
+                skipped[symbol] = f"too_short:{len(df)}"
+                continue
+            try:
+                data_map[symbol] = at_utils.Indicators(df)
+            except Exception as exc:
+                skipped[symbol] = f"indicator_failed:{exc}"
+
+    _try_load(symbols, "loading_history")
+
+    fallback_symbols = []
+    if not data_map:
+        fallback_symbols = _candidate_fallback_symbols(limit=8)
+        _try_load(fallback_symbols, "loading_history_fallback")
 
     if not data_map:
         raise RuntimeError("Could not load any lab symbols with usable history")
@@ -199,6 +251,7 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
         "requested_symbols": symbols,
         "loaded_symbols": list(data_map.keys()),
         "skipped_symbols": skipped,
+        "fallback_symbols": fallback_symbols,
     }
 
 
