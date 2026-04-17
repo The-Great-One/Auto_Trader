@@ -46,6 +46,17 @@ STATUS_DIR = ROOT / "intermediary_files" / "lab_status"
 STATUS_DIR.mkdir(exist_ok=True)
 STATUS_PATH = STATUS_DIR / "weekly_strategy_lab_status.json"
 
+
+def configured_history_period() -> str:
+    return os.getenv("AT_LAB_HISTORY_PERIOD", "3y").strip() or "3y"
+
+
+def configured_min_history_bars(default: int = 260) -> int:
+    try:
+        return max(1, int(os.getenv("AT_LAB_MIN_BARS", str(default))))
+    except Exception:
+        return int(default)
+
 DEFAULT_LAB_SYMBOLS = [
     # --- Large-cap core ---
     "BHARTIARTL", "SBIN", "TCS", "INFY", "LICI",
@@ -168,7 +179,7 @@ def _load_symbol_history(symbol: str) -> pd.DataFrame | None:
         try:
             df = yf.download(
                 y_symbol,
-                period="3y",
+                period=configured_history_period(),
                 interval="1d",
                 auto_adjust=False,
                 progress=False,
@@ -263,6 +274,7 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
     symbols = build_lab_symbols(tradebook_context, fundamental_context)
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
+    min_history_bars = configured_min_history_bars()
 
     def _try_load(symbol_list: list[str], phase_label: str):
         total_symbols = max(1, len(symbol_list))
@@ -280,7 +292,7 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
             if df is None or df.empty:
                 skipped[symbol] = "missing_or_empty"
                 continue
-            if len(df) < 260:
+            if len(df) < min_history_bars:
                 skipped[symbol] = f"too_short:{len(df)}"
                 continue
             try:
@@ -303,6 +315,8 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
         "loaded_symbols": list(data_map.keys()),
         "skipped_symbols": skipped,
         "fallback_symbols": fallback_symbols,
+        "history_period": configured_history_period(),
+        "min_history_bars": min_history_bars,
     }
 
 

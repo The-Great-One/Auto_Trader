@@ -210,6 +210,102 @@ def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
     return out
 
 
+def _iso_week_key(now: datetime) -> str:
+    iso = now.isocalendar()
+    return f"{iso.year}_W{iso.week:02d}"
+
+
+
+def _load_weekly_universe_cagr_report(report_week: str) -> dict | None:
+    path = REPORTS / f"weekly_universe_cagr_{report_week}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text())
+        payload["file"] = str(path)
+        return payload
+    except Exception:
+        return None
+
+
+
+def run_weekly_universe_cagr_check(now: datetime, market_open: bool) -> dict:
+    enabled = os.getenv("AT_WEEKLY_CAGR_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+    weekday_target = max(0, min(6, int(os.getenv("AT_WEEKLY_CAGR_WEEKDAY", "5"))))
+    report_week = _iso_week_key(now)
+    result = {
+        "enabled": enabled,
+        "report_week": report_week,
+        "scheduled_weekday": weekday_target,
+        "ok": False,
+        "ran": False,
+        "reason": None,
+        "file": None,
+        "cagr_pct": None,
+        "total_return_pct": None,
+        "coverage_pct": None,
+        "tested_symbols": 0,
+        "requested_symbols": 0,
+    }
+
+    existing = _load_weekly_universe_cagr_report(report_week)
+    if existing is not None:
+        universe = existing.get("universe", {}) or {}
+        backtest = existing.get("backtest", {}) or {}
+        result.update(
+            {
+                "ok": True,
+                "ran": False,
+                "reason": "already_ran_this_week",
+                "file": existing.get("file"),
+                "cagr_pct": existing.get("cagr_pct"),
+                "total_return_pct": backtest.get("total_return_pct"),
+                "coverage_pct": universe.get("coverage_pct"),
+                "tested_symbols": int(universe.get("tested_symbols", 0) or 0),
+                "requested_symbols": int(universe.get("requested_symbols", 0) or 0),
+                "generated_at": existing.get("generated_at"),
+            }
+        )
+        return result
+
+    if not enabled:
+        result["reason"] = "disabled"
+        return result
+    if market_open:
+        result["reason"] = "market_open"
+        return result
+    if now.weekday() != weekday_target:
+        result["reason"] = "not_scheduled_day"
+        return result
+
+    env = os.environ.copy()
+    env["AT_WEEKLY_CAGR_REPORT_WEEK"] = report_week
+    cmd = ["/home/ubuntu/Auto_Trader/venv/bin/python", str(SCRIPTS / "weekly_universe_cagr_check.py")]
+    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    payload = _load_weekly_universe_cagr_report(report_week)
+    result["ran"] = True
+    result["ok"] = proc.returncode == 0 and payload is not None
+    result["reason"] = "completed" if result["ok"] else f"failed_rc_{proc.returncode}"
+    result["stdout"] = proc.stdout[-1200:]
+    result["stderr"] = proc.stderr[-1200:]
+    if payload is not None:
+        universe = payload.get("universe", {}) or {}
+        backtest = payload.get("backtest", {}) or {}
+        result.update(
+            {
+                "file": payload.get("file"),
+                "generated_at": payload.get("generated_at"),
+                "cagr_pct": payload.get("cagr_pct"),
+                "total_return_pct": backtest.get("total_return_pct"),
+                "coverage_pct": universe.get("coverage_pct"),
+                "tested_symbols": int(universe.get("tested_symbols", 0) or 0),
+                "requested_symbols": int(universe.get("requested_symbols", 0) or 0),
+            }
+        )
+    return result
+
+
+
 def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
     """If market open, ensure paper_shadow file exists for today. If missing, run it."""
     file_latest = REPORTS / "paper_shadow_latest.json"
@@ -452,6 +548,7 @@ def main():
     market_open, trade_date = is_market_open_today()
 
     strategy = run_strategy_lab(trade_date)
+    weekly_universe_cagr = run_weekly_universe_cagr_check(now, market_open)
     paper = check_and_fix_paper_execution(market_open, trade_date)
     autopromote = maybe_auto_promote(strategy, market_open)
 
@@ -462,6 +559,7 @@ def main():
         "calendar": "NSE",
         "strategy_test": strategy,
         "paper_trader": paper,
+        "weekly_universe_cagr": weekly_universe_cagr,
         "autopromote": autopromote,
     }
 
@@ -482,6 +580,14 @@ def main():
         f"- Promote candidate: **{strategy.get('should_promote')}**",
         f"- Auto-promote applied: **{autopromote.get('applied')}**",
         f"- Auto-promote reason: **{autopromote.get('reason')}**",
+        "",
+        "## Weekly universe CAGR check",
+        f"- Status: **{weekly_universe_cagr.get('reason')}**",
+        f"- Requested symbols: **{weekly_universe_cagr.get('requested_symbols')}**",
+        f"- Tested symbols: **{weekly_universe_cagr.get('tested_symbols')}**",
+        f"- Coverage %: **{weekly_universe_cagr.get('coverage_pct')}**",
+        f"- CAGR %: **{weekly_universe_cagr.get('cagr_pct')}**",
+        f"- Total return %: **{weekly_universe_cagr.get('total_return_pct')}**",
         "",
         "## Paper trader check",
         f"- Executed today: **{paper.get('paper_executed')}**",
@@ -504,6 +610,9 @@ def main():
             "improvement_return_pct": strategy.get("improvement_return_pct"),
             "autopromote_applied": autopromote.get("applied"),
             "autopromote_reason": autopromote.get("reason"),
+            "weekly_universe_cagr_reason": weekly_universe_cagr.get("reason"),
+            "weekly_universe_cagr_pct": weekly_universe_cagr.get("cagr_pct"),
+            "weekly_universe_cagr_tested_symbols": weekly_universe_cagr.get("tested_symbols"),
             "paper_executed": paper.get("paper_executed"),
             "paper_self_healed": paper.get("self_healed"),
             "paper_decision": paper.get("decision"),
