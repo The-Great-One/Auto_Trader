@@ -100,7 +100,14 @@ def load_qty(symbol="NIFTYETF") -> int:
 def run_equity_shadow() -> dict:
     at_utils.get_mmi_now = lambda: None
     symbol = "NIFTYETF"
-    df = load_hist(symbol)
+    try:
+        df = load_hist(symbol)
+    except (SystemExit, Exception) as e:
+        logger.error("equity shadow: load_hist failed: %s", e)
+        return {"error": str(e), "decision": "HOLD", "mode": "failed_rc_1"}
+    if df is None or df.empty:
+        logger.error("equity shadow: empty dataframe for %s", symbol)
+        return {"error": "empty_dataframe", "decision": "HOLD", "mode": "failed_rc_1"}
     row = df.iloc[-1].to_dict()
     row.setdefault("instrument_token", 1626369)
 

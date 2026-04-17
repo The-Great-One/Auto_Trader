@@ -48,13 +48,20 @@ STATUS_PATH = STATUS_DIR / "weekly_strategy_lab_status.json"
 
 DEFAULT_LAB_SYMBOLS = [
     "NIFTYETF",
-    "INFY",
-    "WIPRO",
-    "HAL",
-    "NTPC",
-    "CANBK",
-    "HINDPETRO",
-    "HEROMOTOCO",
+    # Large-cap tech
+    "INFY", "WIPRO", "TCS", "HCLTECH",
+    # Financials
+    "SBIN", "AXISBANK", "BANKBARODA", "PNB", "CANBK",
+    # Energy & infra
+    "NTPC", "POWERGRID", "ONGC", "ADANIPORTS", "COALINDIA",
+    # Defence & industrial
+    "HAL", "LT",
+    # Auto & FMCG
+    "HEROMOTOCO", "M\u0026M", "ITC", "MARUTI",
+    # Metals & oil
+    "HINDPETRO", "HINDZINC", "VEDL", "TATACOMM",
+    # Mid/small-cap diversity
+    "SUZLON", "IRFC", "RECLTD", "PFC",
 ]
 
 
@@ -487,41 +494,43 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
     sell_cfg = RULE_SET_2.CONFIG
 
     buy_grid = {
-        "adx_min": prioritized_values([14, 16, 18, 20, 22], buy_cfg["adx_min"]),
-        "adx_strong_min": prioritized_values([22, 25, 28, 30], buy_cfg["adx_strong_min"]),
-        "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5], buy_cfg["max_obv_zscore"]),
-        "obv_min_zscore": prioritized_values([0.0, 0.25, 0.5, 0.75], buy_cfg["obv_min_zscore"]),
-        "max_extension_atr": prioritized_values([1.8, 2.0, 2.2, 2.5, 2.8], buy_cfg["max_extension_atr"]),
-        "mmi_risk_off": prioritized_values([60, 62, 65, 68], buy_cfg["mmi_risk_off"]),
-        "volume_confirm_mult": prioritized_values([1.0, 1.05, 1.1, 1.2], buy_cfg["volume_confirm_mult"]),
-        "cmf_base_min": prioritized_values([0.02, 0.05, 0.08], buy_cfg["cmf_base_min"]),
-        "rsi_floor": prioritized_values([42, 45, 48], buy_cfg["rsi_floor"]),
-        "stoch_pull_max": prioritized_values([65, 75, 85], buy_cfg["stoch_pull_max"]),
-        "stoch_momo_max": prioritized_values([80, 85, 90], buy_cfg["stoch_momo_max"]),
+        "adx_min": prioritized_values([12, 14, 16, 18, 20, 22], buy_cfg["adx_min"]),
+        "adx_strong_min": prioritized_values([20, 22, 25, 28, 30], buy_cfg["adx_strong_min"]),
+        "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5, 4.0], buy_cfg["max_obv_zscore"]),
+        "obv_min_zscore": prioritized_values([0.0, 0.25, 0.5, 0.75, 1.0], buy_cfg["obv_min_zscore"]),
+        "max_extension_atr": prioritized_values([1.5, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2], buy_cfg["max_extension_atr"]),
+        "mmi_risk_off": prioritized_values([60, 62, 65, 68, 70], buy_cfg["mmi_risk_off"]),
+        "volume_confirm_mult": prioritized_values([0.95, 1.0, 1.05, 1.1, 1.2, 1.3], buy_cfg["volume_confirm_mult"]),
+        "cmf_base_min": prioritized_values([0.02, 0.03, 0.05, 0.08], buy_cfg["cmf_base_min"]),
+        "rsi_floor": prioritized_values([40, 42, 45, 48, 50], buy_cfg["rsi_floor"]),
+        "stoch_pull_max": prioritized_values([60, 65, 70, 75, 80], buy_cfg["stoch_pull_max"]),
+        "stoch_momo_max": prioritized_values([75, 80, 85, 90], buy_cfg["stoch_momo_max"]),
+        "min_atr_pct": prioritized_values([0.003, 0.005, 0.006, 0.008], buy_cfg["min_atr_pct"]),
+        "max_atr_pct": prioritized_values([0.07, 0.08, 0.09, 0.10], buy_cfg["max_atr_pct"]),
     }
     sell_grid = {
-        "momentum_exit_rsi": prioritized_values([38.0, 40.0, 42.0, 45.0], sell_cfg["momentum_exit_rsi"]),
-        "ema_break_atr_mult": prioritized_values([0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
-        "breakeven_trigger_pct": prioritized_values([1.5, 2.0, 2.5, 3.0], sell_cfg["breakeven_trigger_pct"]),
-        "relative_volume_exit": prioritized_values([1.1, 1.2, 1.3], sell_cfg["relative_volume_exit"]),
-        "equity_time_stop_bars": prioritized_values([6, 8, 10], sell_cfg["equity_time_stop_bars"]),
-        "equity_review_rsi": prioritized_values([48.0, 50.0, 52.0], sell_cfg["equity_review_rsi"]),
-        "fund_time_stop_bars": prioritized_values([10, 12, 14, 16], sell_cfg["fund_time_stop_bars"]),
-        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 0.75, 1.0, 1.5], sell_cfg["fund_time_stop_min_profit_pct"]),
+        "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0], sell_cfg["momentum_exit_rsi"]),
+        "ema_break_atr_mult": prioritized_values([0.3, 0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
+        "breakeven_trigger_pct": prioritized_values([1.0, 1.5, 2.0, 2.5, 3.0, 3.5], sell_cfg["breakeven_trigger_pct"]),
+        "relative_volume_exit": prioritized_values([1.0, 1.1, 1.2, 1.3, 1.5], sell_cfg["relative_volume_exit"]),
+        "equity_time_stop_bars": prioritized_values([5, 6, 8, 10, 12], sell_cfg["equity_time_stop_bars"]),
+        "equity_review_rsi": prioritized_values([45.0, 48.0, 50.0, 52.0], sell_cfg["equity_review_rsi"]),
+        "fund_time_stop_bars": prioritized_values([10, 12, 14, 16, 18], sell_cfg["fund_time_stop_bars"]),
+        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 0.75, 1.0, 1.5, 2.0], sell_cfg["fund_time_stop_min_profit_pct"]),
     }
 
     if scorecard_context.get("no_trade_day"):
-        buy_grid["adx_min"] = prioritized_values([12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
-        buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0], buy_cfg["max_obv_zscore"])
-        buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.2], buy_cfg["max_extension_atr"])
-        buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70], buy_cfg["mmi_risk_off"])
-        buy_grid["volume_confirm_mult"] = prioritized_values([0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
+        buy_grid["adx_min"] = prioritized_values([10, 12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
+        buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0, 5.0], buy_cfg["max_obv_zscore"])
+        buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.5], buy_cfg["max_extension_atr"])
+        buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70, 75], buy_cfg["mmi_risk_off"])
+        buy_grid["volume_confirm_mult"] = prioritized_values([0.9, 0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
 
     if tradebook_context.get("weak_mid_hold_window"):
-        sell_grid["equity_time_stop_bars"] = prioritized_values([5, 6, *sell_grid["equity_time_stop_bars"]], sell_cfg["equity_time_stop_bars"])
-        sell_grid["equity_review_rsi"] = prioritized_values([46.0, 48.0, *sell_grid["equity_review_rsi"]], sell_cfg["equity_review_rsi"])
+        sell_grid["equity_time_stop_bars"] = prioritized_values([4, 5, 6, *sell_grid["equity_time_stop_bars"]], sell_cfg["equity_time_stop_bars"])
+        sell_grid["equity_review_rsi"] = prioritized_values([44.0, 46.0, 48.0, *sell_grid["equity_review_rsi"]], sell_cfg["equity_review_rsi"])
         sell_grid["fund_time_stop_bars"] = prioritized_values([8, *sell_grid["fund_time_stop_bars"]], sell_cfg["fund_time_stop_bars"])
-        sell_grid["fund_time_stop_min_profit_pct"] = prioritized_values([0.5, 0.75, *sell_grid["fund_time_stop_min_profit_pct"]], sell_cfg["fund_time_stop_min_profit_pct"])
+        sell_grid["fund_time_stop_min_profit_pct"] = prioritized_values([0.3, 0.5, 0.75, *sell_grid["fund_time_stop_min_profit_pct"]], sell_cfg["fund_time_stop_min_profit_pct"])
 
     return buy_grid, sell_grid
 
@@ -614,8 +623,8 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                 continue
             add(f"sell_{key}_{value}", {}, {key: value}, {"enabled": False})
 
-    focus_buy = ["adx_min", "volume_confirm_mult", "obv_min_zscore", "cmf_base_min", "rsi_floor"]
-    focus_sell = ["equity_time_stop_bars", "equity_review_rsi", "momentum_exit_rsi", "breakeven_trigger_pct"]
+    focus_buy = ["adx_min", "volume_confirm_mult", "obv_min_zscore", "cmf_base_min", "rsi_floor", "min_atr_pct"]
+    focus_sell = ["equity_time_stop_bars", "equity_review_rsi", "momentum_exit_rsi", "breakeven_trigger_pct", "relative_volume_exit"]
 
     combo_idx = 0
     for bkey in focus_buy:
@@ -627,7 +636,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                     combo_idx += 1
                     add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval}, {"enabled": False})
 
-    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "220"))
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "350"))
     return out[:max_variants]
 
 

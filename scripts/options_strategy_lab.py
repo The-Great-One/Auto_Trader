@@ -215,6 +215,12 @@ def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tu
         {"take_profit_pct": 15.0, "stop_loss_pct": 10.0, "max_hold_bars": 2},
         {"take_profit_pct": 35.0, "stop_loss_pct": 8.0, "exit_rsi": 50.0},
         {"atr_pct_min": 0.0, "atr_pct_max": 2.0, "buy_score_min": 5.5},
+        # ADX trend + tighter exits (reduce drawdown)
+        {"underlying_adx_min": 14, "take_profit_pct": 18.0, "stop_loss_pct": 10.0},
+        # ADX + score filter (higher conviction)
+        {"underlying_adx_min": 14, "buy_score_min": 6.0, "take_profit_pct": 25.0},
+        # ADX + RSI combo
+        {"underlying_adx_min": 18, "underlying_rsi_bull_min": 55, "buy_score_min": 5.5},
     ]
     for idx, patch in enumerate(prebuilt, start=1):
         add(f"prebuilt_combo_{idx:02d}", patch)
