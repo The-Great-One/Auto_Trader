@@ -69,6 +69,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
 - `weekly_universe_cagr_check.py` - weekly 5 year validation pack for the live RULE_SET_7/RULE_SET_2 strategy across the current fundamentals-approved universe, including risk metrics, walk-forward checks, and Monte Carlo analysis
+- `strategy_bucket_diagnostic.py` - bucketed validation helper that splits current strategy performance across Nifty 50, large cap, mid cap, and small cap slices
 
 ### `reports/`
 Generated outputs, especially:
@@ -89,6 +90,11 @@ Generated outputs, especially:
 
 ### `intermediary_files/`
 Working state and cached artifacts, including holdings and historical market data.
+
+## Universe classification notes
+
+- `StrongFundamentalsStockList.goodStocks()` now annotates each approved symbol with `MarketCapCr`, `CapBucket`, and `IsNifty50`.
+- Default equity universe is now filtered to `LARGE_CAP` + `MID_CAP` (plus approved ETFs) unless `AT_UNIVERSE_CAP_BUCKETS` overrides it.
 
 ### `tests/`
 Backtests, permutations, historical analysis, ad hoc research helpers.
