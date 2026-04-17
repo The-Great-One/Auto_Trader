@@ -27,7 +27,6 @@ if str(ROOT) not in sys.path:
 
 from Auto_Trader import RULE_SET_OPTIONS_1, logger as at_logger
 from Auto_Trader import options_support as opt_support
-from scripts import weekly_strategy_lab as core_lab
 
 at_logger.setLevel("WARNING")
 
@@ -341,9 +340,160 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], params: dict) -> B
 
 
 
+def load_scorecard_context() -> dict:
+    explicit = os.getenv("AT_LAB_SCORECARD_PATH", "").strip()
+    scorecard_path = Path(explicit) if explicit else None
+    if scorecard_path is None:
+        matches = sorted(OUT_DIR.glob("daily_scorecard_*.json"))
+        scorecard_path = matches[-1] if matches else None
+
+    if not scorecard_path or not scorecard_path.exists():
+        return {
+            "scorecard_found": False,
+            "optimization_focus": ["baseline_search"],
+            "code_findings": [],
+        }
+
+    raw = json.loads(scorecard_path.read_text())
+    log_counts = raw.get("log_counts", {}) or {}
+    orders = int(raw.get("orders", 0) or 0)
+    trades = int(raw.get("trades", 0) or 0)
+    buy_placed = int(log_counts.get("buy_placed", 0) or 0)
+    sell_placed = int(log_counts.get("sell_placed", 0) or 0)
+    ws_close = int(log_counts.get("ws_close", 0) or 0)
+    order_failed = int(log_counts.get("order_failed", 0) or 0)
+    market_blocked = int(log_counts.get("market_blocked", 0) or 0)
+    tick_size = int(log_counts.get("tick_size", 0) or 0)
+
+    no_trade_day = orders == 0 and trades == 0 and buy_placed == 0 and sell_placed == 0
+    optimization_focus = ["expand_buy_sensitivity" if no_trade_day else "balanced_search"]
+    code_findings = []
+    if ws_close > 0:
+        code_findings.append("websocket_reconnect_review")
+    if order_failed > 0:
+        code_findings.append("order_error_path_review")
+    if market_blocked > 0 or tick_size > 0:
+        code_findings.append("broker_constraints_review")
+    if not code_findings:
+        code_findings.append("no_code_issues_detected_from_scorecard")
+
+    return {
+        "scorecard_found": True,
+        "scorecard_path": str(scorecard_path),
+        "date": raw.get("date"),
+        "orders": orders,
+        "trades": trades,
+        "buy_placed": buy_placed,
+        "sell_placed": sell_placed,
+        "estimated_realized_pnl": raw.get("estimated_realized_pnl"),
+        "verdict": raw.get("verdict"),
+        "log_counts": log_counts,
+        "no_trade_day": no_trade_day,
+        "optimization_focus": optimization_focus,
+        "code_findings": code_findings,
+    }
+
+
+
+def load_tradebook_context() -> dict:
+    tradebook_path = os.getenv("AT_LAB_TRADEBOOK_PATH", "").strip()
+    if not tradebook_path:
+        return {
+            "tradebook_found": False,
+            "optimization_focus": [],
+            "code_findings": [],
+            "top_symbols": [],
+        }
+
+    path = Path(tradebook_path)
+    if not path.exists():
+        return {
+            "tradebook_found": False,
+            "tradebook_path": tradebook_path,
+            "optimization_focus": [],
+            "code_findings": ["tradebook_path_missing"],
+            "top_symbols": [],
+        }
+
+    try:
+        tradebook = pd.read_csv(path)
+        tradebook["trade_type"] = tradebook["trade_type"].astype(str).str.upper().str.strip()
+        tradebook["symbol"] = tradebook["symbol"].astype(str).str.upper().str.strip()
+        tradebook["trade_date"] = pd.to_datetime(tradebook["trade_date"], errors="coerce")
+        tradebook["order_execution_time"] = pd.to_datetime(tradebook["order_execution_time"], errors="coerce")
+        tradebook["quantity"] = pd.to_numeric(tradebook["quantity"], errors="coerce")
+        tradebook["price"] = pd.to_numeric(tradebook["price"], errors="coerce")
+        tradebook = tradebook.dropna(subset=["trade_type", "symbol", "order_execution_time", "quantity", "price"])
+
+        grouped = tradebook.groupby(["order_id", "symbol", "trade_type", "order_execution_time"], as_index=False).agg(
+            quantity=("quantity", "sum"),
+            avg_price=("price", lambda s: (s * tradebook.loc[s.index, "quantity"]).sum() / tradebook.loc[s.index, "quantity"].sum()),
+        )
+        grouped = grouped.sort_values(["order_execution_time", "order_id"]).reset_index(drop=True)
+
+        open_lots = {}
+        closed_rows = []
+        for row in grouped.to_dict("records"):
+            symbol = row["symbol"]
+            open_lots.setdefault(symbol, [])
+            if row["trade_type"] == "BUY":
+                open_lots[symbol].append({"qty": float(row["quantity"]), "price": float(row["avg_price"]), "ts": row["order_execution_time"]})
+                continue
+
+            remaining = float(row["quantity"])
+            while remaining > 1e-9 and open_lots[symbol]:
+                lot = open_lots[symbol][0]
+                matched = min(remaining, lot["qty"])
+                hold_days = (row["order_execution_time"] - lot["ts"]).total_seconds() / 86400.0
+                closed_rows.append({"symbol": symbol, "hold_days": hold_days, "pnl": (float(row["avg_price"]) - float(lot["price"])) * matched})
+                lot["qty"] -= matched
+                remaining -= matched
+                if lot["qty"] <= 1e-9:
+                    open_lots[symbol].pop(0)
+
+        closed = pd.DataFrame(closed_rows)
+        if closed.empty:
+            return {
+                "tradebook_found": True,
+                "tradebook_path": str(path),
+                "optimization_focus": [],
+                "code_findings": ["tradebook_has_no_closed_round_trips"],
+                "top_symbols": [],
+            }
+
+        buckets = pd.cut(closed["hold_days"], bins=[-1, 2, 5, 10, 30, 9999], labels=["0-2d", "2-5d", "5-10d", "10-30d", "30d+"])
+        hold_stats = closed.groupby(buckets, observed=False)["pnl"].sum().to_dict()
+        weak_mid_hold = float(hold_stats.get("5-10d", 0.0) or 0.0) < min(float(hold_stats.get("0-2d", 0.0) or 0.0), float(hold_stats.get("2-5d", 0.0) or 0.0))
+        top_symbols = closed.groupby("symbol").size().sort_values(ascending=False).head(12).index.tolist()
+
+        optimization_focus = []
+        if weak_mid_hold:
+            optimization_focus.append("tighten_mid_hold_exits")
+
+        return {
+            "tradebook_found": True,
+            "tradebook_path": str(path),
+            "closed_round_trips": int(len(closed)),
+            "hold_bucket_pnl": {k: round(float(v), 2) for k, v in hold_stats.items()},
+            "weak_mid_hold_window": bool(weak_mid_hold),
+            "optimization_focus": optimization_focus,
+            "code_findings": [],
+            "top_symbols": top_symbols,
+        }
+    except Exception as exc:
+        return {
+            "tradebook_found": False,
+            "tradebook_path": str(path),
+            "optimization_focus": [],
+            "code_findings": [f"tradebook_parse_failed: {exc}"],
+            "top_symbols": [],
+        }
+
+
+
 def main():
-    scorecard_context = core_lab.load_scorecard_context()
-    tradebook_context = core_lab.load_tradebook_context()
+    scorecard_context = load_scorecard_context()
+    tradebook_context = load_tradebook_context()
     data_map, data_context = load_option_data()
 
     results = []
