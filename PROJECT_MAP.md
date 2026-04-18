@@ -45,6 +45,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
 - `twitter_sentiment.py` - X/Twitter fetch, tweet-type classification, cached sentiment snapshots, and trading-decision overlay
+- `news_sentiment.py` - RSS/news feed fetch, headline classification, cached news sentiment snapshots, and trading-decision overlay
 - `rnn_lab.py` - lab-only PyTorch GRU/RNN overlay that scores next-bar direction from indicator sequences for research backtests
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker
@@ -58,6 +59,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
 - `fetch_twitter_sentiment.py` - refresh cached X/Twitter sentiment snapshots and tweet-type analysis for tracked symbols
+- `fetch_news_sentiment.py` - refresh cached RSS/news sentiment snapshots for tracked symbols from business/market feeds
 - `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
 - `daily_improvement_audit.py` - read-only daily audit of reports/logs that identifies concrete improvement areas without auto-editing trading code
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
@@ -157,6 +159,7 @@ Implication:
 - `16:20` weekdays: `scripts/daily_scorecard.py`
 - `16:40` weekdays: `scripts/daily_improvement_audit.py`
 - Twitter sentiment fetch is available via `scripts/fetch_twitter_sentiment.py`, but no cron is wired yet in this map
+- RSS/news sentiment fetch is available via `scripts/fetch_news_sentiment.py`; this is suitable for live/paper overlays, but not for historical backtests unless a point-in-time news archive is added
 
 ## Strategy lab scope
 

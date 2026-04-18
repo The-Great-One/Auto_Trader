@@ -23,6 +23,7 @@ from sqlalchemy import create_engine
 
 # Import rule set modules
 from . import RULE_SET_2, RULE_SET_7
+from .news_sentiment import apply_news_overlay
 from .twitter_sentiment import apply_sentiment_overlay
 from .my_secrets import (
     API_KEY,
@@ -667,11 +668,24 @@ def process_stock_and_decide(row):
             # Apply the trading rules
             decision, contributing_rules = apply_trading_rules(df, row, holdings=holdings)
 
-            final_decision, sentiment_overlay = apply_sentiment_overlay(
-                decision,
+            final_decision = decision
+            sentiment_overlays = []
+
+            final_decision, news_overlay = apply_news_overlay(
+                final_decision,
                 row.get("Symbol"),
                 holdings=holdings,
             )
+            if news_overlay:
+                sentiment_overlays.append(news_overlay)
+
+            final_decision, twitter_overlay = apply_sentiment_overlay(
+                final_decision,
+                row.get("Symbol"),
+                holdings=holdings,
+            )
+            if twitter_overlay:
+                sentiment_overlays.append(twitter_overlay)
 
             if final_decision != "HOLD":
                 payload = {
@@ -683,11 +697,15 @@ def process_stock_and_decide(row):
                     "AssetClass": row.get("AssetClass", "EQUITY"),
                     "ETFTheme": row.get("ETFTheme", ""),
                 }
-                if sentiment_overlay:
-                    payload["SentimentOverlay"] = sentiment_overlay
+                if sentiment_overlays:
+                    payload["SentimentOverlay"] = sentiment_overlays[-1]
+                    payload["SentimentOverlays"] = sentiment_overlays
                     payload["ContributingRules"] = dict(contributing_rules or {})
                     payload["ContributingRules"].setdefault(final_decision, [])
-                    payload["ContributingRules"][final_decision].append("TWITTER_SENTIMENT")
+                    for overlay in sentiment_overlays:
+                        source = str(overlay.get("source") or "").upper()
+                        if source and source not in payload["ContributingRules"][final_decision]:
+                            payload["ContributingRules"][final_decision].append(source)
                 return payload
     except Exception as e:
         # Log exceptions with stock symbol for easier debugging
