@@ -16,19 +16,6 @@ from urllib.parse import urlparse
 import pandas as pd
 import requests
 
-from .twitter_sentiment import (
-    POSITIVE_TYPES,
-    NEGATIVE_TYPES,
-    _env_flag,
-    _normalize_symbol,
-    _safe_float,
-    _safe_int,
-    _symbol_query_terms,
-    classify_tweet,
-    discover_symbols,
-    symbol_is_held,
-)
-
 logger = logging.getLogger("Auto_Trade_Logger")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +44,296 @@ REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; AutoTraderNewsSentiment/1.0; +https://github.com/The-Great-One/Auto_Trader)",
     "Accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
 }
+
+NEGATIVE_TYPES = {"bearish", "risk", "regulatory", "earnings_negative", "rumor"}
+POSITIVE_TYPES = {"bullish", "earnings_positive", "news"}
+
+TYPE_PATTERNS: Dict[str, Sequence[str]] = {
+    "bullish": (
+        "bullish",
+        "buy",
+        "accumulate",
+        "breakout",
+        "outperform",
+        "upgrade",
+        "all time high",
+        "new high",
+        "strong guidance",
+        "beat estimates",
+        "beats estimates",
+        "order win",
+        "order book",
+        "upside",
+        "long setup",
+        "momentum intact",
+        "rises",
+        "gains",
+        "jumps",
+        "surges",
+        "rebounds",
+        "record high",
+    ),
+    "bearish": (
+        "bearish",
+        "sell",
+        "short",
+        "breakdown",
+        "downgrade",
+        "miss estimates",
+        "missed estimates",
+        "weak guidance",
+        "profit warning",
+        "overvalued",
+        "distribution",
+        "lower circuit",
+        "exit",
+        "cut target",
+        "margin pressure",
+        "falls",
+        "drops",
+        "slumps",
+        "plunges",
+        "tumbles",
+        "sinks",
+    ),
+    "earnings_positive": (
+        "results",
+        "earnings beat",
+        "beat on revenue",
+        "beat on profit",
+        "raised guidance",
+        "record profit",
+        "margin expansion",
+        "strong quarter",
+        "profit rises",
+        "revenue rises",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+    ),
+    "earnings_negative": (
+        "earnings miss",
+        "revenue miss",
+        "profit miss",
+        "margin contraction",
+        "weak quarter",
+        "guidance cut",
+        "below estimates",
+        "results disappoint",
+        "profit falls",
+        "revenue falls",
+    ),
+    "news": (
+        "announces",
+        "launches",
+        "partnership",
+        "acquisition",
+        "merger",
+        "stake sale",
+        "stake buy",
+        "approval",
+        "contract",
+        "order",
+        "wins",
+        "capex",
+        "buyback",
+    ),
+    "risk": (
+        "rates",
+        "inflation",
+        "cpi",
+        "fed",
+        "rbi",
+        "yield",
+        "crude",
+        "oil",
+        "war",
+        "attack",
+        "sanction",
+        "tariff",
+        "recession",
+        "global risk",
+    ),
+    "regulatory": (
+        "sebi",
+        "investigation",
+        "probe",
+        "raud",
+        "fraud",
+        "lawsuit",
+        "penalty",
+        "ban",
+        "default",
+        "pledge",
+        "governance",
+        "resigns",
+    ),
+    "rumor": (
+        "rumor",
+        "unconfirmed",
+        "hearing",
+        "sources say",
+        "reportedly",
+        "maybe",
+        "looks like",
+        "could be",
+        "might be",
+    ),
+    "meme": (
+        "to the moon",
+        "moon",
+        "rocket",
+        "diamond hands",
+        "yolo",
+        "100x",
+        "multibagger",
+        "lambo",
+        "apeing",
+    ),
+}
+
+TYPE_WEIGHTS = {
+    "bullish": 0.45,
+    "bearish": -0.45,
+    "earnings_positive": 0.35,
+    "earnings_negative": -0.35,
+    "news": 0.15,
+    "risk": -0.20,
+    "regulatory": -0.40,
+    "rumor": -0.10,
+    "meme": 0.0,
+}
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_float(value, default=0.0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return float(default)
+
+
+def _safe_int(value, default=0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return int(default)
+
+
+def _normalize_symbol(symbol: str) -> str:
+    return str(symbol or "").strip().upper()
+
+
+def _load_symbol_aliases() -> Dict[str, List[str]]:
+    raw = os.getenv("AT_NEWS_SYMBOL_ALIASES_JSON", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        logger.warning("Failed to parse AT_NEWS_SYMBOL_ALIASES_JSON: %s", exc)
+        return {}
+
+    aliases: Dict[str, List[str]] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            vals = value if isinstance(value, list) else [value]
+            aliases[_normalize_symbol(key)] = [str(v).strip() for v in vals if str(v).strip()]
+    return aliases
+
+
+def _symbol_query_terms(symbol: str, asset_class: Optional[str] = None, etf_theme: str = "") -> List[str]:
+    symbol = _normalize_symbol(symbol)
+    aliases = _load_symbol_aliases().get(symbol, [])
+    terms = [f"${symbol}", symbol]
+    if asset_class and str(asset_class).upper() == "ETF":
+        if etf_theme:
+            terms.append(str(etf_theme).strip())
+        if symbol.startswith("NIFTY"):
+            terms.extend(["NIFTY", "Nifty 50"])
+    for alias in aliases:
+        if alias not in terms:
+            terms.append(alias)
+    return [t for t in terms if t]
+
+
+def discover_symbols(limit: int = 30) -> List[str]:
+    symbols: List[str] = []
+    seen = set()
+
+    extra = os.getenv("AT_NEWS_EXTRA_SYMBOLS", "")
+    for raw in extra.split(","):
+        sym = _normalize_symbol(raw)
+        if sym and sym not in seen:
+            symbols.append(sym)
+            seen.add(sym)
+
+    holdings_path = ROOT / "intermediary_files" / "Holdings.feather"
+    if holdings_path.exists():
+        try:
+            holdings = pd.read_feather(holdings_path)
+            for sym in holdings.get("tradingsymbol", pd.Series(dtype=str)).astype(str):
+                sym_n = _normalize_symbol(sym)
+                if sym_n and sym_n not in seen:
+                    symbols.append(sym_n)
+                    seen.add(sym_n)
+        except Exception as exc:
+            logger.warning("Failed to inspect Holdings.feather for news symbols: %s", exc)
+
+    instruments_path = ROOT / "intermediary_files" / "Instruments.feather"
+    if instruments_path.exists() and len(symbols) < limit:
+        try:
+            instruments = pd.read_feather(instruments_path)
+            col = instruments.get("tradingsymbol", pd.Series(dtype=str)).astype(str)
+            for sym in col.head(limit * 4):
+                sym_n = _normalize_symbol(sym)
+                if sym_n and sym_n not in seen:
+                    symbols.append(sym_n)
+                    seen.add(sym_n)
+                if len(symbols) >= limit:
+                    break
+        except Exception as exc:
+            logger.warning("Failed to inspect Instruments.feather for news symbols: %s", exc)
+
+    return symbols[:limit]
+
+
+def classify_text(text: str) -> dict:
+    text = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    matched: Dict[str, List[str]] = {}
+    score = 0.0
+
+    for label, patterns in TYPE_PATTERNS.items():
+        hits = [pat for pat in patterns if pat in text]
+        if hits:
+            matched[label] = hits
+            score += TYPE_WEIGHTS.get(label, 0.0) * min(2, len(hits))
+
+    types = list(matched.keys()) or ["uncategorized"]
+    score = max(-1.0, min(1.0, score))
+    confidence = min(1.0, 0.2 + 0.15 * sum(len(v) for v in matched.values()))
+    if "meme" in matched and len(matched) == 1:
+        confidence = min(confidence, 0.35)
+    return {
+        "types": types,
+        "matches": matched,
+        "sentiment": round(score, 4),
+        "confidence": round(confidence, 4),
+    }
+
+
+def symbol_is_held(symbol: str, holdings: Optional[pd.DataFrame]) -> bool:
+    if holdings is None or holdings.empty or "tradingsymbol" not in holdings.columns:
+        return False
+    tradingsymbols = holdings["tradingsymbol"].astype(str).str.upper()
+    return _normalize_symbol(symbol) in set(tradingsymbols.tolist())
 
 
 def _configured_feeds() -> List[str]:
@@ -257,7 +534,7 @@ def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
 
     for entry in entries:
         text = str(entry.get("text") or "")
-        cls = classify_tweet(text)
+        cls = classify_text(text)
         weight = max(0.4, cls.get("confidence", 0.0)) * _source_weight(entry.get("source")) * _recency_weight(entry.get("published_at"))
         signed = cls.get("sentiment", 0.0) * weight
         weighted_sum += signed
@@ -402,13 +679,15 @@ def fetch_and_analyze_symbol(symbol: str, *, asset_class: Optional[str] = None, 
 
     for feed_url in feed_urls:
         fetched = fetch_rss_entries(feed_url)
-        feed_status.append({
-            "feed_url": feed_url,
-            "source": fetched.get("source"),
-            "status": fetched.get("status"),
-            "error": fetched.get("error"),
-            "entry_count": len(fetched.get("entries") or []),
-        })
+        feed_status.append(
+            {
+                "feed_url": feed_url,
+                "source": fetched.get("source"),
+                "status": fetched.get("status"),
+                "error": fetched.get("error"),
+                "entry_count": len(fetched.get("entries") or []),
+            }
+        )
         if fetched.get("status") != "ok":
             continue
         count = 0

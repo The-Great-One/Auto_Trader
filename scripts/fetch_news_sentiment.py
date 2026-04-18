@@ -10,8 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Auto_Trader.news_sentiment import fetch_and_analyze_symbol, write_summary
-from Auto_Trader.twitter_sentiment import discover_symbols
+from Auto_Trader.news_sentiment import discover_symbols, fetch_and_analyze_symbol, write_summary
 
 
 def parse_args() -> argparse.Namespace:
