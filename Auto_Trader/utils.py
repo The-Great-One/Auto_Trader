@@ -24,7 +24,6 @@ from sqlalchemy import create_engine
 # Import rule set modules
 from . import RULE_SET_2, RULE_SET_7
 from .news_sentiment import apply_news_overlay
-from .twitter_sentiment import apply_sentiment_overlay
 from .my_secrets import (
     API_KEY,
     API_SECRET,
@@ -678,14 +677,6 @@ def process_stock_and_decide(row):
             )
             if news_overlay:
                 sentiment_overlays.append(news_overlay)
-
-            final_decision, twitter_overlay = apply_sentiment_overlay(
-                final_decision,
-                row.get("Symbol"),
-                holdings=holdings,
-            )
-            if twitter_overlay:
-                sentiment_overlays.append(twitter_overlay)
 
             if final_decision != "HOLD":
                 payload = {
