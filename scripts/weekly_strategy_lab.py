@@ -10,9 +10,11 @@ Strategy lab:
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
 import os
 import sys
 import tempfile
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -42,9 +44,13 @@ at_logger.setLevel("WARNING")
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
 HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
+HIST_DIR.mkdir(parents=True, exist_ok=True)
 STATUS_DIR = ROOT / "intermediary_files" / "lab_status"
 STATUS_DIR.mkdir(exist_ok=True)
 STATUS_PATH = STATUS_DIR / "weekly_strategy_lab_status.json"
+
+_WORKER_DATA_MAP: dict[str, pd.DataFrame] | None = None
+_WORKER_RNN_MODELS: dict | None = None
 
 
 def configured_history_period() -> str:
@@ -54,6 +60,24 @@ def configured_history_period() -> str:
 def configured_min_history_bars(default: int = 260) -> int:
     try:
         return max(1, int(os.getenv("AT_LAB_MIN_BARS", str(default))))
+    except Exception:
+        return int(default)
+
+
+def configured_precache_workers() -> int:
+    cpu = max(1, int(os.cpu_count() or 1))
+    default = min(12, max(4, cpu))
+    try:
+        return max(1, int(os.getenv("AT_LAB_PRECACHE_WORKERS", str(default))))
+    except Exception:
+        return int(default)
+
+
+def configured_variant_workers() -> int:
+    cpu = max(1, int(os.cpu_count() or 1))
+    default = min(6, max(1, cpu - 2))
+    try:
+        return max(1, int(os.getenv("AT_LAB_MAX_WORKERS", str(default))))
     except Exception:
         return int(default)
 
@@ -149,19 +173,26 @@ def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     return use.sort_values("Date").reset_index(drop=True)
 
 
-def _load_symbol_history(symbol: str) -> pd.DataFrame | None:
+def _history_cache_path(symbol: str) -> Path:
+    return HIST_DIR / f"{str(symbol or '').strip().upper()}.feather"
+
+
+def _save_symbol_history(symbol: str, df: pd.DataFrame) -> None:
+    symbol = str(symbol or "").strip().upper()
+    if not symbol or df is None or df.empty:
+        return
+    out = _normalize_ohlcv(df)
+    if out is None or out.empty:
+        return
+    tmp = _history_cache_path(symbol).with_suffix(".feather.tmp")
+    out.reset_index(drop=True).to_feather(tmp)
+    os.replace(tmp, _history_cache_path(symbol))
+
+
+def _download_symbol_history(symbol: str) -> pd.DataFrame | None:
     symbol = str(symbol or "").strip().upper()
     if not symbol:
         return None
-
-    local_path = HIST_DIR / f"{symbol}.feather"
-    if local_path.exists():
-        try:
-            local_df = _normalize_ohlcv(pd.read_feather(local_path))
-            if local_df is not None and not local_df.empty:
-                return local_df
-        except Exception:
-            pass
 
     y_symbols = []
     if "." in symbol:
@@ -192,6 +223,29 @@ def _load_symbol_history(symbol: str) -> pd.DataFrame | None:
         except Exception:
             continue
     return None
+
+
+def _load_symbol_history(symbol: str, *, persist_download: bool = True) -> pd.DataFrame | None:
+    symbol = str(symbol or "").strip().upper()
+    if not symbol:
+        return None
+
+    local_path = _history_cache_path(symbol)
+    if local_path.exists():
+        try:
+            local_df = _normalize_ohlcv(pd.read_feather(local_path))
+            if local_df is not None and not local_df.empty:
+                return local_df
+        except Exception:
+            pass
+
+    out = _download_symbol_history(symbol)
+    if out is not None and not out.empty and persist_download:
+        try:
+            _save_symbol_history(symbol, out)
+        except Exception:
+            pass
+    return out
 
 
 def _parse_symbol_list(value: str) -> list[str]:
@@ -277,12 +331,88 @@ def _candidate_fallback_symbols(limit: int = 8) -> list[str]:
     return out
 
 
+def _precache_histories(symbols: list[str]) -> dict:
+    enabled = os.getenv("AT_LAB_PRECACHE", "1").strip().lower() not in {"0", "false", "no"}
+    if not enabled:
+        return {
+            "enabled": False,
+            "requested": len(symbols),
+            "cached_before": sum(1 for symbol in symbols if _history_cache_path(symbol).exists()),
+            "downloaded": 0,
+            "missing_after": sum(1 for symbol in symbols if not _history_cache_path(symbol).exists()),
+            "workers": 0,
+        }
+
+    missing = [symbol for symbol in symbols if not _history_cache_path(symbol).exists()]
+    total = max(1, len(missing))
+    if not missing:
+        return {
+            "enabled": True,
+            "requested": len(symbols),
+            "cached_before": len(symbols),
+            "downloaded": 0,
+            "missing_after": 0,
+            "workers": 0,
+        }
+
+    workers = min(configured_precache_workers(), len(missing))
+    downloaded = 0
+
+    def _ensure_cached(symbol: str) -> tuple[str, bool]:
+        if _history_cache_path(symbol).exists():
+            return symbol, True
+        df = _download_symbol_history(symbol)
+        if df is None or df.empty:
+            return symbol, False
+        try:
+            _save_symbol_history(symbol, df)
+            return symbol, True
+        except Exception:
+            return symbol, False
+
+    write_status(
+        phase="precaching_history",
+        message="pre-caching missing symbol history locally",
+        symbols_total=len(symbols),
+        symbols_loaded=0,
+        symbols_index=0,
+        symbols_missing=len(missing),
+        precache_workers=workers,
+    )
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_ensure_cached, symbol): symbol for symbol in missing}
+        for idx, future in enumerate(as_completed(futures), start=1):
+            _, ok = future.result()
+            if ok:
+                downloaded += 1
+            write_status(
+                phase="precaching_history",
+                current_symbol=futures[future],
+                symbols_total=len(symbols),
+                symbols_loaded=downloaded,
+                symbols_index=idx,
+                symbols_missing=len(missing),
+                progress_pct=round((idx / total) * 100.0, 1),
+                precache_workers=workers,
+            )
+
+    missing_after = sum(1 for symbol in symbols if not _history_cache_path(symbol).exists())
+    return {
+        "enabled": True,
+        "requested": len(symbols),
+        "cached_before": len(symbols) - len(missing),
+        "downloaded": downloaded,
+        "missing_after": missing_after,
+        "workers": workers,
+    }
+
 
 def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[str, pd.DataFrame], dict]:
     symbols = build_lab_symbols(tradebook_context, fundamental_context)
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
     min_history_bars = configured_min_history_bars()
+    precache_stats = _precache_histories(symbols)
 
     def _try_load(symbol_list: list[str], phase_label: str):
         total_symbols = max(1, len(symbol_list))
@@ -328,6 +458,7 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
         "history_period": configured_history_period(),
         "min_history_bars": min_history_bars,
         "use_approved_universe": os.getenv("AT_LAB_USE_APPROVED_UNIVERSE", "1").strip().lower() not in {"0", "false", "no"},
+        "precache": precache_stats,
     }
 
 
@@ -796,6 +927,35 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
     }
 
 
+def _variant_worker_init(data_map: dict[str, pd.DataFrame], rnn_models: dict) -> None:
+    global _WORKER_DATA_MAP, _WORKER_RNN_MODELS
+    _WORKER_DATA_MAP = data_map
+    _WORKER_RNN_MODELS = rnn_models
+
+
+def _run_variant_worker(task: tuple[str, dict, dict, dict]) -> BacktestResult:
+    if _WORKER_DATA_MAP is None:
+        raise RuntimeError("Variant worker data not initialized")
+    name, buy_params, sell_params, rnn_params = task
+    return run_variant(
+        name,
+        _WORKER_DATA_MAP,
+        buy_params,
+        sell_params,
+        rnn_params=rnn_params,
+        rnn_models=_WORKER_RNN_MODELS or {},
+    )
+
+
+def _variant_mp_context():
+    default_method = "fork" if sys.platform == "darwin" else "spawn"
+    method = os.getenv("AT_LAB_MP_START", default_method).strip() or default_method
+    try:
+        return mp.get_context(method)
+    except Exception:
+        return mp.get_context(default_method)
+
+
 def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict, rnn_params: dict | None = None, rnn_models: dict | None = None) -> BacktestResult:
     # avoid DB dependency in RULE_SET_7 market regime check
     at_utils.get_mmi_now = lambda: None
@@ -895,15 +1055,54 @@ def main():
         rnn_models_built=len(rnn_models),
     )
     results = []
-    for idx, (name, b, s, rnn_params) in enumerate(variant_list, start=1):
-        write_status(
-            phase="evaluating_variants",
-            current_variant=name,
-            variants_done=idx - 1,
-            variants_total=len(variant_list),
-            progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
-        )
-        results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
+    parallel_enabled = os.getenv("AT_LAB_PARALLEL_VARIANTS", "1").strip().lower() not in {"0", "false", "no"}
+    can_parallelize = parallel_enabled and not bool(rnn_config.enabled)
+    variant_workers = min(configured_variant_workers(), max(1, len(variant_list))) if can_parallelize else 1
+    write_status(
+        phase="evaluating_variants",
+        message="running strategy variants",
+        variants_total=len(variant_list),
+        rnn_models_built=len(rnn_models),
+        parallel_variants=bool(can_parallelize and variant_workers > 1),
+        variant_workers=variant_workers,
+    )
+
+    if can_parallelize and variant_workers > 1:
+        ctx = _variant_mp_context()
+        with ProcessPoolExecutor(
+            max_workers=variant_workers,
+            mp_context=ctx,
+            initializer=_variant_worker_init,
+            initargs=(data_map, rnn_models),
+        ) as executor:
+            future_map = {
+                executor.submit(_run_variant_worker, task): task[0]
+                for task in variant_list
+            }
+            for idx, future in enumerate(as_completed(future_map), start=1):
+                name = future_map[future]
+                write_status(
+                    phase="evaluating_variants",
+                    current_variant=name,
+                    variants_done=idx - 1,
+                    variants_total=len(variant_list),
+                    progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
+                    parallel_variants=True,
+                    variant_workers=variant_workers,
+                )
+                results.append(future.result())
+    else:
+        for idx, (name, b, s, rnn_params) in enumerate(variant_list, start=1):
+            write_status(
+                phase="evaluating_variants",
+                current_variant=name,
+                variants_done=idx - 1,
+                variants_total=len(variant_list),
+                progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
+                parallel_variants=False,
+                variant_workers=variant_workers,
+            )
+            results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
 
     rank = sorted(
         results,
