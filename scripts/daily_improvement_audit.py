@@ -147,6 +147,11 @@ def main():
         "scorecard_cron": _tail(REPORTS / "scorecard_cron.log"),
     }
 
+    daily_iteration = {
+        "equity": (ops.get("iteration_plan") or {}),
+        "options": (options.get("iteration_plan") or {}),
+    }
+
     summary = {
         "generated_at": now.isoformat(),
         "trade_date": trade_date,
@@ -182,6 +187,7 @@ def main():
                 "lab_stale": options_lab_run.get("stale_report"),
             },
         },
+        "daily_iteration": daily_iteration,
         "log_tails": cron_snapshots,
     }
 
@@ -210,6 +216,17 @@ def main():
             lines.append(f"- [{row['priority']}] **{row['title']}**: {row['detail']}")
     else:
         lines.append("- None")
+
+    lines += ["", "## Daily iteration plans"]
+    for asset, plan in daily_iteration.items():
+        lines.append("")
+        lines.append(f"### {asset.capitalize()}")
+        items = plan.get("items") or []
+        if items:
+            for item in items:
+                lines.append(f"- [{item.get('priority')}] **{item.get('focus')}**: {item.get('detail')}")
+        else:
+            lines.append("- None")
 
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))

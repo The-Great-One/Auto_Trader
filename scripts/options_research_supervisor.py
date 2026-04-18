@@ -94,6 +94,81 @@ def _mark_stale(run_result: dict, trade_date: str, payload_path: list[str] | Non
 
 
 
+def build_options_iteration_plan(fetch: dict, paper: dict, lab: dict) -> dict:
+    items: list[dict[str, str]] = []
+
+    if not fetch.get("ok"):
+        items.append(
+            {
+                "priority": "high",
+                "focus": "repair_options_inputs",
+                "detail": "Options fetch failed, so daily options iteration is blocked. Restore contract data freshness before tuning strategy parameters.",
+            }
+        )
+    else:
+        paper_payload = paper.get("payload") or {}
+        options_shadow = paper_payload.get("options_shadow") or {}
+        top = options_shadow.get("top_candidate") or {}
+        lab_payload = lab.get("payload") or {}
+        rec = lab_payload.get("recommendation") or {}
+        best = rec.get("best") or {}
+        improvement = float(rec.get("improvement_return_pct", 0) or 0)
+        tested = int(rec.get("tested_variants", 0) or 0)
+
+        if improvement > 0:
+            best_name = best.get("name") or "unnamed"
+            items.append(
+                {
+                    "priority": "high",
+                    "focus": "exploit_best_options_cluster",
+                    "detail": f"Daily options lab improved on baseline. Center the next sweep around {best_name} and test adjacent values before broadening the search space.",
+                }
+            )
+        else:
+            items.append(
+                {
+                    "priority": "medium",
+                    "focus": "broaden_options_search",
+                    "detail": "Daily options lab did not improve on baseline. Broaden the search across underlying trend filters, score thresholds, and exit logic.",
+                }
+            )
+
+        if tested < 100:
+            items.append(
+                {
+                    "priority": "medium",
+                    "focus": "deeper_options_weekend_sweep",
+                    "detail": f"Latest options lab tested {tested} variants. Keep daily runs lean, but use deeper weekend sweeps for better separation.",
+                }
+            )
+
+        if top and top.get("decision") != "BUY":
+            items.append(
+                {
+                    "priority": "medium",
+                    "focus": "add_options_near_miss_diagnostics",
+                    "detail": f"Top options paper candidate is still {top.get('decision')} with score {top.get('score')}. Add gate-by-gate miss diagnostics so daily iteration can tune the last blockers.",
+                }
+            )
+
+    if not items:
+        items.append(
+            {
+                "priority": "low",
+                "focus": "maintain_options_iteration",
+                "detail": "Options daily iteration is healthy. Keep refreshing the paper universe and refining around the best-performing parameter cluster.",
+            }
+        )
+
+    return {
+        "enabled": True,
+        "asset_class": "options",
+        "objective": "Improve options paper research quality with fresh daily iteration.",
+        "items": items,
+    }
+
+
+
 def _render_markdown(summary: dict) -> str:
     fetch = summary.get("fetch", {})
     paper = summary.get("paper_shadow", {})
@@ -106,6 +181,8 @@ def _render_markdown(summary: dict) -> str:
     rec = lab_payload.get("recommendation") or {}
     best = rec.get("best") or {}
 
+    iteration_plan = summary.get("iteration_plan") or {}
+
     lines = [
         f"# Options Research Supervisor, {summary['trade_date']}",
         "",
@@ -115,6 +192,12 @@ def _render_markdown(summary: dict) -> str:
         f"- Paper shadow stale: **{paper.get('stale_report', False)}**",
         f"- Options lab ran: **{lab.get('ok', False)}**",
         f"- Options lab stale: **{lab.get('stale_report', False)}**",
+        "",
+        "## Daily options iteration plan",
+        *[
+            f"- [{item.get('priority')}] **{item.get('focus')}**: {item.get('detail')}"
+            for item in iteration_plan.get('items', [])
+        ],
     ]
 
     if summary["market_open"]:
@@ -196,6 +279,8 @@ def main():
         else:
             summary["paper_shadow"]["reason"] = "skipped_due_to_fetch_failure"
             summary["options_lab"]["reason"] = "skipped_due_to_fetch_failure"
+
+    summary["iteration_plan"] = build_options_iteration_plan(summary.get("fetch") or {}, summary.get("paper_shadow") or {}, summary.get("options_lab") or {})
 
     out_json = REPORTS / f"options_research_supervisor_{trade_date}.json"
     out_md = REPORTS / f"options_research_supervisor_{trade_date}.md"

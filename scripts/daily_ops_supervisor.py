@@ -158,6 +158,83 @@ def _date_matches_trade_date(value: str | None, trade_date: str) -> bool:
 
 
 
+def build_equity_iteration_plan(strategy: dict, weekly_universe_cagr: dict, paper: dict) -> dict:
+    plan_items: list[dict[str, str]] = []
+
+    if not strategy.get("ok"):
+        plan_items.append(
+            {
+                "priority": "high",
+                "focus": "repair_equity_iteration_inputs",
+                "detail": "Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports.",
+            }
+        )
+    else:
+        improvement = _safe_float(strategy.get("improvement_return_pct"), 0.0) or 0.0
+        tested_variants = int(strategy.get("tested_variants", 0) or 0)
+        candidate = strategy.get("candidate") or {}
+        if improvement <= 0:
+            plan_items.append(
+                {
+                    "priority": "high",
+                    "focus": "expand_buy_sensitivity",
+                    "detail": "Daily equity lab did not beat baseline. Next sweep should loosen entry gates, especially ADX and trend-confirmation thresholds, instead of adding more universe breadth.",
+                }
+            )
+        else:
+            plan_items.append(
+                {
+                    "priority": "medium",
+                    "focus": "exploit_best_equity_cluster",
+                    "detail": f"Daily equity lab found a better candidate ({candidate.get('name') or 'unnamed'}). Center the next sweep around that cluster and test adjacent values before wider searches.",
+                }
+            )
+        if tested_variants < 25:
+            plan_items.append(
+                {
+                    "priority": "medium",
+                    "focus": "deeper_equity_search",
+                    "detail": f"Daily equity lab only tested {tested_variants} variants. Increase weekday search breadth modestly and keep deeper sweeps for weekends.",
+                }
+            )
+
+    cagr_pct = _safe_float(weekly_universe_cagr.get("cagr_pct"), None)
+    if cagr_pct is not None and cagr_pct < 5:
+        plan_items.append(
+            {
+                "priority": "high",
+                "focus": "increase_trade_density",
+                "detail": "Weekly universe CAGR remains weak, which points to overly strict conditions. Focus daily iteration on loosening entries and/or holding winners longer before changing universe construction again.",
+            }
+        )
+
+    if paper.get("decision") == "HOLD":
+        plan_items.append(
+            {
+                "priority": "medium",
+                "focus": "add_equity_near_miss_diagnostics",
+                "detail": "Paper equity decision is HOLD. Add near-miss diagnostics so the daily loop can see which gates are preventing trades and tune them deliberately.",
+            }
+        )
+
+    if not plan_items:
+        plan_items.append(
+            {
+                "priority": "low",
+                "focus": "maintain_equity_iteration",
+                "detail": "Equity daily iteration is healthy. Keep validating fresh reports and continue local parameter refinement around the current best cluster.",
+            }
+        )
+
+    return {
+        "enabled": True,
+        "asset_class": "equity",
+        "objective": "Improve equity trade density and robustness with fresh daily iteration.",
+        "items": plan_items,
+    }
+
+
+
 def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
     requested_variants = int(max_variants or resolve_strategy_lab_max_variants())
     env = os.environ.copy()
@@ -552,6 +629,8 @@ def main():
     paper = check_and_fix_paper_execution(market_open, trade_date)
     autopromote = maybe_auto_promote(strategy, market_open)
 
+    iteration_plan = build_equity_iteration_plan(strategy, weekly_universe_cagr, paper)
+
     summary = {
         "generated_at": now.isoformat(),
         "trade_date": trade_date,
@@ -561,6 +640,7 @@ def main():
         "paper_trader": paper,
         "weekly_universe_cagr": weekly_universe_cagr,
         "autopromote": autopromote,
+        "iteration_plan": iteration_plan,
     }
 
     out_json = REPORTS / f"daily_ops_supervisor_{trade_date}.json"
@@ -580,6 +660,12 @@ def main():
         f"- Promote candidate: **{strategy.get('should_promote')}**",
         f"- Auto-promote applied: **{autopromote.get('applied')}**",
         f"- Auto-promote reason: **{autopromote.get('reason')}**",
+        "",
+        "## Daily equity iteration plan",
+        *[
+            f"- [{item.get('priority')}] **{item.get('focus')}**: {item.get('detail')}"
+            for item in iteration_plan.get('items', [])
+        ],
         "",
         "## Weekly universe CAGR check",
         f"- Status: **{weekly_universe_cagr.get('reason')}**",
