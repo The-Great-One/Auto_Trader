@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -29,33 +29,59 @@ from Auto_Trader.news_sentiment import (
 
 OUT = ROOT / "reports"
 OUT.mkdir(exist_ok=True)
+HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
 OPTIONS_OUT = OUT / "paper_shadow_options_latest.json"
 logger = logging.getLogger("Auto_Trade_Logger")
 
+KITE_FALLBACK_TOKENS = {
+    "NIFTYETF": 1626369,
+}
 
-def _prepare_hist_df(df: pd.DataFrame) -> pd.DataFrame:
+
+def _normalize_hist_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
-    if hasattr(df.columns, "levels"):
-        df.columns = [str(c[0]) for c in df.columns]
-    cols = {str(c).lower(): c for c in df.columns}
+
+    use = df.copy()
+    if hasattr(use.columns, "levels"):
+        use.columns = [str(c[0]) for c in use.columns]
+    if "Date" not in use.columns:
+        use = use.reset_index()
+
+    cols = {str(c).lower(): c for c in use.columns}
+    if "date" not in cols and "datetime" in cols:
+        cols["date"] = cols["datetime"]
     required = ["date", "open", "high", "low", "close"]
     if not all(k in cols for k in required):
         return pd.DataFrame()
-    use = pd.DataFrame(
+
+    out = pd.DataFrame(
         {
-            "Date": pd.to_datetime(df[cols["date"]], errors="coerce"),
-            "Open": pd.to_numeric(df[cols["open"]], errors="coerce"),
-            "High": pd.to_numeric(df[cols["high"]], errors="coerce"),
-            "Low": pd.to_numeric(df[cols["low"]], errors="coerce"),
-            "Close": pd.to_numeric(df[cols["close"]], errors="coerce"),
-            "Volume": pd.to_numeric(df.get(cols.get("volume", "Volume"), 0), errors="coerce").fillna(0),
+            "Date": pd.to_datetime(use[cols["date"]], errors="coerce"),
+            "Open": pd.to_numeric(use[cols["open"]], errors="coerce"),
+            "High": pd.to_numeric(use[cols["high"]], errors="coerce"),
+            "Low": pd.to_numeric(use[cols["low"]], errors="coerce"),
+            "Close": pd.to_numeric(use[cols["close"]], errors="coerce"),
+            "Volume": pd.to_numeric(use.get(cols.get("volume", "Volume"), 0), errors="coerce").fillna(0),
         }
     ).dropna(subset=["Date", "Open", "High", "Low", "Close"])
-    if use.empty:
-        return use
-    use = use.sort_values("Date").drop_duplicates(subset=["Date"], keep="last").reset_index(drop=True)
-    if len(use) < 5:
+    if out.empty:
+        return out
+    return out.sort_values("Date").drop_duplicates(subset=["Date"], keep="last").reset_index(drop=True)
+
+
+
+def _persist_hist_cache(cache_name: str, df: pd.DataFrame) -> Path:
+    HIST_DIR.mkdir(parents=True, exist_ok=True)
+    path = HIST_DIR / f"{cache_name}.feather"
+    df.to_feather(path)
+    return path
+
+
+
+def _prepare_hist_df(df: pd.DataFrame) -> pd.DataFrame:
+    use = _normalize_hist_df(df)
+    if use.empty or len(use) < 5:
         return pd.DataFrame()
     try:
         out = at_utils.Indicators(use)
@@ -66,33 +92,80 @@ def _prepare_hist_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 
-def load_hist(symbol="NIFTYETF"):
-    cache_paths = [
-        ROOT / "intermediary_files" / "Hist_Data" / f"{symbol}.feather",
-        ROOT / "intermediary_files" / "Hist_Data" / "NIFTYBEES.feather",
-        ROOT / "intermediary_files" / "Hist_Data" / "NIFTY50_INDEX.feather",
-    ]
-
-    for p in cache_paths:
-        if not p.exists():
-            continue
-        try:
-            out = _prepare_hist_df(pd.read_feather(p))
-            if not out.empty:
-                return out
-        except Exception:
-            pass
-
-    # fallback: fetch fresh data if cache was cleaned by runtime or cache is bad/empty
+def _fetch_hist_from_yfinance(symbol: str):
     import yfinance as yf
 
-    for ysym in [f"{symbol}.NS", "NIFTYBEES.NS"]:
-        df = yf.download(ysym, period="2y", interval="1d", auto_adjust=False, progress=False)
-        out = _prepare_hist_df(df)
-        if not out.empty:
-            return out
+    candidates = [
+        (symbol, f"{symbol}.NS"),
+        ("NIFTYBEES", "NIFTYBEES.NS"),
+        ("NIFTY50_INDEX", "^NSEI"),
+    ]
+    for cache_name, ticker in candidates:
+        try:
+            raw = yf.download(ticker, period="2y", interval="1d", auto_adjust=False, progress=False)
+            normalized = _normalize_hist_df(raw)
+            if normalized.empty:
+                continue
+            path = _persist_hist_cache(cache_name, normalized)
+            prepared = _prepare_hist_df(normalized)
+            if not prepared.empty:
+                return prepared, {"source": "yfinance", "ticker": ticker, "cache_name": cache_name, "cache_path": str(path)}
+        except Exception as exc:
+            logger.warning("paper shadow: yfinance fetch failed for %s: %s", ticker, exc)
+    return pd.DataFrame(), None
 
-    raise SystemExit("No usable historical data found for shadow mode, local cache and yfinance fallback both failed")
+
+
+def _fetch_hist_from_kite(symbol: str):
+    token = KITE_FALLBACK_TOKENS.get(symbol)
+    if not token:
+        return pd.DataFrame(), None
+
+    try:
+        kite = at_utils.initialize_kite()
+        end_dt = datetime.now()
+        start_dt = end_dt - timedelta(days=365 * 5)
+        data = kite.historical_data(token, from_date=start_dt, to_date=end_dt, interval="day", oi=False)
+        normalized = _normalize_hist_df(pd.DataFrame(data))
+        if normalized.empty:
+            return pd.DataFrame(), None
+        path = _persist_hist_cache(symbol, normalized)
+        prepared = _prepare_hist_df(normalized)
+        if prepared.empty:
+            return pd.DataFrame(), None
+        return prepared, {"source": "kite", "instrument_token": token, "cache_name": symbol, "cache_path": str(path)}
+    except Exception as exc:
+        logger.warning("paper shadow: Kite fallback failed for %s: %s", symbol, exc)
+        return pd.DataFrame(), None
+
+
+
+def load_hist(symbol="NIFTYETF"):
+    cache_paths = [
+        (symbol, HIST_DIR / f"{symbol}.feather"),
+        ("NIFTYBEES", HIST_DIR / "NIFTYBEES.feather"),
+        ("NIFTY50_INDEX", HIST_DIR / "NIFTY50_INDEX.feather"),
+    ]
+
+    for cache_name, path in cache_paths:
+        if not path.exists():
+            continue
+        try:
+            out = _prepare_hist_df(pd.read_feather(path))
+            if not out.empty:
+                return out, {"source": "cache", "cache_name": cache_name, "cache_path": str(path)}
+        except Exception as exc:
+            logger.warning("paper shadow: failed reading cache %s: %s", path, exc)
+
+    out, meta = _fetch_hist_from_yfinance(symbol)
+    if not out.empty:
+        return out, meta
+
+    out, meta = _fetch_hist_from_kite(symbol)
+    if not out.empty:
+        return out, meta
+
+    raise SystemExit("No usable historical data found for shadow mode, cache, yfinance, and Kite fallback all failed")
 
 
 def load_qty(symbol="NIFTYETF") -> int:
@@ -118,7 +191,7 @@ def run_equity_shadow() -> dict:
         topic_summary = latest_topic_snapshot(["trump_market"])
 
     try:
-        df = load_hist(symbol)
+        df, price_history_meta = load_hist(symbol)
     except (SystemExit, Exception) as e:
         logger.error("equity shadow: load_hist failed: %s", e)
         return {"error": str(e), "decision": "HOLD", "mode": "failed_rc_1", "market_news_topics": topic_summary.get("topics", [])}
@@ -167,6 +240,7 @@ def run_equity_shadow() -> dict:
         "decision_changed_by_news": str(base_decision).upper() != str(final_decision).upper(),
         "news_overlay": news_overlay,
         "last_close": float(df.iloc[-1]["Close"]),
+        "price_history": price_history_meta,
         "symbol_news_sentiment": {
             "weighted_sentiment": symbol_news.get("weighted_sentiment"),
             "item_count": symbol_news.get("item_count"),
