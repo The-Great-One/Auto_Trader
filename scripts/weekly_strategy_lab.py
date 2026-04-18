@@ -81,6 +81,21 @@ def configured_variant_workers() -> int:
     except Exception:
         return int(default)
 
+
+def configured_variant_batch() -> tuple[int, int | None]:
+    try:
+        offset = max(0, int(os.getenv("AT_LAB_VARIANT_OFFSET", "0")))
+    except Exception:
+        offset = 0
+    raw_limit = os.getenv("AT_LAB_VARIANT_LIMIT", "").strip()
+    if not raw_limit:
+        return offset, None
+    try:
+        limit = max(1, int(raw_limit))
+    except Exception:
+        limit = None
+    return offset, limit
+
 DEFAULT_LAB_SYMBOLS = [
     # --- Large-cap core ---
     "BHARTIARTL", "SBIN", "TCS", "INFY", "LICI",
@@ -690,37 +705,42 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
     sell_cfg = RULE_SET_2.CONFIG
 
     buy_grid = {
-        "adx_min": prioritized_values([12, 14, 16, 18, 20, 22], buy_cfg["adx_min"]),
-        "adx_strong_min": prioritized_values([20, 22, 25, 28, 30], buy_cfg["adx_strong_min"]),
-        "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5, 4.0], buy_cfg["max_obv_zscore"]),
+        "adx_min": prioritized_values([10, 12, 14, 16, 18, 20, 22], buy_cfg["adx_min"]),
+        "adx_strong_min": prioritized_values([18, 20, 22, 25, 28, 30], buy_cfg["adx_strong_min"]),
+        "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5, 4.0, 5.0], buy_cfg["max_obv_zscore"]),
         "obv_min_zscore": prioritized_values([0.0, 0.25, 0.5, 0.75, 1.0], buy_cfg["obv_min_zscore"]),
-        "max_extension_atr": prioritized_values([1.5, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2], buy_cfg["max_extension_atr"]),
-        "mmi_risk_off": prioritized_values([60, 62, 65, 68, 70], buy_cfg["mmi_risk_off"]),
-        "volume_confirm_mult": prioritized_values([0.95, 1.0, 1.05, 1.1, 1.2, 1.3], buy_cfg["volume_confirm_mult"]),
-        "cmf_base_min": prioritized_values([0.02, 0.03, 0.05, 0.08], buy_cfg["cmf_base_min"]),
-        "rsi_floor": prioritized_values([40, 42, 45, 48, 50], buy_cfg["rsi_floor"]),
-        "stoch_pull_max": prioritized_values([60, 65, 70, 75, 80], buy_cfg["stoch_pull_max"]),
-        "stoch_momo_max": prioritized_values([75, 80, 85, 90], buy_cfg["stoch_momo_max"]),
-        "min_atr_pct": prioritized_values([0.003, 0.005, 0.006, 0.008], buy_cfg["min_atr_pct"]),
-        "max_atr_pct": prioritized_values([0.07, 0.08, 0.09, 0.10], buy_cfg["max_atr_pct"]),
+        "max_extension_atr": prioritized_values([1.5, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5], buy_cfg["max_extension_atr"]),
+        "mmi_risk_off": prioritized_values([60, 62, 65, 68, 70, 75], buy_cfg["mmi_risk_off"]),
+        "volume_confirm_mult": prioritized_values([0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3], buy_cfg["volume_confirm_mult"]),
+        "cmf_base_min": prioritized_values([0.0, 0.02, 0.03, 0.05, 0.08], buy_cfg["cmf_base_min"]),
+        "rsi_floor": prioritized_values([38, 40, 42, 45, 48, 50], buy_cfg["rsi_floor"]),
+        "stoch_pull_max": prioritized_values([60, 65, 70, 75, 80, 85, 90], buy_cfg["stoch_pull_max"]),
+        "stoch_momo_max": prioritized_values([75, 80, 85, 90, 95], buy_cfg["stoch_momo_max"]),
+        "min_atr_pct": prioritized_values([0.002, 0.003, 0.005, 0.006, 0.008], buy_cfg["min_atr_pct"]),
+        "max_atr_pct": prioritized_values([0.07, 0.08, 0.09, 0.10, 0.12], buy_cfg["max_atr_pct"]),
+        "ich_cloud_bull": prioritized_values([0, 1], buy_cfg["ich_cloud_bull"]),
+        "vwap_buy_above": prioritized_values([0, 1], buy_cfg["vwap_buy_above"]),
+        "cci_buy_min": prioritized_values([-150, -125, -100, -75, -50], buy_cfg["cci_buy_min"]),
     }
     sell_grid = {
-        "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0], sell_cfg["momentum_exit_rsi"]),
-        "ema_break_atr_mult": prioritized_values([0.3, 0.4, 0.45, 0.5, 0.7], sell_cfg["ema_break_atr_mult"]),
-        "breakeven_trigger_pct": prioritized_values([1.0, 1.5, 2.0, 2.5, 3.0, 3.5], sell_cfg["breakeven_trigger_pct"]),
+        "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0, 48.0], sell_cfg["momentum_exit_rsi"]),
+        "ema_break_atr_mult": prioritized_values([0.3, 0.4, 0.45, 0.5, 0.7, 0.9], sell_cfg["ema_break_atr_mult"]),
+        "breakeven_trigger_pct": prioritized_values([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0], sell_cfg["breakeven_trigger_pct"]),
         "relative_volume_exit": prioritized_values([1.0, 1.1, 1.2, 1.3, 1.5], sell_cfg["relative_volume_exit"]),
-        "equity_time_stop_bars": prioritized_values([5, 6, 8, 10, 12], sell_cfg["equity_time_stop_bars"]),
-        "equity_review_rsi": prioritized_values([45.0, 48.0, 50.0, 52.0], sell_cfg["equity_review_rsi"]),
-        "fund_time_stop_bars": prioritized_values([10, 12, 14, 16, 18], sell_cfg["fund_time_stop_bars"]),
-        "fund_time_stop_min_profit_pct": prioritized_values([0.5, 0.75, 1.0, 1.5, 2.0], sell_cfg["fund_time_stop_min_profit_pct"]),
+        "equity_time_stop_bars": prioritized_values([5, 6, 8, 10, 12, 15, 20], sell_cfg["equity_time_stop_bars"]),
+        "equity_review_rsi": prioritized_values([42.0, 45.0, 48.0, 50.0, 52.0, 55.0], sell_cfg["equity_review_rsi"]),
+        "fund_time_stop_bars": prioritized_values([10, 12, 14, 16, 18, 22, 26], sell_cfg["fund_time_stop_bars"]),
+        "fund_time_stop_min_profit_pct": prioritized_values([0.3, 0.5, 0.75, 1.0, 1.5, 2.0], sell_cfg["fund_time_stop_min_profit_pct"]),
     }
 
     if scorecard_context.get("no_trade_day"):
-        buy_grid["adx_min"] = prioritized_values([10, 12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
+        buy_grid["adx_min"] = prioritized_values([8, 10, 12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
         buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0, 5.0], buy_cfg["max_obv_zscore"])
         buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.5], buy_cfg["max_extension_atr"])
         buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70, 75], buy_cfg["mmi_risk_off"])
-        buy_grid["volume_confirm_mult"] = prioritized_values([0.9, 0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
+        buy_grid["volume_confirm_mult"] = prioritized_values([0.8, 0.9, 0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
+        buy_grid["ich_cloud_bull"] = prioritized_values([0, 1], buy_cfg["ich_cloud_bull"])
+        buy_grid["vwap_buy_above"] = prioritized_values([0, 1], buy_cfg["vwap_buy_above"])
 
     if tradebook_context.get("weak_mid_hold_window"):
         sell_grid["equity_time_stop_bars"] = prioritized_values([4, 5, 6, *sell_grid["equity_time_stop_bars"]], sell_cfg["equity_time_stop_bars"])
@@ -819,8 +839,26 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                 continue
             add(f"sell_{key}_{value}", {}, {key: value}, {"enabled": False})
 
-    focus_buy = ["adx_min", "volume_confirm_mult", "obv_min_zscore", "cmf_base_min", "rsi_floor", "min_atr_pct"]
-    focus_sell = ["equity_time_stop_bars", "equity_review_rsi", "momentum_exit_rsi", "breakeven_trigger_pct", "relative_volume_exit"]
+    focus_buy = [
+        "adx_min",
+        "volume_confirm_mult",
+        "obv_min_zscore",
+        "cmf_base_min",
+        "rsi_floor",
+        "min_atr_pct",
+        "ich_cloud_bull",
+        "vwap_buy_above",
+        "stoch_pull_max",
+        "cci_buy_min",
+    ]
+    focus_sell = [
+        "equity_time_stop_bars",
+        "equity_review_rsi",
+        "momentum_exit_rsi",
+        "breakeven_trigger_pct",
+        "relative_volume_exit",
+        "fund_time_stop_bars",
+    ]
 
     combo_idx = 0
     for bkey in focus_buy:
@@ -832,7 +870,31 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                     combo_idx += 1
                     add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval}, {"enabled": False})
 
-    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "350"))
+    curated_buy = [
+        {"volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+        {"volume_confirm_mult": 0.9, "vwap_buy_above": 0},
+        {"volume_confirm_mult": 0.9, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        {"rsi_floor": 40, "stoch_pull_max": 85, "stoch_momo_max": 90},
+        {"rsi_floor": 40, "volume_confirm_mult": 0.9, "stoch_pull_max": 85, "ich_cloud_bull": 0},
+        {"adx_min": 12, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+        {"adx_min": 12, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        {"cci_buy_min": -125, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+    ]
+    curated_sell = [
+        {},
+        {"breakeven_trigger_pct": 4.0},
+        {"breakeven_trigger_pct": 5.0, "equity_time_stop_bars": 12},
+        {"breakeven_trigger_pct": 4.0, "fund_time_stop_bars": 18},
+        {"equity_time_stop_bars": 15, "fund_time_stop_bars": 22},
+        {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0},
+    ]
+    curated_idx = 0
+    for buy_patch in curated_buy:
+        for sell_patch in curated_sell:
+            curated_idx += 1
+            add(f"curated_combo_{curated_idx:03d}", buy_patch, sell_patch, {"enabled": False})
+
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "500"))
     return out[:max_variants]
 
 
@@ -956,6 +1018,16 @@ def _variant_mp_context():
         return mp.get_context(default_method)
 
 
+def _save_lab_payload(payload: dict, prefix: str = "strategy_lab") -> tuple[Path, Path]:
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_json = OUT_DIR / f"{prefix}_{ts}.json"
+    out_csv = OUT_DIR / f"{prefix}_{ts}.csv"
+    out_json.write_text(json.dumps(payload, indent=2))
+    pd.DataFrame(payload.get("ranked", [])).to_csv(out_csv, index=False)
+    return out_json, out_csv
+
+
+
 def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict, rnn_params: dict | None = None, rnn_models: dict | None = None) -> BacktestResult:
     # avoid DB dependency in RULE_SET_7 market regime check
     at_utils.get_mmi_now = lambda: None
@@ -1047,11 +1119,24 @@ def main():
         universe_symbols=list(data_map.keys()),
     )
     rnn_models = build_rnn_models(data_map, config=rnn_config)
-    variant_list = variants(scorecard_context, tradebook_context)
+    full_variant_list = variants(scorecard_context, tradebook_context)
+    batch_offset, batch_limit = configured_variant_batch()
+    if batch_limit is None:
+        variant_list = full_variant_list[batch_offset:]
+    else:
+        variant_list = full_variant_list[batch_offset : batch_offset + batch_limit]
+    if not variant_list:
+        raise RuntimeError(f"No variants selected for batch offset={batch_offset} limit={batch_limit}")
+
+    batch_label = f"offset_{batch_offset}_limit_{batch_limit or 'all'}"
     write_status(
         phase="evaluating_variants",
         message="running strategy variants",
         variants_total=len(variant_list),
+        variants_total_full=len(full_variant_list),
+        variant_batch_offset=batch_offset,
+        variant_batch_limit=batch_limit,
+        variant_batch_label=batch_label,
         rnn_models_built=len(rnn_models),
     )
     results = []
@@ -1062,6 +1147,10 @@ def main():
         phase="evaluating_variants",
         message="running strategy variants",
         variants_total=len(variant_list),
+        variants_total_full=len(full_variant_list),
+        variant_batch_offset=batch_offset,
+        variant_batch_limit=batch_limit,
+        variant_batch_label=batch_label,
         rnn_models_built=len(rnn_models),
         parallel_variants=bool(can_parallelize and variant_workers > 1),
         variant_workers=variant_workers,
@@ -1086,6 +1175,10 @@ def main():
                     current_variant=name,
                     variants_done=idx - 1,
                     variants_total=len(variant_list),
+                    variants_total_full=len(full_variant_list),
+                    variant_batch_offset=batch_offset,
+                    variant_batch_limit=batch_limit,
+                    variant_batch_label=batch_label,
                     progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
                     parallel_variants=True,
                     variant_workers=variant_workers,
@@ -1098,6 +1191,10 @@ def main():
                 current_variant=name,
                 variants_done=idx - 1,
                 variants_total=len(variant_list),
+                variants_total_full=len(full_variant_list),
+                variant_batch_offset=batch_offset,
+                variant_batch_limit=batch_limit,
+                variant_batch_label=batch_label,
                 progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
                 parallel_variants=False,
                 variant_workers=variant_workers,
@@ -1109,12 +1206,27 @@ def main():
         key=lambda r: (r.selection_score, r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct),
         reverse=True,
     )
-    baseline = next(r for r in rank if r.name == "baseline_current")
+    baseline = next((r for r in rank if r.name == "baseline_current"), None)
+    if baseline is None:
+        baseline = run_variant("baseline_current", data_map, {}, {}, rnn_params={"enabled": False}, rnn_models=rnn_models)
+        rank.append(baseline)
+        rank = sorted(
+            rank,
+            key=lambda r: (r.selection_score, r.total_return_pct, -abs(r.max_drawdown_pct), r.win_rate_pct),
+            reverse=True,
+        )
     best = rank[0]
 
     recommendation = {
         "generated_at": datetime.now().isoformat(),
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "batch": {
+            "offset": batch_offset,
+            "limit": batch_limit,
+            "tested_variants": len(rank),
+            "full_variant_count": len(full_variant_list),
+            "label": batch_label,
+        },
         "scorecard_context": scorecard_context,
         "tradebook_context": tradebook_context,
         "fundamental_context": {
@@ -1146,12 +1258,8 @@ def main():
         "ranked": [asdict(r) for r in rank],
     }
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_json = OUT_DIR / f"strategy_lab_{ts}.json"
-    out_csv = OUT_DIR / f"strategy_lab_{ts}.csv"
-
-    out_json.write_text(json.dumps(payload, indent=2))
-    pd.DataFrame([asdict(r) for r in rank]).to_csv(out_csv, index=False)
+    prefix = "strategy_lab" if batch_offset == 0 and batch_limit is None else f"strategy_lab_batch_{batch_offset}_{batch_limit or 'all'}"
+    out_json, out_csv = _save_lab_payload(payload, prefix=prefix)
 
     write_status(
         status="done",
@@ -1160,6 +1268,10 @@ def main():
         current_variant=None,
         variants_done=len(variant_list),
         variants_total=len(variant_list),
+        variants_total_full=len(full_variant_list),
+        variant_batch_offset=batch_offset,
+        variant_batch_limit=batch_limit,
+        variant_batch_label=batch_label,
         latest_report_json=str(out_json),
         latest_report_csv=str(out_csv),
         best_variant=best.name,
