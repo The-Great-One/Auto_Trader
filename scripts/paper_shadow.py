@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -18,10 +19,18 @@ if str(ROOT) not in sys.path:
 from Auto_Trader import RULE_SET_2, RULE_SET_7, RULE_SET_OPTIONS_1
 from Auto_Trader import options_support as opt_support
 from Auto_Trader import utils as at_utils
+from Auto_Trader.news_sentiment import (
+    apply_news_overlay,
+    fetch_and_analyze_symbol,
+    fetch_and_analyze_topics,
+    latest_topic_snapshot,
+    load_analysis,
+)
 
 OUT = ROOT / "reports"
 OUT.mkdir(exist_ok=True)
 OPTIONS_OUT = OUT / "paper_shadow_options_latest.json"
+logger = logging.getLogger("Auto_Trade_Logger")
 
 
 def _prepare_hist_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -100,14 +109,22 @@ def load_qty(symbol="NIFTYETF") -> int:
 def run_equity_shadow() -> dict:
     at_utils.get_mmi_now = lambda: None
     symbol = "NIFTYETF"
+    topic_summary = {"topics": []}
+    try:
+        fetch_and_analyze_symbol(symbol, asset_class="ETF", etf_theme="NIFTY 50")
+        topic_summary = fetch_and_analyze_topics(["trump_market"])
+    except Exception as exc:
+        logger.warning("equity shadow: news refresh failed: %s", exc)
+        topic_summary = latest_topic_snapshot(["trump_market"])
+
     try:
         df = load_hist(symbol)
     except (SystemExit, Exception) as e:
         logger.error("equity shadow: load_hist failed: %s", e)
-        return {"error": str(e), "decision": "HOLD", "mode": "failed_rc_1"}
+        return {"error": str(e), "decision": "HOLD", "mode": "failed_rc_1", "market_news_topics": topic_summary.get("topics", [])}
     if df is None or df.empty:
         logger.error("equity shadow: empty dataframe for %s", symbol)
-        return {"error": "empty_dataframe", "decision": "HOLD", "mode": "failed_rc_1"}
+        return {"error": "empty_dataframe", "decision": "HOLD", "mode": "failed_rc_1", "market_news_topics": topic_summary.get("topics", [])}
     row = df.iloc[-1].to_dict()
     row.setdefault("instrument_token", 1626369)
 
@@ -128,12 +145,15 @@ def run_equity_shadow() -> dict:
             RULE_SET_2.BASE_DIR = td
             RULE_SET_2.HOLDINGS_FILE_PATH = str(Path(td) / "Holdings.json")
             RULE_SET_2.LOCK_FILE_PATH = str(Path(td) / "Holdings.lock")
-            decision = RULE_SET_2.buy_or_sell(df, row, holdings)
+            base_decision = RULE_SET_2.buy_or_sell(df, row, holdings)
         mode = "SELL_RULE_ONLY"
     else:
         holdings = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
-        decision = RULE_SET_7.buy_or_sell(df, row, holdings)
+        base_decision = RULE_SET_7.buy_or_sell(df, row, holdings)
         mode = "BUY_RULE_ONLY"
+
+    final_decision, news_overlay = apply_news_overlay(base_decision, symbol, holdings=holdings)
+    symbol_news = load_analysis(symbol, max_age_minutes=24 * 60) or {}
 
     payload = {
         "generated_at": datetime.now().isoformat(),
@@ -142,8 +162,18 @@ def run_equity_shadow() -> dict:
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
         "position_qty": qty,
         "mode": mode,
-        "decision": str(decision).upper(),
+        "base_decision": str(base_decision).upper(),
+        "decision": str(final_decision).upper(),
+        "decision_changed_by_news": str(base_decision).upper() != str(final_decision).upper(),
+        "news_overlay": news_overlay,
         "last_close": float(df.iloc[-1]["Close"]),
+        "symbol_news_sentiment": {
+            "weighted_sentiment": symbol_news.get("weighted_sentiment"),
+            "item_count": symbol_news.get("item_count"),
+            "dominant_types": symbol_news.get("dominant_types"),
+            "sample_headlines": symbol_news.get("sample_headlines", [])[:3],
+        },
+        "market_news_topics": topic_summary.get("topics", []),
     }
     (OUT / "paper_shadow_latest.json").write_text(json.dumps(payload, indent=2))
     return payload

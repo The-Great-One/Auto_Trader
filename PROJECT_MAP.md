@@ -44,7 +44,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_7.py` - current BUY rule
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
-- `news_sentiment.py` - RSS/news feed fetch, headline classification, cached news sentiment snapshots, and trading-decision overlay
+- `news_sentiment.py` - RSS/news feed fetch, timestamped news archive, headline classification, cached news sentiment snapshots, market-topic tracking (including Trump-market impact), and trading-decision overlay
 - `rnn_lab.py` - lab-only PyTorch GRU/RNN overlay that scores next-bar direction from indicator sequences for research backtests
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker
@@ -57,7 +57,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `daily_portfolio_report.py` - holdings + allocation intelligence
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
-- `fetch_news_sentiment.py` - refresh cached RSS/news sentiment snapshots for tracked symbols from business/market feeds
+- `fetch_news_sentiment.py` - refresh cached RSS/news sentiment snapshots for tracked symbols, archive timestamped articles for later correlation work, and update market-topic feeds such as Trump-market impact
 - `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
 - `daily_improvement_audit.py` - read-only daily audit of reports/logs that identifies concrete improvement areas without auto-editing trading code
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
@@ -104,6 +104,7 @@ Backtests, permutations, historical analysis, ad hoc research helpers.
 - BUY: `RULE_SET_7`
 - SELL: `RULE_SET_2`
 - Optional overlay: cached RSS/news sentiment can veto risky BUYs or force SELL on held names when `AT_NEWS_SENTIMENT_ENABLED=1`
+- Paper shadow now refreshes symbol news plus Trump-market topic context before evaluating the NIFTYETF shadow decision, and records whether news changed the paper decision
 
 ## Current options support status
 
@@ -156,7 +157,7 @@ Implication:
   - also runs `weekly_universe_cagr_check.py` once per ISO week on the configured weekday (default Saturday) when markets are closed
 - `16:20` weekdays: `scripts/daily_scorecard.py`
 - `16:40` weekdays: `scripts/daily_improvement_audit.py`
-- RSS/news sentiment fetch is available via `scripts/fetch_news_sentiment.py`; this is suitable for live/paper overlays, but not for historical backtests unless a point-in-time news archive is added
+- RSS/news sentiment fetch is available via `scripts/fetch_news_sentiment.py`; it now archives timestamped raw news/events for later correlation analysis and maintains market-topic snapshots, but still should not be scored inside historical backtests without point-in-time replay logic
 
 ## Strategy lab scope
 

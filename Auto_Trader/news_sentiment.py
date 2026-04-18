@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import logging
@@ -11,7 +12,7 @@ import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import pandas as pd
 import requests
@@ -22,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = ROOT / "intermediary_files" / "news_sentiment"
 REPORTS_DIR = ROOT / "reports"
 SUMMARY_PATH = STATE_DIR / "latest.json"
+ARCHIVE_DIR = STATE_DIR / "archive"
+TOPICS_DIR = STATE_DIR / "topics"
+TOPICS_SUMMARY_PATH = STATE_DIR / "market_topics_latest.json"
 
 DEFAULT_RSS_FEEDS = (
     "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
@@ -38,6 +42,7 @@ SOURCE_WEIGHTS = {
     "moneycontrol.com": 1.05,
     "livemint.com": 1.05,
     "news.google.com": 0.95,
+    "truthsocial.com": 1.10,
 }
 
 REQUEST_HEADERS = {
@@ -72,6 +77,8 @@ TYPE_PATTERNS: Dict[str, Sequence[str]] = {
         "surges",
         "rebounds",
         "record high",
+        "tops picks",
+        "top picks",
     ),
     "bearish": (
         "bearish",
@@ -95,6 +102,7 @@ TYPE_PATTERNS: Dict[str, Sequence[str]] = {
         "plunges",
         "tumbles",
         "sinks",
+        "spooked",
     ),
     "earnings_positive": (
         "results",
@@ -138,6 +146,7 @@ TYPE_PATTERNS: Dict[str, Sequence[str]] = {
         "wins",
         "capex",
         "buyback",
+        "top picks",
     ),
     "risk": (
         "rates",
@@ -152,14 +161,15 @@ TYPE_PATTERNS: Dict[str, Sequence[str]] = {
         "attack",
         "sanction",
         "tariff",
+        "tariffs",
         "recession",
         "global risk",
+        "trade war",
     ),
     "regulatory": (
         "sebi",
         "investigation",
         "probe",
-        "raud",
         "fraud",
         "lawsuit",
         "penalty",
@@ -203,6 +213,17 @@ TYPE_WEIGHTS = {
     "regulatory": -0.40,
     "rumor": -0.10,
     "meme": 0.0,
+}
+
+TOPIC_CONFIGS = {
+    "trump_market": {
+        "label": "Trump market impact",
+        "queries": [
+            '("Donald Trump" OR Trump OR "Truth Social") (tariff OR tariffs OR trade OR market OR stocks OR oil OR fed OR china) when:7d',
+            '("Donald Trump" OR Trump) (markets OR stocks OR trade war OR tariffs) when:7d',
+        ],
+        "feeds_env": "AT_TRUMP_RSS_FEEDS",
+    },
 }
 
 
@@ -264,12 +285,23 @@ def _symbol_query_terms(symbol: str, asset_class: Optional[str] = None, etf_them
     return [t for t in terms if t]
 
 
+def _split_env_list(name: str) -> List[str]:
+    raw = os.getenv(name, "").strip()
+    values: List[str] = []
+    if not raw:
+        return values
+    for part in re.split(r"[\n,]+", raw):
+        item = str(part or "").strip()
+        if item and item not in values:
+            values.append(item)
+    return values
+
+
 def discover_symbols(limit: int = 30) -> List[str]:
     symbols: List[str] = []
     seen = set()
 
-    extra = os.getenv("AT_NEWS_EXTRA_SYMBOLS", "")
-    for raw in extra.split(","):
+    for raw in _split_env_list("AT_NEWS_EXTRA_SYMBOLS"):
         sym = _normalize_symbol(raw)
         if sym and sym not in seen:
             symbols.append(sym)
@@ -305,30 +337,6 @@ def discover_symbols(limit: int = 30) -> List[str]:
     return symbols[:limit]
 
 
-def classify_text(text: str) -> dict:
-    text = re.sub(r"\s+", " ", str(text or "").strip().lower())
-    matched: Dict[str, List[str]] = {}
-    score = 0.0
-
-    for label, patterns in TYPE_PATTERNS.items():
-        hits = [pat for pat in patterns if pat in text]
-        if hits:
-            matched[label] = hits
-            score += TYPE_WEIGHTS.get(label, 0.0) * min(2, len(hits))
-
-    types = list(matched.keys()) or ["uncategorized"]
-    score = max(-1.0, min(1.0, score))
-    confidence = min(1.0, 0.2 + 0.15 * sum(len(v) for v in matched.values()))
-    if "meme" in matched and len(matched) == 1:
-        confidence = min(confidence, 0.35)
-    return {
-        "types": types,
-        "matches": matched,
-        "sentiment": round(score, 4),
-        "confidence": round(confidence, 4),
-    }
-
-
 def symbol_is_held(symbol: str, holdings: Optional[pd.DataFrame]) -> bool:
     if holdings is None or holdings.empty or "tradingsymbol" not in holdings.columns:
         return False
@@ -337,13 +345,7 @@ def symbol_is_held(symbol: str, holdings: Optional[pd.DataFrame]) -> bool:
 
 
 def _configured_feeds() -> List[str]:
-    raw = os.getenv("AT_NEWS_RSS_FEEDS", "").strip()
-    feeds = []
-    if raw:
-        for part in re.split(r"[\n,]+", raw):
-            url = str(part or "").strip()
-            if url and url not in feeds:
-                feeds.append(url)
+    feeds = _split_env_list("AT_NEWS_RSS_FEEDS")
     if feeds:
         return feeds
     return list(DEFAULT_RSS_FEEDS)
@@ -368,7 +370,11 @@ def _google_news_search_feed(symbol: str, *, asset_class: Optional[str] = None, 
 
     query = " OR ".join(term if term.startswith('"') else (f'"{term}"' if " " in term else term) for term in terms)
     query = f"({query}) India stock market when:7d"
-    return f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    return f"https://news.google.com/rss/search?q={quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+
+
+def _google_topic_feed(query: str) -> str:
+    return f"https://news.google.com/rss/search?q={quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
 
 
 def _strip_html(text: str) -> str:
@@ -378,8 +384,7 @@ def _strip_html(text: str) -> str:
 
 
 def _source_name(url: str) -> str:
-    host = (urlparse(url).netloc or "").lower()
-    host = host.replace("www.", "")
+    host = (urlparse(url).netloc or "").lower().replace("www.", "")
     return host
 
 
@@ -450,6 +455,7 @@ def _parse_feed_items(xml_text: str, feed_url: str) -> List[dict]:
                 "published_at": published_at,
                 "published_raw": published_raw,
                 "source": source,
+                "feed_url": feed_url,
             }
         )
     return items
@@ -477,18 +483,35 @@ def fetch_rss_entries(feed_url: str, *, timeout: int = 20) -> dict:
         }
 
 
-def _symbol_match(text: str, symbol: str, *, asset_class: Optional[str] = None, etf_theme: str = "") -> bool:
-    haystack = str(text or "")
-    if not haystack.strip():
-        return False
+def _regex_hit(pattern: str, text: str) -> bool:
+    escaped = re.escape(pattern)
+    if re.search(r"[A-Za-z0-9]", pattern):
+        return re.search(rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])", text, flags=re.IGNORECASE) is not None
+    return re.search(escaped, text, flags=re.IGNORECASE) is not None
 
-    for term in _symbol_query_terms(symbol, asset_class=asset_class, etf_theme=etf_theme):
-        token = str(term or "").strip()
-        if not token:
-            continue
-        if re.search(rf"(?<![A-Za-z0-9]){re.escape(token)}(?![A-Za-z0-9])", haystack, flags=re.IGNORECASE):
-            return True
-    return False
+
+def classify_text(text: str) -> dict:
+    text = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    matched: Dict[str, List[str]] = {}
+    score = 0.0
+
+    for label, patterns in TYPE_PATTERNS.items():
+        hits = [pat for pat in patterns if _regex_hit(pat.lower(), text)]
+        if hits:
+            matched[label] = hits
+            score += TYPE_WEIGHTS.get(label, 0.0) * min(2, len(hits))
+
+    types = list(matched.keys()) or ["uncategorized"]
+    score = max(-1.0, min(1.0, score))
+    confidence = min(1.0, 0.2 + 0.15 * sum(len(v) for v in matched.values()))
+    if "meme" in matched and len(matched) == 1:
+        confidence = min(confidence, 0.35)
+    return {
+        "types": types,
+        "matches": matched,
+        "sentiment": round(score, 4),
+        "confidence": round(confidence, 4),
+    }
 
 
 def _source_weight(source: str) -> float:
@@ -512,17 +535,117 @@ def _recency_weight(published_at: Optional[int]) -> float:
     return max(0.6, 1.0 / math.sqrt(1.0 + age_hours / 48.0))
 
 
-def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
+def _symbol_match(text: str, symbol: str, *, asset_class: Optional[str] = None, etf_theme: str = "") -> bool:
+    haystack = str(text or "")
+    if not haystack.strip():
+        return False
+
+    for term in _symbol_query_terms(symbol, asset_class=asset_class, etf_theme=etf_theme):
+        token = str(term or "").strip()
+        if token and _regex_hit(token, haystack):
+            return True
+    return False
+
+
+def _event_id(kind: str, key: str, entry: dict) -> str:
+    base = "|".join(
+        [
+            kind,
+            key,
+            str(entry.get("link") or ""),
+            str(entry.get("published_at") or entry.get("published_raw") or ""),
+            str(entry.get("title") or ""),
+        ]
+    )
+    return hashlib.sha1(base.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _append_archive_rows(rows: Sequence[dict]) -> None:
+    if not rows:
+        return
+
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    by_day: Dict[str, List[dict]] = {}
+    for row in rows:
+        fetched_day = str(pd.Timestamp.utcfromtimestamp(int(row.get("fetched_at", time.time()))).date())
+        by_day.setdefault(fetched_day, []).append(row)
+
+    for day, day_rows in by_day.items():
+        path = ARCHIVE_DIR / f"{day}.jsonl"
+        seen = set()
+        if path.exists():
+            try:
+                for line in path.read_text().splitlines():
+                    if not line.strip():
+                        continue
+                    payload = json.loads(line)
+                    event_id = str(payload.get("event_id") or "")
+                    if event_id:
+                        seen.add(event_id)
+            except Exception:
+                seen = set()
+        with path.open("a", encoding="utf-8") as fh:
+            for row in day_rows:
+                event_id = str(row.get("event_id") or "")
+                if event_id in seen:
+                    continue
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+                seen.add(event_id)
+
+
+def _dedupe_entries(kind: str, key: str, entries: Sequence[dict]) -> List[dict]:
+    deduped: List[dict] = []
+    seen = set()
+    for entry in entries:
+        event_id = _event_id(kind, key, entry)
+        if event_id in seen:
+            continue
+        seen.add(event_id)
+        payload = dict(entry)
+        payload["event_id"] = event_id
+        deduped.append(payload)
+    return deduped
+
+
+def archive_entries(kind: str, key: str, entries: Sequence[dict]) -> None:
+    fetched_at = int(time.time())
+    rows = []
+    for entry in _dedupe_entries(kind, key, entries):
+        cls = entry.get("classification") or classify_text(entry.get("text") or "")
+        rows.append(
+            {
+                "event_id": entry.get("event_id") or _event_id(kind, key, entry),
+                "kind": kind,
+                "key": key,
+                "fetched_at": fetched_at,
+                "published_at": entry.get("published_at"),
+                "published_raw": entry.get("published_raw"),
+                "source": entry.get("source"),
+                "feed_url": entry.get("feed_url"),
+                "link": entry.get("link"),
+                "title": entry.get("title"),
+                "summary": entry.get("summary"),
+                "text": entry.get("text"),
+                "classification": cls,
+            }
+        )
+    _append_archive_rows(rows)
+
+
+def _analyze_entries(kind: str, key: str, entries: Sequence[dict], *, item_label: str = "item") -> dict:
     if not entries:
         return {
-            "symbol": _normalize_symbol(symbol),
-            "item_count": 0,
+            kind: key,
+            f"{item_label}_count": 0,
+            f"bullish_{item_label}s": 0,
+            f"bearish_{item_label}s": 0,
             "weighted_sentiment": 0.0,
             "type_counts": {},
             "dominant_types": [],
             "sample_headlines": [],
+            "top_items": [],
             "generated_at": int(time.time()),
-            "status": "no_news",
+            "status": f"no_{item_label}s",
         }
 
     type_counts: Dict[str, int] = {}
@@ -534,7 +657,7 @@ def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
 
     for entry in entries:
         text = str(entry.get("text") or "")
-        cls = classify_text(text)
+        cls = entry.get("classification") or classify_text(text)
         weight = max(0.4, cls.get("confidence", 0.0)) * _source_weight(entry.get("source")) * _recency_weight(entry.get("published_at"))
         signed = cls.get("sentiment", 0.0) * weight
         weighted_sum += signed
@@ -558,15 +681,13 @@ def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
         )
 
     scored.sort(key=lambda x: abs(x["classification"].get("sentiment", 0.0)) * x["weight"], reverse=True)
-    dominant_types = [
-        label for label, _ in sorted(type_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:4]
-    ]
+    dominant_types = [label for label, _ in sorted(type_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:4]]
     weighted_sentiment = weighted_sum / total_weight if total_weight else 0.0
-    summary = {
-        "symbol": _normalize_symbol(symbol),
-        "item_count": len(entries),
-        "bullish_items": bullish,
-        "bearish_items": bearish,
+    return {
+        kind: key,
+        f"{item_label}_count": len(entries),
+        f"bullish_{item_label}s": bullish,
+        f"bearish_{item_label}s": bearish,
         "weighted_sentiment": round(max(-1.0, min(1.0, weighted_sentiment)), 4),
         "type_counts": type_counts,
         "dominant_types": dominant_types,
@@ -575,8 +696,6 @@ def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
         "generated_at": int(time.time()),
         "status": "ok",
     }
-    summary["trade_bias"] = infer_news_trade_bias(summary)
-    return summary
 
 
 def infer_news_trade_bias(analysis: dict) -> dict:
@@ -626,6 +745,16 @@ def infer_news_trade_bias(analysis: dict) -> dict:
     }
 
 
+def analyze_news(symbol: str, entries: Sequence[dict]) -> dict:
+    summary = _analyze_entries("symbol", _normalize_symbol(symbol), entries)
+    summary["symbol"] = summary.pop("symbol")
+    summary["item_count"] = summary.pop("item_count")
+    summary["bullish_items"] = summary.pop("bullish_items")
+    summary["bearish_items"] = summary.pop("bearish_items")
+    summary["trade_bias"] = infer_news_trade_bias(summary)
+    return summary
+
+
 def save_analysis(analysis: dict) -> Path:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     path = STATE_DIR / f"{_normalize_symbol(analysis.get('symbol'))}.json"
@@ -644,9 +773,7 @@ def load_analysis(symbol: str, max_age_minutes: Optional[int] = None) -> Optiona
         return None
     if max_age_minutes is not None:
         generated_at = _safe_int(data.get("generated_at"), 0)
-        if generated_at <= 0:
-            return None
-        if time.time() - generated_at > max_age_minutes * 60:
+        if generated_at <= 0 or time.time() - generated_at > max_age_minutes * 60:
             return None
     return data
 
@@ -662,6 +789,7 @@ def write_summary(analyses: Sequence[dict]) -> dict:
         "top_bullish": sorted(active, key=lambda x: x.get("weighted_sentiment", 0.0), reverse=True)[:5],
         "top_bearish": sorted(active, key=lambda x: x.get("weighted_sentiment", 0.0))[:5],
         "feeds": _configured_feeds(),
+        "archive_dir": str(ARCHIVE_DIR),
     }
     SUMMARY_PATH.write_text(json.dumps(summary, indent=2))
     (REPORTS_DIR / "news_sentiment_latest.json").write_text(json.dumps(summary, indent=2))
@@ -693,15 +821,115 @@ def fetch_and_analyze_symbol(symbol: str, *, asset_class: Optional[str] = None, 
         count = 0
         for entry in fetched.get("entries") or []:
             if _symbol_match(entry.get("text"), symbol, asset_class=asset_class, etf_theme=etf_theme):
+                entry = dict(entry)
+                entry["classification"] = classify_text(entry.get("text") or "")
                 matches.append(entry)
                 count += 1
                 if count >= per_feed_limit:
                     break
 
+    matches = _dedupe_entries("symbol", _normalize_symbol(symbol), matches)
+    archive_entries("symbol", _normalize_symbol(symbol), matches)
     analysis = analyze_news(symbol, matches)
     analysis["feed_status"] = feed_status
+    analysis["archive_dir"] = str(ARCHIVE_DIR)
     save_analysis(analysis)
     return analysis
+
+
+def _topic_feed_urls(topic: str) -> List[str]:
+    cfg = TOPIC_CONFIGS.get(topic, {})
+    feeds: List[str] = []
+    feeds_env = str(cfg.get("feeds_env") or "").strip()
+    if feeds_env:
+        feeds.extend(_split_env_list(feeds_env))
+    for query in cfg.get("queries") or []:
+        url = _google_topic_feed(str(query))
+        if url not in feeds:
+            feeds.append(url)
+    return feeds
+
+
+def save_topic_analysis(topic: str, analysis: dict) -> Path:
+    TOPICS_DIR.mkdir(parents=True, exist_ok=True)
+    path = TOPICS_DIR / f"{topic}.json"
+    path.write_text(json.dumps(analysis, indent=2))
+    return path
+
+
+def load_topic_analysis(topic: str, max_age_minutes: Optional[int] = None) -> Optional[dict]:
+    path = TOPICS_DIR / f"{topic}.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except Exception as exc:
+        logger.warning("Failed to load topic analysis for %s: %s", topic, exc)
+        return None
+    if max_age_minutes is not None:
+        generated_at = _safe_int(data.get("generated_at"), 0)
+        if generated_at <= 0 or time.time() - generated_at > max_age_minutes * 60:
+            return None
+    return data
+
+
+def fetch_and_analyze_topic(topic: str) -> dict:
+    cfg = TOPIC_CONFIGS.get(topic, {})
+    entries: List[dict] = []
+    feed_status: List[dict] = []
+    for feed_url in _topic_feed_urls(topic):
+        fetched = fetch_rss_entries(feed_url)
+        feed_status.append(
+            {
+                "feed_url": feed_url,
+                "source": fetched.get("source"),
+                "status": fetched.get("status"),
+                "error": fetched.get("error"),
+                "entry_count": len(fetched.get("entries") or []),
+            }
+        )
+        if fetched.get("status") != "ok":
+            continue
+        for entry in fetched.get("entries") or []:
+            entry = dict(entry)
+            entry["classification"] = classify_text(entry.get("text") or "")
+            entries.append(entry)
+
+    entries = _dedupe_entries("topic", topic, entries)
+    archive_entries("topic", topic, entries)
+    summary = _analyze_entries("topic", topic, entries)
+    summary["topic"] = summary.pop("topic")
+    summary["item_count"] = summary.pop("item_count")
+    summary["bullish_items"] = summary.pop("bullish_items")
+    summary["bearish_items"] = summary.pop("bearish_items")
+    summary["label"] = cfg.get("label", topic)
+    summary["feed_status"] = feed_status
+    summary["archive_dir"] = str(ARCHIVE_DIR)
+    save_topic_analysis(topic, summary)
+    return summary
+
+
+def fetch_and_analyze_topics(topics: Optional[Sequence[str]] = None) -> dict:
+    topic_list = [str(t).strip() for t in (topics or TOPIC_CONFIGS.keys()) if str(t).strip()]
+    analyses = [fetch_and_analyze_topic(topic) for topic in topic_list]
+    payload = {
+        "generated_at": int(time.time()),
+        "topics": analyses,
+        "archive_dir": str(ARCHIVE_DIR),
+    }
+    TOPICS_SUMMARY_PATH.write_text(json.dumps(payload, indent=2))
+    (REPORTS_DIR / "market_topics_latest.json").write_text(json.dumps(payload, indent=2))
+    return payload
+
+
+def latest_topic_snapshot(topics: Optional[Sequence[str]] = None, max_age_minutes: int = 240) -> dict:
+    topic_list = [str(t).strip() for t in (topics or TOPIC_CONFIGS.keys()) if str(t).strip()]
+    out = []
+    for topic in topic_list:
+        loaded = load_topic_analysis(topic, max_age_minutes=max_age_minutes)
+        if loaded:
+            out.append(loaded)
+    return {"generated_at": int(time.time()), "topics": out}
 
 
 def apply_news_overlay(base_decision: str, symbol: str, holdings: Optional[pd.DataFrame] = None) -> Tuple[str, Optional[dict]]:
