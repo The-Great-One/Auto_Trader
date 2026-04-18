@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 import sys
@@ -201,6 +202,9 @@ def run_equity_shadow() -> dict:
     row = df.iloc[-1].to_dict()
     row.setdefault("instrument_token", 1626369)
 
+    entry_holdings = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
+    entry_decision, entry_details = RULE_SET_7.evaluate_signal(df, row, entry_holdings)
+
     qty = load_qty(symbol)
     if qty > 0:
         avg = float(df["Close"].iloc[-20:-1].mean())
@@ -221,8 +225,8 @@ def run_equity_shadow() -> dict:
             base_decision = RULE_SET_2.buy_or_sell(df, row, holdings)
         mode = "SELL_RULE_ONLY"
     else:
-        holdings = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
-        base_decision = RULE_SET_7.buy_or_sell(df, row, holdings)
+        holdings = entry_holdings
+        base_decision = entry_decision
         mode = "BUY_RULE_ONLY"
 
     final_decision, news_overlay = apply_news_overlay(base_decision, symbol, holdings=holdings)
@@ -241,6 +245,20 @@ def run_equity_shadow() -> dict:
         "news_overlay": news_overlay,
         "last_close": float(df.iloc[-1]["Close"]),
         "price_history": price_history_meta,
+        "equity_entry_diagnostics": {
+            "decision": str(entry_decision).upper(),
+            "entry_gate_failures": entry_details.get("entry_gate_failures", []),
+            "hard_blocks": entry_details.get("hard_blocks", []),
+            "nearest_mode": entry_details.get("nearest_mode"),
+            "nearest_mode_missing": entry_details.get("nearest_mode_missing", []),
+            "nearest_mode_missing_count": entry_details.get("nearest_mode_missing_count"),
+            "alternate_mode_missing": entry_details.get("alternate_mode_missing", []),
+            "reason": entry_details.get("reason", []),
+            "gate_status": entry_details.get("gate_status", {}),
+            "metric_snapshot": entry_details.get("metric_snapshot", {}),
+            "threshold_snapshot": entry_details.get("threshold_snapshot", {}),
+            "mode_diagnostics": entry_details.get("mode_diagnostics", {}),
+        },
         "symbol_news_sentiment": {
             "weighted_sentiment": symbol_news.get("weighted_sentiment"),
             "item_count": symbol_news.get("item_count"),
@@ -305,10 +323,14 @@ def run_options_shadow() -> dict:
 
     ranked = sorted(candidates, key=lambda x: (x["decision"] == "BUY", x["score"]), reverse=True)
     buy_candidates = [x for x in ranked if x["decision"] == "BUY"]
+    hold_candidates = [x for x in ranked if x["decision"] != "BUY"]
     near_miss_candidates = sorted(
-        [x for x in ranked if x["decision"] != "BUY"],
+        hold_candidates,
         key=lambda x: (x["gate_failures_count"], x["score_gap_to_buy"], -x["score"]),
     )[:5]
+    blocker_counts = Counter()
+    for candidate in hold_candidates:
+        blocker_counts.update(candidate.get("gate_failures") or [])
     payload = {
         "generated_at": datetime.now().isoformat(),
         "paper_mode": True,
@@ -320,6 +342,14 @@ def run_options_shadow() -> dict:
         "skipped": skipped,
         "buy_candidates": buy_candidates[:5],
         "near_miss_candidates": near_miss_candidates,
+        "near_miss_summary": {
+            "hold_candidates": len(hold_candidates),
+            "closest_symbol": near_miss_candidates[0].get("symbol") if near_miss_candidates else None,
+            "closest_score_gap_to_buy": near_miss_candidates[0].get("score_gap_to_buy") if near_miss_candidates else None,
+            "most_common_gate_failures": [
+                {"gate": gate, "count": count} for gate, count in blocker_counts.most_common(8)
+            ],
+        },
         "top_candidate": buy_candidates[0] if buy_candidates else (ranked[0] if ranked else None),
         "all_ranked": ranked[:10],
     }
