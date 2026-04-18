@@ -10,13 +10,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from Auto_Trader.news_sentiment import discover_symbols, fetch_and_analyze_symbol, write_summary
+from Auto_Trader.news_sentiment import (
+    discover_symbols,
+    fetch_and_analyze_symbol,
+    fetch_and_analyze_topics,
+    write_summary,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch and analyze RSS/news sentiment for trading symbols.")
     parser.add_argument("--symbols", nargs="*", help="Explicit tradingsymbols to fetch")
     parser.add_argument("--limit", type=int, default=20, help="Max discovered symbols when --symbols is omitted")
+    parser.add_argument("--topics", nargs="*", default=["trump_market"], help="Optional market topics to fetch alongside symbol news")
     return parser.parse_args()
 
 
@@ -28,7 +34,9 @@ def main() -> int:
 
     analyses = [fetch_and_analyze_symbol(symbol) for symbol in symbols]
     summary = write_summary(analyses)
-    print(json.dumps(summary, indent=2))
+    topics = [str(t).strip() for t in (args.topics or []) if str(t).strip()]
+    topic_summary = fetch_and_analyze_topics(topics) if topics else {"topics": []}
+    print(json.dumps({"symbols": summary, "topics": topic_summary}, indent=2))
     return 0
 
 

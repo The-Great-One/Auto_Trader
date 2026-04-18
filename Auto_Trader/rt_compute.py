@@ -30,6 +30,20 @@ def _publish_paper_decisions(message_queue, decisions):
     buy_symbols = sorted({d.get("Symbol") for d in buys[:20] if d.get("Symbol")})
     sell_symbols = sorted({d.get("Symbol") for d in sells[:20] if d.get("Symbol")})
 
+    decision_details = []
+    for decision in decisions[:25]:
+        decision_details.append(
+            {
+                "symbol": decision.get("Symbol"),
+                "decision": decision.get("Decision"),
+                "close": decision.get("Close"),
+                "asset_class": decision.get("AssetClass"),
+                "contributing_rules": decision.get("ContributingRules"),
+                "sentiment_overlay": decision.get("SentimentOverlay"),
+                "sentiment_overlays": decision.get("SentimentOverlays"),
+            }
+        )
+
     payload = {
         "time": ts,
         "mode": "paper-shadow",
@@ -38,6 +52,7 @@ def _publish_paper_decisions(message_queue, decisions):
         "buys": buy_symbols,
         "sells": sell_symbols,
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "decision_details": decision_details,
     }
 
     os.makedirs("reports", exist_ok=True)
