@@ -61,7 +61,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
 - `daily_improvement_audit.py` - read-only daily audit of reports/logs that identifies concrete improvement areas without auto-editing trading code
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
-- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now defaulting non-RNN variants to the same live-parity execution engine used by weekly validation and defaulting symbol selection to the full approved fundamentals universe unless explicitly overridden
+- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now defaulting non-RNN variants to the same live-parity execution engine used by weekly validation, defaulting symbol selection to the full approved fundamentals universe unless explicitly overridden, pre-caching local history into `intermediary_files/Hist_Data`, and evaluating non-RNN variants in parallel worker processes
 - `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
 - `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
@@ -185,7 +185,9 @@ In `scripts/weekly_strategy_lab.py`:
 - reads latest `daily_scorecard_*.json` when available
 - supports env overrides for history depth via `AT_LAB_HISTORY_PERIOD` and `AT_LAB_MIN_BARS`
 - defaults to the full approved fundamentals universe for lab symbol selection; set `AT_LAB_SYMBOLS` to force a smaller explicit basket or `AT_LAB_USE_APPROVED_UNIVERSE=0` to fall back to the older curated list
+- pre-caches missing history locally by default before loading indicators; tune with `AT_LAB_PRECACHE`, `AT_LAB_PRECACHE_WORKERS`
 - non-RNN variants now route through the live-parity baseline simulator by default; set `AT_LAB_MATCH_LIVE=0` to fall back to the older per-symbol simulator
+- non-RNN variants are evaluated in parallel by default on multi-core machines; tune with `AT_LAB_PARALLEL_VARIANTS`, `AT_LAB_MAX_WORKERS`, and optionally `AT_LAB_MP_START`
 - can also read a tradebook CSV via `AT_LAB_TRADEBOOK_PATH`
 - if the day had zero trades, it expands buy-side search space automatically
 - if tradebook analysis shows weak 5 to 10 day holds, it biases sell-side search toward tighter time stops
