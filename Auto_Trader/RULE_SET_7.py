@@ -21,37 +21,73 @@ CONFIG = {
     "rsi_floor": float(os.getenv("AT_BUY_RSI_FLOOR", "45")),
     "stoch_pull_max": float(os.getenv("AT_BUY_STOCH_PULL_MAX", "75")),
     "stoch_momo_max": float(os.getenv("AT_BUY_STOCH_MOMO_MAX", "85")),
-    # --- New indicator gates ---
-    "cci_buy_min": float(os.getenv("AT_BUY_CCI_BUY_MIN", "-100")),     # CCI above -100 = bullish zone
-    "willr_oversold_max": float(os.getenv("AT_BUY_WILLR_OVERSOLD_MAX", "-20")),  # Williams %R above -20 = overbought
-    "vwap_buy_above": float(os.getenv("AT_BUY_VWAP_BUY_ABOVE", "1")),  # 1 = must be above VWAP, 0 = skip
-    "ich_cloud_bull": float(os.getenv("AT_BUY_ICH_CLOUD_BULL", "1")),  # 1 = must be above Ichimoku cloud, 0 = skip
-    "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),      # 1 = price must be above SAR, 0 = skip gate
-    "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),        # minimum DI+ (0 = skip)
-    "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")), # 1 = DI+ must be > DI-, 0 = skip
+    "cci_buy_min": float(os.getenv("AT_BUY_CCI_BUY_MIN", "-100")),
+    "willr_oversold_max": float(os.getenv("AT_BUY_WILLR_OVERSOLD_MAX", "-20")),
+    "vwap_buy_above": float(os.getenv("AT_BUY_VWAP_BUY_ABOVE", "1")),
+    "ich_cloud_bull": float(os.getenv("AT_BUY_ICH_CLOUD_BULL", "1")),
+    "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),
+    "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),
+    "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")),
 }
 
 
-def buy_or_sell(df, row, holdings):
+def _slope_up(series, win=3):
+    if len(series) < win:
+        return False
+    x = np.arange(win)
+    y = np.array(series[-win:], dtype=float)
+    cov = np.cov(x, y, bias=True)[0, 1]
+    var = np.var(x)
+    return (cov / var) > 0 if var > 0 else False
+
+
+
+def _safe_metric(value, digits=4):
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if not np.isfinite(out):
+        return None
+    return round(out, digits)
+
+
+
+def _uniq(items):
+    seen = set()
+    out = []
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+
+def evaluate_signal(df, row, holdings):
     from .utils import get_mmi_now
 
     if len(df) < 3:
-        return "HOLD"
+        return "HOLD", {
+            "entry_gate_failures": ["short_history"],
+            "hard_blocks": ["short_history"],
+            "nearest_mode": None,
+            "nearest_mode_missing": ["short_history"],
+            "nearest_mode_missing_count": 1,
+            "gate_status": {"enough_history": False},
+            "metric_snapshot": {},
+            "threshold_snapshot": {
+                "adx_min": CONFIG["adx_min"],
+                "adx_strong_min": CONFIG["adx_strong_min"],
+                "rsi_floor": CONFIG["rsi_floor"],
+            },
+            "reason": ["short_history"],
+        }
 
     latest = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # --- helper for slope ---
-    def slope_up(series, win=3):
-        if len(series) < win:
-            return False
-        x = np.arange(win)
-        y = np.array(series[-win:], dtype=float)
-        cov = np.cov(x, y, bias=True)[0, 1]
-        var = np.var(x)
-        return (cov / var) > 0 if var > 0 else False
-
-    # --- signals ---
     close = float(latest["Close"])
     ema20 = float(latest["EMA20"])
     ema50 = float(latest["EMA50"])
@@ -67,173 +103,309 @@ def buy_or_sell(df, row, holdings):
 
     macd = latest["MACD"]
     macd_sig = latest["MACD_Signal"]
-    macd_rising = latest["MACD_Hist"] > prev["MACD_Hist"]
+    macd_hist = latest.get("MACD_Hist", np.nan)
+    prev_macd_hist = prev.get("MACD_Hist", np.nan)
+    macd_rising = macd_hist > prev_macd_hist
+    macd_signal_ok = macd > macd_sig
 
-    # Volume
     vol = latest["Volume"]
     vol_sma = latest["SMA_20_Volume"]
     vol_ok = vol > CONFIG["volume_confirm_mult"] * vol_sma
 
-    # CMF regime-aware
     cmf = latest["CMF"]
+    prev_cmf = prev["CMF"]
     if adx_strong:
         cmf_gate = CONFIG["cmf_strong_min"]
     elif not adx_ok:
         cmf_gate = CONFIG["cmf_weak_min"]
     else:
         cmf_gate = CONFIG["cmf_base_min"]
-    cmf_ok = (cmf >= cmf_gate) and (cmf > prev["CMF"])
+    cmf_ok = (cmf >= cmf_gate) and (cmf > prev_cmf)
 
-    # OBV
     z = latest.get("OBV_ZScore20", np.nan)
-    obv_trend = latest["OBV"] > latest["OBV_EMA20"]
-    obv_slope = slope_up(df["OBV_EMA20"].values)
+    obv = latest.get("OBV", np.nan)
+    obv_ema20 = latest.get("OBV_EMA20", np.nan)
+    obv_trend = obv > obv_ema20
+    obv_slope = _slope_up(df["OBV_EMA20"].values)
     obv_ok = (np.isfinite(z) and z >= CONFIG["obv_min_zscore"] and obv_trend) or (obv_trend and obv_slope)
-    if np.isfinite(z) and z > CONFIG["max_obv_zscore"]:
-        return "HOLD"
+    obv_overextended = np.isfinite(z) and z > CONFIG["max_obv_zscore"]
 
-    # Breakouts
     prior_high_break = close > float(prev["High"])
     hhv20 = latest.get("HHV_20", np.nan)
     prev_hhv20 = prev.get("HHV_20", np.nan)
     highN_break = False
     if np.isfinite(hhv20) and np.isfinite(prev_hhv20):
-        highN_break = (close > float(hhv20)) and (
-            float(prev["Close"]) <= float(prev_hhv20)
-        )
+        highN_break = (close > float(hhv20)) and (float(prev["Close"]) <= float(prev_hhv20))
 
-    # RSI with adaptive gates
     rsi = latest["RSI"]
-    rsi_slope_up = rsi >= prev["RSI"]
+    prev_rsi = prev["RSI"]
+    rsi_floor_ok = rsi >= CONFIG["rsi_floor"]
+    rsi_slope_up = rsi >= prev_rsi
+    overbought_guard = np.isfinite(z) and z >= 2.0 and rsi >= 75
     stoch_k = latest.get("Stochastic_%K", np.nan)
-    supertrend_dir = latest.get("Supertrend_Direction", True)
+    supertrend_dir = bool(latest.get("Supertrend_Direction", True))
     supertrend = latest.get("Supertrend", np.nan)
     weekly_sma_20 = latest.get("Weekly_SMA_20", np.nan)
     weekly_sma_200 = latest.get("Weekly_SMA_200", np.nan)
 
-    if rsi < CONFIG["rsi_floor"]:
-        return "HOLD"
-    if np.isfinite(z) and z >= 2.0 and rsi >= 75:
-        return "HOLD"
-
     atr = latest.get("ATR", np.nan)
+    atr_pct = np.nan
+    extension_atr = np.nan
+    atr_band_ok = True
+    extension_ok = True
     if np.isfinite(atr) and close > 0:
         atr_pct = float(atr) / close
-        if not (CONFIG["min_atr_pct"] <= atr_pct <= CONFIG["max_atr_pct"]):
-            return "HOLD"
+        atr_band_ok = CONFIG["min_atr_pct"] <= atr_pct <= CONFIG["max_atr_pct"]
         extension_atr = (close - ema20) / max(float(atr), 1e-9)
-        if extension_atr > CONFIG["max_extension_atr"]:
-            return "HOLD"
+        extension_ok = extension_atr <= CONFIG["max_extension_atr"]
 
-    if np.isfinite(supertrend) and close < float(supertrend):
-        return "HOLD"
-    if not bool(supertrend_dir):
-        return "HOLD"
-    if np.isfinite(weekly_sma_20) and np.isfinite(weekly_sma_200) and weekly_sma_20 < weekly_sma_200:
-        return "HOLD"
+    supertrend_price_ok = (not np.isfinite(supertrend)) or close >= float(supertrend)
+    weekly_trend_ok = True
+    if np.isfinite(weekly_sma_20) and np.isfinite(weekly_sma_200):
+        weekly_trend_ok = weekly_sma_20 >= weekly_sma_200
 
     rsi_pull_gate = 55
     rsi_momo_gate = 60
-
     strong_regime = trend_ok and adx_strong and (cmf >= 0.05) and obv_trend
     if strong_regime:
         rsi_pull_gate = 50
         rsi_momo_gate = 55
 
-    rsi_pullback_trigger = (
-        (prev["RSI"] < rsi_pull_gate) and (rsi >= rsi_pull_gate) and rsi_slope_up
-    )
-    rsi_momo_trigger = (
-        (prev["RSI"] < rsi_momo_gate) and (rsi >= rsi_momo_gate) and rsi_slope_up
-    )
+    rsi_pullback_trigger = (prev_rsi < rsi_pull_gate) and (rsi >= rsi_pull_gate) and rsi_slope_up
+    rsi_momo_trigger = (prev_rsi < rsi_momo_gate) and (rsi >= rsi_momo_gate) and rsi_slope_up
 
-    # --- Extra safeguard: always demand MACD > Signal ---
-    if macd <= macd_sig:
-        return "HOLD"
-
-    # Market regime (MMI) guard
     mmi = get_mmi_now()
-    if mmi is not None and mmi >= CONFIG["mmi_risk_off"]:
-        return "HOLD"
+    mmi_ok = mmi is None or mmi < CONFIG["mmi_risk_off"]
 
-    # --- NEW: Additional indicator gates (disabled by default, activated via env vars) ---
-    # VWAP: price must be above VWAP (intraday benchmark)
-    if CONFIG["vwap_buy_above"] >= 1:
-        vwap = latest.get("VWAP", np.nan)
-        if np.isfinite(vwap) and close < float(vwap):
-            return "HOLD"
+    vwap = latest.get("VWAP", np.nan)
+    vwap_ok = True
+    if CONFIG["vwap_buy_above"] >= 1 and np.isfinite(vwap):
+        vwap_ok = close >= float(vwap)
 
-    # Ichimoku cloud: price must be above the cloud
-    if CONFIG["ich_cloud_bull"] >= 1:
-        ich_bull = latest.get("ICH_CLOUD_BULL", np.nan)
-        if np.isfinite(ich_bull) and not bool(ich_bull):
-            return "HOLD"
+    ich_bull = latest.get("ICH_CLOUD_BULL", np.nan)
+    ich_cloud_ok = True
+    if CONFIG["ich_cloud_bull"] >= 1 and np.isfinite(ich_bull):
+        ich_cloud_ok = bool(ich_bull)
 
-    # Parabolic SAR: price must be above SAR
-    if CONFIG["sar_buy_enabled"] >= 1:
-        sar = latest.get("SAR", np.nan)
-        if np.isfinite(sar) and close < float(sar):
-            return "HOLD"
+    sar = latest.get("SAR", np.nan)
+    sar_ok = True
+    if CONFIG["sar_buy_enabled"] >= 1 and np.isfinite(sar):
+        sar_ok = close >= float(sar)
 
-    # CCI: must be above oversold zone
     cci = latest.get("CCI", np.nan)
-    if np.isfinite(cci) and float(cci) < CONFIG["cci_buy_min"]:
-        return "HOLD"
+    cci_ok = (not np.isfinite(cci)) or (float(cci) >= CONFIG["cci_buy_min"])
 
-    # Williams %R: not deeply oversold (above threshold = not oversold)
-    # Note: Williams %R is negative, -20 is overbought, -80 is oversold
     willr = latest.get("Williams_%R", latest.get("Williams_R", np.nan))
-    if np.isfinite(willr) and float(willr) < -80:
-        # Deeply oversold — but for buy this could be a contrarian signal, so only block if extreme
-        pass  # Don't block on oversold; allow for bounce
+    plus_di = latest.get("PLUS_DI", np.nan)
+    minus_di = latest.get("MINUS_DI", np.nan)
 
-    # DMI+/DMI-: if enabled, require DI+ > DI-
-    if CONFIG["di_cross_enabled"] >= 1:
-        plus_di = latest.get("PLUS_DI", np.nan)
-        minus_di = latest.get("MINUS_DI", np.nan)
-        if np.isfinite(plus_di) and np.isfinite(minus_di) and float(plus_di) < float(minus_di):
-            return "HOLD"
+    di_cross_ok = True
+    if CONFIG["di_cross_enabled"] >= 1 and np.isfinite(plus_di) and np.isfinite(minus_di):
+        di_cross_ok = float(plus_di) >= float(minus_di)
 
-    # Minimum DI+ requirement
-    di_plus_min = CONFIG["di_plus_min"]
-    if di_plus_min > 0:
-        plus_di = latest.get("PLUS_DI", np.nan)
-        if np.isfinite(plus_di) and float(plus_di) < di_plus_min:
-            return "HOLD"
+    di_plus_ok = True
+    if CONFIG["di_plus_min"] > 0 and np.isfinite(plus_di):
+        di_plus_ok = float(plus_di) >= CONFIG["di_plus_min"]
 
-    # --- Modes ---
     stoch_pull_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_pull_max"])
     stoch_momo_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_momo_max"])
 
-    pullback_mode = all(
-        (
-            trend_ok,
-            trend_slope_ok,
-            adx_ok,
-            vol_ok,
-            cmf_ok,
-            obv_ok,
-            macd_rising,
-            rsi_pullback_trigger,
-            stoch_pull_ok,
-            close >= ema20,
-        )
-    )
-    breakout_mode = all(
-        (
-            trend_ok,
-            trend_slope_ok,
-            adx_strong,
-            vol_ok,
-            cmf_ok,
-            obv_ok,
-            macd_rising,
-            stoch_momo_ok,
-            (rsi_momo_trigger or highN_break or prior_high_break),
-        )
-    )
+    pullback_checks = {
+        "trend_ok": bool(trend_ok),
+        "trend_slope_ok": bool(trend_slope_ok),
+        "adx_ok": bool(adx_ok),
+        "volume_confirm": bool(vol_ok),
+        "cmf_ok": bool(cmf_ok),
+        "obv_ok": bool(obv_ok),
+        "macd_hist_rising": bool(macd_rising),
+        "rsi_pullback_trigger": bool(rsi_pullback_trigger),
+        "stoch_pull_ok": bool(stoch_pull_ok),
+        "close_above_ema20": bool(close >= ema20),
+    }
+    breakout_checks = {
+        "trend_ok": bool(trend_ok),
+        "trend_slope_ok": bool(trend_slope_ok),
+        "adx_strong": bool(adx_strong),
+        "volume_confirm": bool(vol_ok),
+        "cmf_ok": bool(cmf_ok),
+        "obv_ok": bool(obv_ok),
+        "macd_hist_rising": bool(macd_rising),
+        "stoch_momo_ok": bool(stoch_momo_ok),
+        "breakout_trigger": bool(rsi_momo_trigger or highN_break or prior_high_break),
+    }
 
-    if pullback_mode or breakout_mode:
-        return "BUY"
+    pullback_mode = all(pullback_checks.values())
+    breakout_mode = all(breakout_checks.values())
+    pullback_missing = [name for name, ok in pullback_checks.items() if not ok]
+    breakout_missing = [name for name, ok in breakout_checks.items() if not ok]
+    if len(pullback_missing) <= len(breakout_missing):
+        nearest_mode = "pullback"
+        nearest_mode_missing = pullback_missing
+    else:
+        nearest_mode = "breakout"
+        nearest_mode_missing = breakout_missing
 
-    return "HOLD"
+    hard_blocks = []
+    if obv_overextended:
+        hard_blocks.append("obv_overextended")
+    if not rsi_floor_ok:
+        hard_blocks.append("rsi_floor")
+    if overbought_guard:
+        hard_blocks.append("overbought_guard")
+    if not atr_band_ok:
+        hard_blocks.append("atr_band")
+    if not extension_ok:
+        hard_blocks.append("extension_atr")
+    if not supertrend_price_ok:
+        hard_blocks.append("supertrend_price")
+    if not supertrend_dir:
+        hard_blocks.append("supertrend_direction")
+    if not weekly_trend_ok:
+        hard_blocks.append("weekly_trend")
+    if not macd_signal_ok:
+        hard_blocks.append("macd_signal_cross")
+    if not mmi_ok:
+        hard_blocks.append("mmi_risk_off")
+    if not vwap_ok:
+        hard_blocks.append("vwap")
+    if not ich_cloud_ok:
+        hard_blocks.append("ich_cloud")
+    if not sar_ok:
+        hard_blocks.append("sar")
+    if not cci_ok:
+        hard_blocks.append("cci")
+    if not di_cross_ok:
+        hard_blocks.append("di_cross")
+    if not di_plus_ok:
+        hard_blocks.append("di_plus")
+
+    decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode)) else "HOLD"
+    entry_gate_failures = _uniq(hard_blocks + nearest_mode_missing)
+
+    gate_status = {
+        "trend_ok": bool(trend_ok),
+        "trend_slope_ok": bool(trend_slope_ok),
+        "adx_ok": bool(adx_ok),
+        "adx_strong": bool(adx_strong),
+        "volume_confirm": bool(vol_ok),
+        "cmf_ok": bool(cmf_ok),
+        "obv_ok": bool(obv_ok),
+        "obv_overextended": not bool(obv_overextended),
+        "macd_signal_ok": bool(macd_signal_ok),
+        "macd_hist_rising": bool(macd_rising),
+        "rsi_floor_ok": bool(rsi_floor_ok),
+        "atr_band_ok": bool(atr_band_ok),
+        "extension_ok": bool(extension_ok),
+        "supertrend_price_ok": bool(supertrend_price_ok),
+        "supertrend_direction_ok": bool(supertrend_dir),
+        "weekly_trend_ok": bool(weekly_trend_ok),
+        "mmi_ok": bool(mmi_ok),
+        "vwap_ok": bool(vwap_ok),
+        "ich_cloud_ok": bool(ich_cloud_ok),
+        "sar_ok": bool(sar_ok),
+        "cci_ok": bool(cci_ok),
+        "di_cross_ok": bool(di_cross_ok),
+        "di_plus_ok": bool(di_plus_ok),
+        "stoch_pull_ok": bool(stoch_pull_ok),
+        "stoch_momo_ok": bool(stoch_momo_ok),
+        "rsi_pullback_trigger": bool(rsi_pullback_trigger),
+        "rsi_momo_trigger": bool(rsi_momo_trigger),
+        "prior_high_break": bool(prior_high_break),
+        "highN_break": bool(highN_break),
+        "pullback_mode": bool(pullback_mode),
+        "breakout_mode": bool(breakout_mode),
+    }
+
+    metric_snapshot = {
+        "close": _safe_metric(close),
+        "ema20": _safe_metric(ema20),
+        "ema50": _safe_metric(ema50),
+        "ema200": _safe_metric(ema200),
+        "adx": _safe_metric(adx),
+        "macd": _safe_metric(macd),
+        "macd_signal": _safe_metric(macd_sig),
+        "macd_hist": _safe_metric(macd_hist),
+        "volume": _safe_metric(vol, 2),
+        "volume_sma20": _safe_metric(vol_sma, 2),
+        "cmf": _safe_metric(cmf),
+        "obv": _safe_metric(obv, 2),
+        "obv_ema20": _safe_metric(obv_ema20, 2),
+        "obv_zscore20": _safe_metric(z),
+        "rsi": _safe_metric(rsi),
+        "stochastic_k": _safe_metric(stoch_k),
+        "atr": _safe_metric(atr),
+        "atr_pct": _safe_metric(atr_pct),
+        "extension_atr": _safe_metric(extension_atr),
+        "supertrend": _safe_metric(supertrend),
+        "weekly_sma_20": _safe_metric(weekly_sma_20),
+        "weekly_sma_200": _safe_metric(weekly_sma_200),
+        "vwap": _safe_metric(vwap),
+        "ich_cloud_bull": None if not np.isfinite(ich_bull) else bool(ich_bull),
+        "sar": _safe_metric(sar),
+        "cci": _safe_metric(cci),
+        "williams_r": _safe_metric(willr),
+        "plus_di": _safe_metric(plus_di),
+        "minus_di": _safe_metric(minus_di),
+        "mmi": _safe_metric(mmi),
+        "cmf_gate": _safe_metric(cmf_gate),
+        "rsi_pull_gate": _safe_metric(rsi_pull_gate),
+        "rsi_momo_gate": _safe_metric(rsi_momo_gate),
+    }
+
+    threshold_snapshot = {
+        "adx_min": CONFIG["adx_min"],
+        "adx_strong_min": CONFIG["adx_strong_min"],
+        "mmi_risk_off": CONFIG["mmi_risk_off"],
+        "min_atr_pct": CONFIG["min_atr_pct"],
+        "max_atr_pct": CONFIG["max_atr_pct"],
+        "max_extension_atr": CONFIG["max_extension_atr"],
+        "max_obv_zscore": CONFIG["max_obv_zscore"],
+        "obv_min_zscore": CONFIG["obv_min_zscore"],
+        "volume_confirm_mult": CONFIG["volume_confirm_mult"],
+        "cmf_gate": round(float(cmf_gate), 4),
+        "rsi_floor": CONFIG["rsi_floor"],
+        "stoch_pull_max": CONFIG["stoch_pull_max"],
+        "stoch_momo_max": CONFIG["stoch_momo_max"],
+        "cci_buy_min": CONFIG["cci_buy_min"],
+        "vwap_buy_above": CONFIG["vwap_buy_above"],
+        "ich_cloud_bull": CONFIG["ich_cloud_bull"],
+        "sar_buy_enabled": CONFIG["sar_buy_enabled"],
+        "di_plus_min": CONFIG["di_plus_min"],
+        "di_cross_enabled": CONFIG["di_cross_enabled"],
+        "rsi_pull_gate": rsi_pull_gate,
+        "rsi_momo_gate": rsi_momo_gate,
+    }
+
+    reason = []
+    if decision == "BUY":
+        if pullback_mode:
+            reason.append("pullback_mode")
+        if breakout_mode:
+            reason.append("breakout_mode")
+    else:
+        if hard_blocks:
+            reason.extend(hard_blocks)
+        reason.append(f"nearest_mode:{nearest_mode}")
+
+    return decision, {
+        "entry_gate_failures": entry_gate_failures,
+        "hard_blocks": hard_blocks,
+        "nearest_mode": nearest_mode,
+        "nearest_mode_missing": nearest_mode_missing,
+        "nearest_mode_missing_count": len(nearest_mode_missing),
+        "alternate_mode_missing": breakout_missing if nearest_mode == "pullback" else pullback_missing,
+        "gate_status": gate_status,
+        "metric_snapshot": metric_snapshot,
+        "threshold_snapshot": threshold_snapshot,
+        "mode_diagnostics": {
+            "pullback_missing": pullback_missing,
+            "breakout_missing": breakout_missing,
+        },
+        "reason": reason,
+    }
+
+
+
+def buy_or_sell(df, row, holdings):
+    decision, _ = evaluate_signal(df, row, holdings)
+    return decision
