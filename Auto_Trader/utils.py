@@ -157,16 +157,30 @@ def compute_supertrend(
 ) -> None:
     """
     Vectorized Supertrend: appends `sup_col` & `sup_dir` in-place.
-    """
-    hl2 = (df["High"].values + df["Low"].values) * 0.5
-    up = hl2 + multiplier * atr
-    dn = hl2 - multiplier * atr
 
+    Be defensive around empty/short ATR inputs so downstream shadow/lab
+    workflows do not crash on sparse histories or partially-formed arrays.
+    """
     n = len(df)
     if n == 0:
         df[sup_col] = np.nan
         df[sup_dir] = True
         return
+
+    atr_arr = np.asarray(atr, dtype="float64").reshape(-1)
+    if atr_arr.size == 0:
+        atr_arr = np.full(n, np.nan, dtype="float64")
+    elif atr_arr.size == 1 and n > 1:
+        atr_arr = np.full(n, float(atr_arr[0]), dtype="float64")
+    elif atr_arr.size != n:
+        padded = np.full(n, np.nan, dtype="float64")
+        copy_n = min(n, atr_arr.size)
+        padded[:copy_n] = atr_arr[:copy_n]
+        atr_arr = padded
+
+    hl2 = (df["High"].values + df["Low"].values) * 0.5
+    up = hl2 + multiplier * atr_arr
+    dn = hl2 - multiplier * atr_arr
 
     up_shift = np.roll(up, 1)
     dn_shift = np.roll(dn, 1)
@@ -250,6 +264,10 @@ def Indicators(
         df["RSI"] = np.nan
         df["ADX"] = np.nan
         df["ATR"] = np.nan
+        df["Supertrend"] = np.nan
+        df["Supertrend_Direction"] = True
+        df["Supertrend_Rule_8_Exit"] = np.nan
+        df["Supertrend_Direction_Rule_8_Exit"] = True
         return df
 
     # Coerce numeric dtypes once
