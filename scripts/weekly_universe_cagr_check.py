@@ -144,6 +144,92 @@ def _load_symbol_history_local(symbol: str) -> pd.DataFrame | None:
         return None
 
 
+def _resolve_regime_filter_config() -> dict:
+    cfg = dict(getattr(lab.RULE_SET_7, "CONFIG", {}) or {})
+    symbol = str(os.getenv("AT_BUY_REGIME_SYMBOL", "NIFTYETF") or "NIFTYETF").strip().upper()
+    try:
+        symbol = str(cfg.get("regime_symbol", symbol) or symbol).strip().upper()
+    except Exception:
+        pass
+    enabled = bool(float(cfg.get("regime_filter_enabled", os.getenv("AT_BUY_REGIME_FILTER_ENABLED", "0") or 0)) > 0)
+    ema_fast = max(5, int(float(cfg.get("regime_ema_fast", os.getenv("AT_BUY_REGIME_EMA_FAST", "50") or 50))))
+    ema_slow = max(ema_fast + 1, int(float(cfg.get("regime_ema_slow", os.getenv("AT_BUY_REGIME_EMA_SLOW", "200") or 200))))
+    atr_pct_max = float(cfg.get("regime_atr_pct_max", os.getenv("AT_BUY_REGIME_ATR_PCT_MAX", "0") or 0) or 0)
+    return {
+        "enabled": enabled,
+        "symbol": symbol or "NIFTYETF",
+        "ema_fast": ema_fast,
+        "ema_slow": ema_slow,
+        "atr_pct_max": atr_pct_max,
+    }
+
+
+def _load_regime_proxy_history(config: dict) -> tuple[pd.DataFrame | None, dict]:
+    if not config.get("enabled"):
+        return None, {"enabled": False, "reason": "disabled"}
+
+    candidates = []
+    for raw in [config.get("symbol", "NIFTYETF"), "NIFTYBEES", "NIFTY50_INDEX"]:
+        symbol = str(raw or "").strip().upper()
+        if symbol and symbol not in candidates:
+            candidates.append(symbol)
+
+    for symbol in candidates:
+        df = _load_symbol_history_local(symbol)
+        if df is None or df.empty:
+            continue
+        try:
+            ind = at_utils.Indicators(df.copy())
+        except Exception:
+            continue
+        ind = ind.sort_values("Date").drop_duplicates(subset=["Date"], keep="last").reset_index(drop=True)
+        ind["ATR_PCT"] = pd.to_numeric(ind.get("ATR"), errors="coerce") / pd.to_numeric(ind.get("Close"), errors="coerce").replace(0, np.nan)
+        ind["Date"] = pd.to_datetime(ind["Date"], errors="coerce")
+        ind = ind.dropna(subset=["Date", "Close"]).reset_index(drop=True)
+        if not ind.empty:
+            return ind, {"enabled": True, "proxy_symbol": symbol, "requested_symbol": config.get("symbol")}
+
+    raise RuntimeError(f"Regime filter enabled but no usable proxy history found for {candidates}")
+
+
+def _regime_state_for_date(regime_df: pd.DataFrame | None, date: pd.Timestamp, config: dict) -> dict:
+    if not config.get("enabled"):
+        return {"enabled": False, "allow_new_longs": True, "reason": "disabled"}
+    if regime_df is None or regime_df.empty:
+        return {"enabled": True, "allow_new_longs": True, "reason": "missing_proxy_history"}
+
+    part = regime_df[regime_df["Date"] <= pd.to_datetime(date)]
+    if part.empty:
+        return {"enabled": True, "allow_new_longs": True, "reason": "no_proxy_bar_yet"}
+
+    latest = part.iloc[-1]
+    close = float(latest.get("Close", np.nan))
+    ema_fast = float(latest.get(f'EMA{int(config["ema_fast"])}', np.nan))
+    ema_slow = float(latest.get(f'EMA{int(config["ema_slow"])}', np.nan))
+    atr_pct = float(latest.get("ATR_PCT", np.nan)) if pd.notna(latest.get("ATR_PCT", np.nan)) else np.nan
+    trend_ok = np.isfinite(close) and np.isfinite(ema_fast) and np.isfinite(ema_slow) and close > ema_fast and ema_fast > ema_slow
+    vol_ok = True
+    if float(config.get("atr_pct_max", 0.0) or 0.0) > 0:
+        vol_ok = np.isfinite(atr_pct) and atr_pct <= float(config["atr_pct_max"])
+
+    reasons = []
+    if not trend_ok:
+        reasons.append("proxy_trend_off")
+    if not vol_ok:
+        reasons.append("proxy_vol_too_high")
+
+    return {
+        "enabled": True,
+        "allow_new_longs": bool(trend_ok and vol_ok),
+        "date": pd.to_datetime(latest["Date"]).isoformat(),
+        "close": round(close, 4) if np.isfinite(close) else None,
+        "ema_fast": round(ema_fast, 4) if np.isfinite(ema_fast) else None,
+        "ema_slow": round(ema_slow, 4) if np.isfinite(ema_slow) else None,
+        "atr_pct": round(atr_pct, 4) if np.isfinite(atr_pct) else None,
+        "reason": reasons or ["proxy_regime_ok"],
+    }
+
+
 def load_data(symbols: list[str], min_history_bars: int) -> tuple[dict[str, pd.DataFrame], dict]:
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
@@ -291,6 +377,16 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
     starting_capital = float(os.getenv("AT_BACKTEST_STARTING_CAPITAL", os.getenv("AT_WEEKLY_CAGR_STARTING_CAPITAL", "100000")) or 100000)
     min_order_notional = float(os.getenv("AT_BACKTEST_MIN_ORDER_NOTIONAL", "500") or 500)
     warmup_bars = max(250, int(os.getenv("AT_BACKTEST_WARMUP_BARS", "250") or 250))
+    regime_cfg = _resolve_regime_filter_config()
+    regime_df, regime_meta = _load_regime_proxy_history(regime_cfg)
+    regime_stats = {
+        "enabled": bool(regime_cfg.get("enabled")),
+        "blocked_buy_signals": 0,
+        "allowed_buy_signals": 0,
+        "proxy_meta": regime_meta,
+        "config": dict(regime_cfg),
+        "last_state": None,
+    }
 
     details: dict[str, dict] = {
         symbol: {
@@ -328,6 +424,8 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
             total = max(1, len(all_dates))
             for day_idx, date in enumerate(all_dates, start=1):
                 symbols_today = sorted(date_to_symbols.get(date, []))
+                regime_state = _regime_state_for_date(regime_df, date, regime_cfg)
+                regime_stats["last_state"] = regime_state
                 for symbol in symbols_today:
                     df = data_map[symbol]
                     idx_matches = df.index[pd.to_datetime(df["Date"]) == date]
@@ -425,7 +523,11 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                         sig = lab.RULE_SET_7.buy_or_sell(part, row, hold_df)
                         next_date = _get_next_date(df, i)
                         if str(sig).upper() == "BUY" and next_date is not None and symbol not in pending_orders:
-                            pending_orders[symbol] = {"side": "BUY", "exec_date": next_date}
+                            if regime_state.get("allow_new_longs", True):
+                                regime_stats["allowed_buy_signals"] += 1
+                                pending_orders[symbol] = {"side": "BUY", "exec_date": next_date}
+                            else:
+                                regime_stats["blocked_buy_signals"] += 1
 
                 portfolio_value = cash
                 for held_symbol, pos in positions.items():
@@ -511,6 +613,14 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
             "execution_timing": "signal_on_close_execute_next_open",
             "starting_capital": round(starting_capital, 2),
             "per_buy_allocation": round(per_buy_allocation, 2),
+            "regime_filter": {
+                "enabled": bool(regime_stats.get("enabled")),
+                "blocked_buy_signals": int(regime_stats.get("blocked_buy_signals", 0) or 0),
+                "allowed_buy_signals": int(regime_stats.get("allowed_buy_signals", 0) or 0),
+                "proxy_meta": regime_stats.get("proxy_meta", {}),
+                "config": regime_stats.get("config", {}),
+                "last_state": regime_stats.get("last_state", {}),
+            },
         },
     }
     return result, details, sim_meta
