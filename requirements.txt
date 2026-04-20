@@ -1,5 +1,7 @@
 filelock
+joblib
 kiteconnect
+lightgbm
 multitasking
 numpy
 onetimepass
@@ -8,11 +10,15 @@ pandas_market_calendars
 python-telegram-bot
 requests
 retry
+scikit-learn
+scipy
 streamlit
 plotly
 TA-Lib
+threadpoolctl
 timedelta
 tqdm
+xgboost
 yfinance
 Bharat-sm-data
 mcp
