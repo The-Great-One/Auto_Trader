@@ -9,8 +9,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
+
+try:
+    from sklearn.ensemble import HistGradientBoostingClassifier  # type: ignore
+except Exception:
+    HistGradientBoostingClassifier = None
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -42,6 +45,71 @@ META_COLS = {
     "forward_end_return_pct",
     "forward_min_return_pct",
 }
+
+
+class NumpyLogisticMetaModel:
+    def __init__(self, learning_rate: float = 0.05, max_iter: int = 1200, l2: float = 1e-3):
+        self.learning_rate = learning_rate
+        self.max_iter = max_iter
+        self.l2 = l2
+        self.fill_values: np.ndarray | None = None
+        self.means: np.ndarray | None = None
+        self.scales: np.ndarray | None = None
+        self.weights: np.ndarray | None = None
+        self.bias: float = 0.0
+        self.constant_prob: float | None = None
+
+    def _prepare(self, X: pd.DataFrame | np.ndarray, fit: bool = False) -> np.ndarray:
+        arr = np.asarray(X, dtype=float)
+        if fit:
+            self.fill_values = np.nanmedian(arr, axis=0)
+            self.fill_values = np.where(np.isfinite(self.fill_values), self.fill_values, 0.0)
+        if self.fill_values is None:
+            raise RuntimeError("Model not fitted")
+        arr = np.where(np.isfinite(arr), arr, self.fill_values)
+        if fit:
+            self.means = arr.mean(axis=0)
+            self.scales = arr.std(axis=0)
+            self.scales = np.where(self.scales > 1e-9, self.scales, 1.0)
+        if self.means is None or self.scales is None:
+            raise RuntimeError("Model not fitted")
+        return (arr - self.means) / self.scales
+
+    @staticmethod
+    def _sigmoid(z: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-np.clip(z, -30.0, 30.0)))
+
+    def fit(self, X: pd.DataFrame, y: pd.Series | np.ndarray) -> "NumpyLogisticMetaModel":
+        y_arr = np.asarray(y, dtype=float)
+        X_arr = self._prepare(X, fit=True)
+        if len(np.unique(y_arr)) < 2:
+            self.constant_prob = float(y_arr.mean()) if len(y_arr) else 0.0
+            self.weights = np.zeros(X_arr.shape[1], dtype=float)
+            self.bias = 0.0
+            return self
+        self.constant_prob = None
+        self.weights = np.zeros(X_arr.shape[1], dtype=float)
+        self.bias = 0.0
+        n = max(1, len(y_arr))
+        for _ in range(self.max_iter):
+            logits = X_arr @ self.weights + self.bias
+            probs = self._sigmoid(logits)
+            error = probs - y_arr
+            grad_w = (X_arr.T @ error) / n + self.l2 * self.weights
+            grad_b = float(error.mean())
+            self.weights -= self.learning_rate * grad_w
+            self.bias -= self.learning_rate * grad_b
+        return self
+
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        X_arr = self._prepare(X, fit=False)
+        if self.constant_prob is not None:
+            probs = np.full(len(X_arr), self.constant_prob, dtype=float)
+        else:
+            if self.weights is None:
+                raise RuntimeError("Model not fitted")
+            probs = self._sigmoid(X_arr @ self.weights + self.bias)
+        return np.column_stack([1.0 - probs, probs])
 
 
 def now_iso() -> str:
@@ -142,6 +210,36 @@ def extract_signal_rows(data_map: dict[str, pd.DataFrame], buy_params: dict, hor
     return out.sort_values(["date", "symbol"]).reset_index(drop=True)
 
 
+def accuracy_score_binary(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    if len(y_true) == 0:
+        return 0.0
+    return float((y_true == y_pred).mean())
+
+
+def precision_score_binary(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    tp = int(((y_true == 1) & (y_pred == 1)).sum())
+    fp = int(((y_true == 0) & (y_pred == 1)).sum())
+    return float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+
+
+def recall_score_binary(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    tp = int(((y_true == 1) & (y_pred == 1)).sum())
+    fn = int(((y_true == 1) & (y_pred == 0)).sum())
+    return float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+
+
+def roc_auc_score_binary(y_true: np.ndarray, scores: np.ndarray) -> float | None:
+    pos = y_true == 1
+    neg = y_true == 0
+    n_pos = int(pos.sum())
+    n_neg = int(neg.sum())
+    if n_pos == 0 or n_neg == 0:
+        return None
+    ranks = pd.Series(scores).rank(method="average").to_numpy()
+    auc = (ranks[pos].sum() - (n_pos * (n_pos + 1) / 2.0)) / (n_pos * n_neg)
+    return float(auc)
+
+
 def choose_threshold(test_df: pd.DataFrame, probabilities: np.ndarray) -> tuple[dict, list[dict]]:
     scans: list[dict] = []
     best: dict | None = None
@@ -168,6 +266,21 @@ def choose_threshold(test_df: pd.DataFrame, probabilities: np.ndarray) -> tuple[
         ):
             best = entry
     return best or scans[0], scans
+
+
+def build_model() -> tuple[object, str]:
+    if HistGradientBoostingClassifier is not None:
+        return (
+            HistGradientBoostingClassifier(
+                learning_rate=0.05,
+                max_depth=3,
+                max_iter=250,
+                min_samples_leaf=20,
+                random_state=42,
+            ),
+            "HistGradientBoostingClassifier",
+        )
+    return NumpyLogisticMetaModel(learning_rate=0.05, max_iter=1200, l2=1e-3), "NumpyLogisticMetaModel"
 
 
 def main() -> int:
@@ -216,13 +329,7 @@ def main() -> int:
     X_test = test_df[feature_cols]
     y_test = test_df["label"].astype(int)
 
-    model = HistGradientBoostingClassifier(
-        learning_rate=0.05,
-        max_depth=3,
-        max_iter=250,
-        min_samples_leaf=20,
-        random_state=42,
-    )
+    model, algorithm_name = build_model()
     model.fit(X_train, y_train)
     probabilities = model.predict_proba(X_test)[:, 1]
     predictions = (probabilities >= 0.5).astype(int)
@@ -231,10 +338,11 @@ def main() -> int:
     baseline_positive_rate = float(test_df["label"].mean() * 100.0)
     baseline_avg_end = float(test_df["forward_end_return_pct"].mean())
     baseline_avg_max = float(test_df["forward_max_return_pct"].mean())
+    y_test_arr = y_test.to_numpy(dtype=int)
 
-    roc_auc = None
-    if len(set(y_test.tolist())) > 1:
-        roc_auc = round(float(roc_auc_score(y_test, probabilities)), 4)
+    roc_auc = roc_auc_score_binary(y_test_arr, probabilities)
+    if roc_auc is not None:
+        roc_auc = round(float(roc_auc), 4)
 
     recommendation = {
         "generated_at": now_iso(),
@@ -259,18 +367,18 @@ def main() -> int:
             "max_adverse_excursion_pct": round(max_adverse_excursion * 100.0, 2),
         },
         "model": {
-            "algorithm": "HistGradientBoostingClassifier",
+            "algorithm": algorithm_name,
             "feature_count": len(feature_cols),
-            "accuracy": round(float(accuracy_score(y_test, predictions)), 4),
-            "precision": round(float(precision_score(y_test, predictions, zero_division=0)), 4),
-            "recall": round(float(recall_score(y_test, predictions, zero_division=0)), 4),
+            "accuracy": round(accuracy_score_binary(y_test_arr, predictions), 4),
+            "precision": round(precision_score_binary(y_test_arr, predictions), 4),
+            "recall": round(recall_score_binary(y_test_arr, predictions), 4),
             "roc_auc": roc_auc,
         },
         "threshold_scan": threshold_scan,
         "recommended_threshold": chosen_threshold,
         "notes": [
             "This is the first ML pass, using a pooled meta-label classifier over RULE_SET_7 BUY signals.",
-            "RNN remains disabled; this path is a separate signal-quality filter using scikit-learn.",
+            "RNN remains disabled; this path is a separate signal-quality filter using a lightweight classifier.",
             "Next step if this shows lift is to wire the chosen threshold into a live-parity backtest instead of signal-quality-only evaluation.",
         ],
     }
