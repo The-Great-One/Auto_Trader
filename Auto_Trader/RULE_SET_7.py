@@ -6,10 +6,10 @@ import numpy as np
 logger = logging.getLogger("Auto_Trade_Logger")
 
 CONFIG = {
-    "adx_min": float(os.getenv("AT_BUY_ADX_MIN", "18")),
+    "adx_min": float(os.getenv("AT_BUY_ADX_MIN", "10")),
     "adx_strong_min": float(os.getenv("AT_BUY_ADX_STRONG_MIN", "25")),
     "mmi_risk_off": float(os.getenv("AT_BUY_MMI_RISK_OFF", "65")),
-    "regime_filter_enabled": float(os.getenv("AT_BUY_REGIME_FILTER_ENABLED", "0")),
+    "regime_filter_enabled": float(os.getenv("AT_BUY_REGIME_FILTER_ENABLED", "1")),
     "regime_ema_fast": float(os.getenv("AT_BUY_REGIME_EMA_FAST", "50")),
     "regime_ema_slow": float(os.getenv("AT_BUY_REGIME_EMA_SLOW", "200")),
     "regime_atr_pct_max": float(os.getenv("AT_BUY_REGIME_ATR_PCT_MAX", "0")),
@@ -18,7 +18,7 @@ CONFIG = {
     "max_extension_atr": float(os.getenv("AT_BUY_MAX_EXTENSION_ATR", "2.2")),
     "max_obv_zscore": float(os.getenv("AT_BUY_MAX_OBV_ZSCORE", "3.5")),
     "obv_min_zscore": float(os.getenv("AT_BUY_OBV_MIN_ZSCORE", "0.5")),
-    "volume_confirm_mult": float(os.getenv("AT_BUY_VOLUME_CONFIRM_MULT", "1.1")),
+    "volume_confirm_mult": float(os.getenv("AT_BUY_VOLUME_CONFIRM_MULT", "0.85")),
     "cmf_strong_min": float(os.getenv("AT_BUY_CMF_STRONG_MIN", "0.03")),
     "cmf_base_min": float(os.getenv("AT_BUY_CMF_BASE_MIN", "0.05")),
     "cmf_weak_min": float(os.getenv("AT_BUY_CMF_WEAK_MIN", "0.10")),
@@ -28,7 +28,7 @@ CONFIG = {
     "cci_buy_min": float(os.getenv("AT_BUY_CCI_BUY_MIN", "-100")),
     "willr_oversold_max": float(os.getenv("AT_BUY_WILLR_OVERSOLD_MAX", "-20")),
     "vwap_buy_above": float(os.getenv("AT_BUY_VWAP_BUY_ABOVE", "1")),
-    "ich_cloud_bull": float(os.getenv("AT_BUY_ICH_CLOUD_BULL", "1")),
+    "ich_cloud_bull": float(os.getenv("AT_BUY_ICH_CLOUD_BULL", "0")),
     "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),
     "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),
     "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")),

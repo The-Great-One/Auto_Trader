@@ -35,7 +35,7 @@ CONFIG = {
     "equity_review_rsi": float(os.getenv("AT_EQUITY_REVIEW_RSI", "50.0")),
     "equity_review_macd_hist": float(os.getenv("AT_EQUITY_REVIEW_MACD_HIST", "0.0")),
     "min_atr_fallback_frac": 0.02,  # if ATR missing, fallback = max(0.01, frac * price)
-    "breakeven_trigger_pct": float(os.getenv("AT_SELL_BREAKEVEN_TRIGGER_PCT", "2.5")),  # once crossed, SL should protect principal
+    "breakeven_trigger_pct": float(os.getenv("AT_SELL_BREAKEVEN_TRIGGER_PCT", "4.0")),  # once crossed, SL should protect principal
     "breakeven_buffer_pct": 0.2,  # lock at least +0.2% above avg after trigger
     "momentum_exit_rsi": float(os.getenv("AT_SELL_MOMENTUM_EXIT_RSI", "42.0")),
     "profit_ladder": [  # (profit% threshold, trail = max(last - k*ATR, entry*floor_mult))

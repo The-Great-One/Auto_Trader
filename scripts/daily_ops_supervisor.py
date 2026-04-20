@@ -68,6 +68,12 @@ PARAM_ENV_MAP = {
         "equity_review_rsi": "AT_EQUITY_REVIEW_RSI",
         "equity_review_macd_hist": "AT_EQUITY_REVIEW_MACD_HIST",
     },
+    "simulation": {
+        "vol_sizing_enabled": "AT_BACKTEST_VOL_SIZING_ENABLED",
+        "risk_per_trade_pct": "AT_BACKTEST_RISK_PER_TRADE_PCT",
+        "atr_stop_mult": "AT_BACKTEST_ATR_STOP_MULT",
+        "max_position_notional_pct": "AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT",
+    },
 }
 
 
@@ -137,22 +143,30 @@ def _extract_candidate(rec: dict) -> dict:
         for k, v in (params.get("sell", {}) or {}).items()
         if k in PARAM_ENV_MAP["sell"]
     }
+    raw_sim = ((params.get("simulation", {}) or {}).get("volatility_sizing_env", {}) or {})
+    simulation = {
+        logical_key: _normalize_param_value(raw_sim[env_name])
+        for logical_key, env_name in PARAM_ENV_MAP["simulation"].items()
+        if env_name in raw_sim
+    }
     env_updates = {
         **{PARAM_ENV_MAP["buy"][k]: str(v) for k, v in buy.items()},
         **{PARAM_ENV_MAP["sell"][k]: str(v) for k, v in sell.items()},
+        **{PARAM_ENV_MAP["simulation"][k]: str(v) for k, v in simulation.items()},
     }
-    key = json.dumps({"buy": buy, "sell": sell}, sort_keys=True)
+    key = json.dumps({"buy": buy, "sell": sell, "simulation": simulation}, sort_keys=True)
     return {
         "key": key,
         "name": best.get("name"),
         "buy": buy,
         "sell": sell,
+        "simulation": simulation,
         "env_updates": env_updates,
         "return_pct": best.get("total_return_pct"),
         "selection_score": best.get("selection_score"),
         "max_drawdown_pct": best.get("max_drawdown_pct"),
         "trades": best.get("trades"),
-        "empty": not (buy or sell),
+        "empty": not (buy or sell or simulation),
     }
 
 
@@ -458,7 +472,11 @@ def _append_promotion_history(row: dict):
 
 def _load_recent_candidates(limit: int) -> list[dict]:
     out = []
-    for path in sorted(REPORTS.glob("strategy_lab_*.json"), reverse=True)[: limit * 3]:
+    paths = sorted(
+        list(REPORTS.glob("strategy_lab_*.json")) + list(REPORTS.glob("volatility_sizing_lab_*.json")),
+        reverse=True,
+    )
+    for path in paths[: limit * 4]:
         try:
             payload = json.loads(path.read_text())
             rec = payload.get("recommendation", {})
@@ -467,7 +485,7 @@ def _load_recent_candidates(limit: int) -> list[dict]:
                 {
                     "path": str(path),
                     "generated_at": rec.get("generated_at"),
-                    "should_promote": bool(rec.get("should_promote", False)),
+                    "should_promote": bool(rec.get("should_promote", False) or not str(path.name).startswith("strategy_lab_")),
                     "improvement_return_pct": rec.get("improvement_return_pct"),
                     "improvement_score": rec.get("improvement_score"),
                     "candidate": cand,
@@ -480,11 +498,25 @@ def _load_recent_candidates(limit: int) -> list[dict]:
     return out
 
 
+def _read_env_exports() -> dict[str, str]:
+    if not ENV_FILE.exists():
+        return {}
+    exports: dict[str, str] = {}
+    for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, value = line[len("export "):].split("=", 1)
+        exports[key.strip()] = value.strip().strip('"').strip("'")
+    return exports
+
+
 def _current_effective_candidate(candidate: dict) -> dict:
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     buy_mod = importlib.import_module("Auto_Trader.RULE_SET_7")
     sell_mod = importlib.import_module("Auto_Trader.RULE_SET_2")
+    env_exports = _read_env_exports()
     return {
         "buy": {
             k: _normalize_param_value((buy_mod.CONFIG or {}).get(k))
@@ -493,6 +525,10 @@ def _current_effective_candidate(candidate: dict) -> dict:
         "sell": {
             k: _normalize_param_value((sell_mod.CONFIG or {}).get(k))
             for k in (candidate.get("sell") or {})
+        },
+        "simulation": {
+            k: _normalize_param_value(env_exports.get(PARAM_ENV_MAP["simulation"][k]))
+            for k in (candidate.get("simulation") or {})
         },
     }
 
@@ -550,7 +586,11 @@ def maybe_auto_promote(strategy: dict, market_open: bool) -> dict:
         return result
 
     effective_candidate = _current_effective_candidate(candidate)
-    if effective_candidate == {"buy": candidate.get("buy") or {}, "sell": candidate.get("sell") or {}}:
+    if effective_candidate == {
+        "buy": candidate.get("buy") or {},
+        "sell": candidate.get("sell") or {},
+        "simulation": candidate.get("simulation") or {},
+    }:
         result["reason"] = "already_active_effective_config"
         result["env_updates"] = candidate.get("env_updates")
         return result

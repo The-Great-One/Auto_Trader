@@ -367,6 +367,63 @@ def _portfolio_allows_buy(asset_class: str, symbol: str, order_notional: float, 
     return True, "ok"
 
 
+def _resolve_position_sizing_config() -> dict:
+    enabled = os.getenv("AT_BACKTEST_VOL_SIZING_ENABLED", "0").strip().lower() not in {"0", "false", "no"}
+    return {
+        "enabled": enabled,
+        "risk_per_trade_pct": float(os.getenv("AT_BACKTEST_RISK_PER_TRADE_PCT", "0.0075") or 0.0075),
+        "atr_stop_mult": float(os.getenv("AT_BACKTEST_ATR_STOP_MULT", "2.0") or 2.0),
+        "max_position_notional_pct": float(os.getenv("AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT", "0.2") or 0.2),
+        "fallback_notional": float(os.getenv("FUND_ALLOCATION", "20000") or 20000),
+    }
+
+
+def _portfolio_value(cash: float, positions: dict[str, dict], last_prices: dict[str, float]) -> float:
+    total = float(cash)
+    for held_symbol, pos in positions.items():
+        mark = float(last_prices.get(held_symbol, pos.get("avg_price", 0.0)) or 0.0)
+        total += float(pos.get("qty", 0)) * mark
+    return float(total)
+
+
+def _position_qty_for_open(row_now: pd.Series, open_price: float, cash: float, positions: dict[str, dict], last_prices: dict[str, float], sizing_cfg: dict) -> tuple[int, dict]:
+    fallback_notional = float(sizing_cfg.get("fallback_notional", 0.0) or 0.0)
+    if open_price <= 0:
+        return 0, {"method": "invalid_open_price", "target_notional": 0.0}
+
+    if not sizing_cfg.get("enabled"):
+        qty = int(fallback_notional // max(open_price, 1e-9))
+        return qty, {"method": "fixed_notional", "target_notional": round(fallback_notional, 2)}
+
+    portfolio_value = _portfolio_value(cash, positions, last_prices)
+    atr = float(row_now.get("ATR", np.nan)) if pd.notna(row_now.get("ATR", np.nan)) else np.nan
+    atr_pct = float(atr / open_price) if np.isfinite(atr) and open_price > 0 else np.nan
+    stop_distance = float(atr * float(sizing_cfg.get("atr_stop_mult", 2.0) or 2.0)) if np.isfinite(atr) else np.nan
+    risk_budget = float(portfolio_value) * float(sizing_cfg.get("risk_per_trade_pct", 0.0) or 0.0)
+    max_notional = float(portfolio_value) * float(sizing_cfg.get("max_position_notional_pct", 1.0) or 1.0)
+
+    target_notional = fallback_notional
+    method = "vol_fallback_fixed"
+    if np.isfinite(stop_distance) and stop_distance > 0 and risk_budget > 0 and max_notional > 0:
+        risk_qty = risk_budget / stop_distance
+        target_notional = min(max_notional, risk_qty * open_price, cash)
+        method = "atr_risk_sizing"
+    else:
+        target_notional = min(fallback_notional, cash)
+
+    qty = int(max(0.0, target_notional) // max(open_price, 1e-9))
+    return qty, {
+        "method": method,
+        "portfolio_value": round(float(portfolio_value), 2),
+        "risk_budget": round(float(risk_budget), 2),
+        "atr": round(float(atr), 4) if np.isfinite(atr) else None,
+        "atr_pct": round(float(atr_pct), 4) if np.isfinite(atr_pct) else None,
+        "stop_distance": round(float(stop_distance), 4) if np.isfinite(stop_distance) else None,
+        "target_notional": round(float(target_notional), 2),
+        "max_notional": round(float(max_notional), 2),
+    }
+
+
 def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.DataFrame | None = None):
     at_utils.get_mmi_now = lambda: None
 
@@ -379,6 +436,7 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
     warmup_bars = max(250, int(os.getenv("AT_BACKTEST_WARMUP_BARS", "250") or 250))
     regime_cfg = _resolve_regime_filter_config()
     regime_df, regime_meta = _load_regime_proxy_history(regime_cfg)
+    sizing_cfg = _resolve_position_sizing_config()
     regime_stats = {
         "enabled": bool(regime_cfg.get("enabled")),
         "blocked_buy_signals": 0,
@@ -386,6 +444,12 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
         "proxy_meta": regime_meta,
         "config": dict(regime_cfg),
         "last_state": None,
+    }
+    sizing_stats = {
+        "enabled": bool(sizing_cfg.get("enabled")),
+        "buy_orders_sized": 0,
+        "last_sizing": None,
+        "config": dict(sizing_cfg),
     }
 
     details: dict[str, dict] = {
@@ -439,7 +503,7 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                     if pending and pd.to_datetime(pending.get("exec_date")) == date:
                         open_price = float(row_now.get("Open", row_now["Close"]))
                         if pending["side"] == "BUY" and symbol not in positions:
-                            qty = int(per_buy_allocation // max(open_price, 1e-9))
+                            qty, sizing_meta = _position_qty_for_open(row_now, open_price, cash, positions, last_prices, sizing_cfg)
                             order_notional = qty * open_price
                             asset_class = asset_classes.get(symbol, "EQUITY")
                             allowed, _ = _portfolio_allows_buy(asset_class, symbol, order_notional, cash, positions, last_prices, asset_classes)
@@ -451,6 +515,8 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                                     "entry_date": date,
                                     "entry_idx": i,
                                 }
+                                sizing_stats["buy_orders_sized"] += 1
+                                sizing_stats["last_sizing"] = {**(sizing_meta or {}), "symbol": symbol, "qty": int(qty), "order_notional": round(float(order_notional), 2)}
                                 details[symbol]["trades"] += 1
                         elif pending["side"] == "SELL" and symbol in positions:
                             pos = positions.pop(symbol)
@@ -529,10 +595,7 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                             else:
                                 regime_stats["blocked_buy_signals"] += 1
 
-                portfolio_value = cash
-                for held_symbol, pos in positions.items():
-                    mark = float(last_prices.get(held_symbol, pos.get("avg_price", 0.0)) or 0.0)
-                    portfolio_value += float(pos["qty"]) * mark
+                portfolio_value = _portfolio_value(cash, positions, last_prices)
                 equity_points.append({"Date": date, "Equity": float(portfolio_value), "Cash": float(cash), "OpenPositions": int(len(positions))})
     finally:
         lab.RULE_SET_2.CONFIG.clear()
@@ -620,6 +683,12 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                 "proxy_meta": regime_stats.get("proxy_meta", {}),
                 "config": regime_stats.get("config", {}),
                 "last_state": regime_stats.get("last_state", {}),
+            },
+            "position_sizing": {
+                "enabled": bool(sizing_stats.get("enabled")),
+                "buy_orders_sized": int(sizing_stats.get("buy_orders_sized", 0) or 0),
+                "config": sizing_stats.get("config", {}),
+                "last_sizing": sizing_stats.get("last_sizing", {}),
             },
         },
     }
