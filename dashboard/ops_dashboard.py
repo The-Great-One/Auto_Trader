@@ -15,6 +15,8 @@ REPORTS_DIR = ROOT / "reports"
 INTERMEDIARY_DIR = ROOT / "intermediary_files"
 TWITTER_DIR = INTERMEDIARY_DIR / "twitter_sentiment"
 LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.json"
+LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
+LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
 SERVER_KEY = Path("REDACTED_KEY_PATH")
 SERVER_HOST = os.getenv("AT_SERVER_HOST", "REDACTED_SERVER")
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
@@ -87,6 +89,69 @@ def load_ranked_variants(report_name: str) -> pd.DataFrame:
     if not data:
         return pd.DataFrame()
     return pd.DataFrame(data.get("ranked") or [])
+
+
+@st.cache_data(ttl=20)
+def recent_telegram_options_reports(limit: int = 20) -> list[tuple[Path, dict]]:
+    rows: list[tuple[Path, dict]] = []
+    for p in sorted(REPORTS_DIR.glob("telegram_options_paper*.json"))[-limit:]:
+        data = load_json(p)
+        if data:
+            rows.append((p, data))
+    return rows
+
+
+@st.cache_data(ttl=20)
+def load_telegram_options_table(limit: int = 20) -> pd.DataFrame:
+    rows = []
+    for path, data in recent_telegram_options_reports(limit=limit):
+        rows.append(
+            {
+                "report": path.name,
+                "generated_at": data.get("generated_at"),
+                "channel": data.get("channel"),
+                "starting_capital": data.get("starting_capital"),
+                "signals_found": data.get("signals_found"),
+                "trades_simulated": data.get("trades_simulated"),
+                "final_equity": data.get("final_equity"),
+                "total_return_pct": data.get("total_return_pct"),
+                "win_rate_pct": data.get("win_rate_pct"),
+                "avg_trade_return_pct": data.get("avg_trade_return_pct"),
+                "best_trade_pct": data.get("best_trade_pct"),
+                "worst_trade_pct": data.get("worst_trade_pct"),
+                "target_style": data.get("target_style"),
+                "max_hold_bars": data.get("max_hold_bars"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=10)
+def load_live_telegram_ledger() -> dict:
+    return load_json(LIVE_TELEGRAM_LEDGER_PATH) or {}
+
+
+@st.cache_data(ttl=10)
+def load_live_telegram_equity_history() -> pd.DataFrame:
+    if not LIVE_TELEGRAM_LEDGER_HISTORY.exists():
+        return pd.DataFrame(columns=["timestamp", "equity", "cash"])
+    rows = []
+    for line in LIVE_TELEGRAM_LEDGER_HISTORY.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except Exception:
+            continue
+    if not rows:
+        return pd.DataFrame(columns=["timestamp", "equity", "cash"])
+    df = pd.DataFrame(rows)
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    for col in ["equity", "cash"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates(subset=["timestamp"])
 
 
 @st.cache_data(ttl=10)
@@ -189,14 +254,18 @@ live_paper = load_json(REPORTS_DIR / "paper_shadow_live_latest.json") or {}
 lab_df = load_lab_table()
 lab_status = load_lab_status()
 sentiment_df = load_sentiment_rows()
+telegram_options_df = load_telegram_options_table()
+live_telegram_ledger = load_live_telegram_ledger()
+live_telegram_history = load_live_telegram_equity_history()
 latest_lab = lab_df.sort_values("generated_at").iloc[-1].to_dict() if not lab_df.empty else {}
 
-hero1, hero2, hero3, hero4, hero5 = st.columns(5)
+hero1, hero2, hero3, hero4, hero5, hero6 = st.columns(6)
 hero1.metric("Lab status", status_badge_text(lab_status) if lab_status else "idle")
 hero2.metric("Latest best return %", latest_lab.get("best_return_pct", "-"))
 hero3.metric("Latest best score", latest_lab.get("best_score", "-"))
 hero4.metric("Paper decision", paper.get("decision", live_paper.get("mode", "-")))
 hero5.metric("Sentiment symbols", len(sentiment_df))
+hero6.metric("Telegram paper equity", live_telegram_ledger.get("equity", "-"))
 
 if lab_status:
     progress = float(lab_status.get("progress_pct", 0.0) or 0.0)
@@ -214,9 +283,10 @@ if scorecard:
     quick3.metric("Realized PnL", scorecard.get("estimated_realized_pnl", "-"))
     quick4.metric("Scorecard verdict", scorecard.get("verdict", "-"))
 
-summary_tab, trader_tab, labs_tab, sentiment_tab, server_tab = st.tabs([
+summary_tab, trader_tab, telegram_tab, labs_tab, sentiment_tab, server_tab = st.tabs([
     "Mission Control",
     "Live + Paper",
+    "Telegram Options",
     "Labs + RNN",
     "Twitter Sentiment",
     "Server",
@@ -272,6 +342,67 @@ with trader_tab:
         st.json(live_paper or {"status": "missing"})
     st.subheader("Available local report files")
     st.dataframe(pd.DataFrame({"report": sorted([p.name for p in REPORTS_DIR.glob("*.json")], reverse=True)}), use_container_width=True, hide_index=True)
+
+with telegram_tab:
+    st.subheader("Telegram options paper returns")
+    t1, t2, t3, t4 = st.columns(4)
+    t1.metric("Live equity", live_telegram_ledger.get("equity", "-"))
+    t2.metric("Cash", live_telegram_ledger.get("cash", "-"))
+    t3.metric("Realized PnL", live_telegram_ledger.get("realized_pnl", "-"))
+    t4.metric("Unrealized PnL", live_telegram_ledger.get("unrealized_pnl", "-"))
+
+    left, right = st.columns([1.2, 0.8])
+    with left:
+        st.markdown("**Live equity curve**")
+        if live_telegram_history.empty:
+            st.info("No live Telegram equity history yet. Run the live ledger a few times to accumulate snapshots.")
+        else:
+            fig = px.line(live_telegram_history, x="timestamp", y=[c for c in ["equity", "cash"] if c in live_telegram_history.columns], markers=True, title="Live Telegram paper ledger")
+            st.plotly_chart(fig, use_container_width=True)
+    with right:
+        st.markdown("**Current live ledger snapshot**")
+        if live_telegram_ledger:
+            st.json(live_telegram_ledger)
+        else:
+            st.info("Live Telegram ledger not found yet.")
+
+    open_df = pd.DataFrame(live_telegram_ledger.get("open_positions") or [])
+    closed_df = pd.DataFrame(live_telegram_ledger.get("closed_positions") or [])
+    if not open_df.empty:
+        st.markdown("**Open paper positions**")
+        st.dataframe(open_df, use_container_width=True, hide_index=True)
+    if not closed_df.empty:
+        st.markdown("**Closed paper positions**")
+        st.dataframe(closed_df, use_container_width=True, hide_index=True)
+
+    weekly = pd.DataFrame(live_telegram_ledger.get("weekly_returns") or [])
+    monthly = pd.DataFrame(live_telegram_ledger.get("monthly_returns") or [])
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Weekly returns**")
+        if weekly.empty:
+            st.info("No weekly return snapshots yet.")
+        else:
+            st.plotly_chart(px.bar(weekly, x="period", y="return_pct", title="Weekly return %"), use_container_width=True)
+            st.dataframe(weekly, use_container_width=True, hide_index=True)
+    with c2:
+        st.markdown("**Monthly returns**")
+        if monthly.empty:
+            st.info("No monthly return snapshots yet.")
+        else:
+            st.plotly_chart(px.bar(monthly, x="period", y="return_pct", title="Monthly return %"), use_container_width=True)
+            st.dataframe(monthly, use_container_width=True, hide_index=True)
+
+    st.markdown("**Historical Telegram options paper backtests**")
+    if telegram_options_df.empty:
+        st.info("No Telegram options paper backtest reports found.")
+    else:
+        ordered = telegram_options_df.sort_values("generated_at", ascending=False)
+        st.dataframe(ordered, use_container_width=True, hide_index=True)
+        fig = px.bar(ordered, x="report", y="total_return_pct", color="channel", title="Backtest return by report")
+        st.plotly_chart(fig, use_container_width=True)
+        fig2 = px.scatter(ordered, x="win_rate_pct", y="total_return_pct", size=ordered["trades_simulated"].fillna(0) + 0.1, hover_name="report", title="Return vs win rate")
+        st.plotly_chart(fig2, use_container_width=True)
 
 with labs_tab:
     st.subheader("Lab reports")
