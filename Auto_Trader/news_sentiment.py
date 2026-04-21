@@ -34,6 +34,15 @@ DEFAULT_RSS_FEEDS = (
     "https://feeds.feedburner.com/ndtvprofit-latest",
 )
 
+NEWSAPI_BASE = os.getenv("AT_NEWSAPI_BASE", "https://saurav.tech/NewsAPI")
+NEWSAPI_CATEGORIES = {
+    "business": "business",
+    "technology": "technology",
+    "science": "science",
+}
+NEWSAPI_COUNTRY = os.getenv("AT_NEWSAPI_COUNTRY", "in")
+NEWSAPI_SOURCES = {"bbc-news": "bbc-news", "cnn": "cnn", "google-news": "google-news"}
+
 SOURCE_WEIGHTS = {
     "reuters.com": 1.25,
     "economictimes.indiatimes.com": 1.15,
@@ -563,6 +572,85 @@ def fetch_rss_entries(feed_url: str, *, timeout: int = 20) -> dict:
         }
 
 
+def fetch_newsapi_category(category: str, country: str = "", timeout: int = 15) -> dict:
+    """Fetch headlines from SauravKanchan/NewsAPI (no API key required)."""
+    country = country or NEWSAPI_COUNTRY
+    url = f"{NEWSAPI_BASE}/top-headlines/category/{category}/{country}.json"
+    try:
+        resp = requests.get(url, headers=REQUEST_HEADERS, timeout=timeout)
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception as exc:
+        logger.warning("NewsAPI fetch failed for %s/%s: %s", category, country, exc)
+        return {"url": url, "status": "error", "error": str(exc), "entries": []}
+
+    entries = []
+    for article in (payload.get("articles") or []):
+        title = _strip_html(str(article.get("title") or ""))
+        desc = _strip_html(str(article.get("description") or ""))
+        text_blob = f"{title} {desc}".strip()
+        if not text_blob:
+            continue
+        published_at = None
+        pub_str = str(article.get("publishedAt") or "")
+        if pub_str:
+            try:
+                published_at = int(pd.Timestamp(pub_str).timestamp())
+            except Exception:
+                pass
+        source_name = (article.get("source") or {}).get("name", "newsapi")
+        entries.append({
+            "title": title,
+            "summary": desc,
+            "text": text_blob,
+            "link": str(article.get("url") or ""),
+            "published_at": published_at,
+            "published_raw": pub_str,
+            "source": source_name.lower().replace(" ", ""),
+            "feed_url": url,
+        })
+    return {"url": url, "status": "ok", "category": category, "country": country, "entries": entries}
+
+
+def fetch_newsapi_source(source_id: str, timeout: int = 15) -> dict:
+    """Fetch everything from a specific news source via NewsAPI (no API key required)."""
+    url = f"{NEWSAPI_BASE}/everything/{source_id}.json"
+    try:
+        resp = requests.get(url, headers=REQUEST_HEADERS, timeout=timeout)
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception as exc:
+        logger.warning("NewsAPI source fetch failed for %s: %s", source_id, exc)
+        return {"url": url, "status": "error", "error": str(exc), "entries": []}
+
+    entries = []
+    for article in (payload.get("articles") or []):
+        title = _strip_html(str(article.get("title") or ""))
+        desc = _strip_html(str(article.get("description") or ""))
+        text_blob = f"{title} {desc}".strip()
+        if not text_blob:
+            continue
+        published_at = None
+        pub_str = str(article.get("publishedAt") or "")
+        if pub_str:
+            try:
+                published_at = int(pd.Timestamp(pub_str).timestamp())
+            except Exception:
+                pass
+        source_name = (article.get("source") or {}).get("name", source_id)
+        entries.append({
+            "title": title,
+            "summary": desc,
+            "text": text_blob,
+            "link": str(article.get("url") or ""),
+            "published_at": published_at,
+            "published_raw": pub_str,
+            "source": source_name.lower().replace(" ", ""),
+            "feed_url": url,
+        })
+    return {"url": url, "status": "ok", "source_id": source_id, "entries": entries}
+
+
 def _regex_hit(pattern: str, text: str) -> bool:
     escaped = re.escape(pattern)
     if re.search(r"[A-Za-z0-9]", pattern):
@@ -908,6 +996,36 @@ def fetch_and_analyze_symbol(symbol: str, *, asset_class: Optional[str] = None, 
                 if count >= per_feed_limit:
                     break
 
+    # Also fetch NewsAPI business headlines for India (no API key required)
+    if _env_flag("AT_NEWS_NEWSAPI_ENABLED", True):
+        for cat in NEWSAPI_CATEGORIES:
+            newsapi_result = fetch_newsapi_category(cat)
+            if newsapi_result.get("status") == "ok":
+                feed_status.append({
+                    "feed_url": newsapi_result.get("url", ""),
+                    "source": f"newsapi_{cat}",
+                    "status": "ok",
+                    "error": None,
+                    "entry_count": len(newsapi_result.get("entries") or []),
+                })
+                count = 0
+                for entry in newsapi_result.get("entries") or []:
+                    if _symbol_match(entry.get("text"), symbol, asset_class=asset_class, etf_theme=etf_theme):
+                        entry = dict(entry)
+                        entry["classification"] = classify_text(entry.get("text") or "")
+                        matches.append(entry)
+                        count += 1
+                        if count >= per_feed_limit:
+                            break
+            else:
+                feed_status.append({
+                    "feed_url": newsapi_result.get("url", ""),
+                    "source": f"newsapi_{cat}",
+                    "status": "error",
+                    "error": newsapi_result.get("error"),
+                    "entry_count": 0,
+                })
+
     matches = _dedupe_entries("symbol", _normalize_symbol(symbol), matches)
     archive_entries("symbol", _normalize_symbol(symbol), matches)
     analysis = analyze_news(symbol, matches)
@@ -974,6 +1092,23 @@ def fetch_and_analyze_topic(topic: str) -> dict:
             entry = dict(entry)
             entry["classification"] = classify_text(entry.get("text") or "")
             entries.append(entry)
+
+    # For sector topics, also pull NewsAPI business headlines for India
+    if topic.startswith("sector_") and _env_flag("AT_NEWS_NEWSAPI_ENABLED", True):
+        for cat in NEWSAPI_CATEGORIES:
+            newsapi_result = fetch_newsapi_category(cat)
+            if newsapi_result.get("status") == "ok":
+                feed_status.append({
+                    "feed_url": newsapi_result.get("url", ""),
+                    "source": f"newsapi_{cat}",
+                    "status": "ok",
+                    "error": None,
+                    "entry_count": len(newsapi_result.get("entries") or []),
+                })
+                for entry in newsapi_result.get("entries") or []:
+                    entry = dict(entry)
+                    entry["classification"] = classify_text(entry.get("text") or "")
+                    entries.append(entry)
 
     entries = _dedupe_entries("topic", topic, entries)
     archive_entries("topic", topic, entries)
