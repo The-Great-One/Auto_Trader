@@ -1,9 +1,9 @@
 #!/bin/bash
 set -uo pipefail
 
-cd REDACTED_LOCAL_REPO || exit 1
-LOG_FILE="REDACTED_LOCAL_REPO/reports/telegram_dashboard.log"
-mkdir -p REDACTED_LOCAL_REPO/reports
+cd "$(dirname "$0")/.." || exit 1
+LOG_FILE="$(dirname "$0")/../reports/telegram_dashboard.log"
+mkdir -p "$(dirname "$0")/../reports"
 PATTERN='dashboard/ops_dash_app.py'
 CMD=(REDACTED_LOCAL_REPO/venv/bin/python REDACTED_LOCAL_REPO/dashboard/ops_dash_app.py)
 export DASH_HOST="0.0.0.0"

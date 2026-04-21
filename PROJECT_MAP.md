@@ -4,9 +4,9 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 
 ## Project roots
 
-- Local repo: `REDACTED_LOCAL_REPO`
+- Local repo: Auto_Trader
 - Live server repo: `/home/ubuntu/Auto_Trader`
-- Live server host: `REDACTED_SERVER`
+- Live server host: set via `AT_SERVER_HOST` or `AT_ORACLE` env var
 - Service entrypoint: `wednesday.py`
 
 ## High level runtime flow

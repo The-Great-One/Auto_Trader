@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / 'reports'
 REPORTS.mkdir(exist_ok=True)
 
-EXPORT_DEFAULT = Path('REDACTED_OPENCLAW/telegram-user/exports/telegram_export_20260421_103224.json')
-SSH_KEY = 'REDACTED_KEY_PATH'
-ORACLE = 'REDACTED_SERVER'
+EXPORT_DEFAULT = Path(os.getenv('AT_TELEGRAM_EXPORT', os.path.expanduser('~/.openclaw/telegram-user/exports/telegram_export_latest.json')))
+SSH_KEY = os.getenv('AT_SERVER_KEY', os.path.expanduser('~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key'))
+ORACLE = os.getenv('AT_SERVER_HOST', os.getenv('AT_ORACLE', ''))
 
 OPTION_CALL_RE = re.compile(
     r'Stock\s*Name-\s*#?(?P<symbol>[A-Za-z0-9&-]+).*?'

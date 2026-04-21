@@ -12,3 +12,5 @@ intermediary_files/
 tests/
 log/reports/
 scripts/test_mumbai_vpn.py
+.env
+*.env

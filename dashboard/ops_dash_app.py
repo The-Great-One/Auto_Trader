@@ -20,8 +20,8 @@ TWITTER_DIR = INTERMEDIARY_DIR / "twitter_sentiment"
 LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.json"
 LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
 LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
-SERVER_KEY = Path("REDACTED_KEY_PATH")
-SERVER_HOST = os.getenv("AT_SERVER_HOST", "REDACTED_SERVER")
+SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key")))
+SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", ""))
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
 COMBINED_LAB_STATUS_FILES = [
     "sizing_exit_sweep_latest.json",

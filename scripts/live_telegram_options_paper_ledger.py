@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,8 +15,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / 'reports'
 REPORTS.mkdir(exist_ok=True)
-TRACKED_CALLS = Path('REDACTED_OPENCLAW/telegram-user/tracked_option_calls.json')
-WORKSPACE_TOOLS = Path('REDACTED_OPENCLAW/workspace/tools')
+TRACKED_CALLS = Path(os.getenv('AT_TRACKED_CALLS', os.path.expanduser('~/.openclaw/telegram-user/tracked_option_calls.json')))
+WORKSPACE_TOOLS = Path(os.getenv('AT_WORKSPACE_TOOLS', os.path.expanduser('~/.openclaw/workspace/tools')))
 if str(WORKSPACE_TOOLS) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_TOOLS))
 

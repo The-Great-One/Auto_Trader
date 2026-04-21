@@ -1,0 +1,193 @@
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8504
+
+  Stopping...
+[2026-04-21 18:14:39] launcher started
+[2026-04-21 18:14:39] starting dashboard worker
+[2026-04-21 18:14:39] dashboard worker pid 41906
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8504
+
+  Stopping...
+[2026-04-21 18:21:22] launcher started
+[2026-04-21 18:21:22] starting dashboard worker
+[2026-04-21 18:21:22] dashboard worker pid 42297
+
+  You can now view your Streamlit app in your browser.
+
+  URL: http://0.0.0.0:8504
+
+[2026-04-21 18:54:36] launcher started
+  Stopping...
+[2026-04-21 19:40:09] launcher started
+[2026-04-21 19:40:09] starting dashboard worker
+[2026-04-21 19:40:09] dashboard worker pid 46569
+Dash is running on http://0.0.0.0:8504/
+
+ * Serving Flask app 'ops_dash_app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8504
+ * Running on http://192.168.1.3:8504
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [21/Apr/2026 19:41:10] "HEAD / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:41:10] "GET /_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/deps/polyfill@7.v4_1_0m1776779415.12.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/deps/react-dom@18.v4_1_0m1776779415.3.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/deps/react@18.v4_1_0m1776779415.3.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/deps/prop-types@15.v4_1_0m1776779415.8.1.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dash-renderer/build/dash_renderer.v4_1_0m1776779415.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dcc/dash_core_components.v4_1_0m1776779415.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dcc/dash_core_components-shared.v4_1_0m1776779415.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/html/dash_html_components.v4_1_0m1776779415.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dash_table/bundle.v7_1_0m1776779415.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_favicon.ico?v=4.1.0 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:40] "GET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:49:41] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:50:01] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:50:20] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:50:41] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:51:02] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:51:22] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:51:42] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:52:02] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:52:22] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:52:44] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:53:04] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:53:24] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:53:44] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:54:04] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:54:24] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:54:44] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:55:04] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:55:24] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:55:44] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:56:04] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:56:25] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:56:45] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:57:05] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:57:25] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:57:45] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:58:05] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:58:25] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:58:44] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:59:05] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:59:25] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 19:59:46] "POST /_dash-update-component HTTP/1.1" 200 -
+[2026-04-21 20:00:00] launcher started
+[2026-04-21 20:00:00] starting dashboard worker
+[2026-04-21 20:00:00] dashboard worker pid 48343
+Dash is running on http://0.0.0.0:8504/
+
+ * Serving Flask app 'ops_dash_app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8504
+ * Running on http://192.168.1.3:8504
+[33mPress CTRL+C to quit[0m
+[2026-04-21 20:00:05,996] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1493, in _prepare_callback
+    cb = self.callback_map[output]
+KeyError: '..hero-row.children...lab-line.figure...telegram-line.figure...lab-table.data...lab-table.columns...telegram-open-table.data...telegram-open-table.columns..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1596, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1527, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..hero-row.children...lab-line.figure...telegram-line.figure...lab-table.data...lab-table.columns...telegram-open-table.data...telegram-open-table.columns..'."
+127.0.0.1 - - [21/Apr/2026 20:00:05] "[35m[1mPOST /_dash-update-component HTTP/1.1[0m" 500 -
+127.0.0.1 - - [21/Apr/2026 20:00:06] "HEAD / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:00:06] "GET /_dash-layout HTTP/1.1" 200 -
+[2026-04-21 20:00:26,002] ERROR in app: Exception on /_dash-update-component [POST]
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1493, in _prepare_callback
+    cb = self.callback_map[output]
+KeyError: '..hero-row.children...lab-line.figure...telegram-line.figure...lab-table.data...lab-table.columns...telegram-open-table.data...telegram-open-table.columns..'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/_get_app.py", line 17, in wrap
+    return ctx.run(func, self, *args, **kwargs)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1596, in dispatch
+    func = self._prepare_callback(g, body)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/dash/dash.py", line 1527, in _prepare_callback
+    raise KeyError(f"Callback function not found for output '{output}'.") from e
+KeyError: "Callback function not found for output '..hero-row.children...lab-line.figure...telegram-line.figure...lab-table.data...lab-table.columns...telegram-open-table.data...telegram-open-table.columns..'."
+127.0.0.1 - - [21/Apr/2026 20:00:26] "[35m[1mPOST /_dash-update-component HTTP/1.1[0m" 500 -
+127.0.0.1 - - [21/Apr/2026 20:00:32] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:00:32] "GET /_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:00:32] "GET /_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:00:33] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:00:33] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [21/Apr/2026 20:00:33] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [21/Apr/2026 20:01:02] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:01:34] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:01:42] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:01:42] "[36mGET /_dash-component-suites/dash/dash_table/async-highlight.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [21/Apr/2026 20:01:42] "[36mGET /_dash-component-suites/dash/dash_table/async-table.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [21/Apr/2026 20:01:48] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:01:57] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:02] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:06] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:06] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:07] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:07] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:07] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:08] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:11] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:12] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:02:33] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:03:02] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:03:34] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:04:04] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:04:34] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:05:03] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:05:35] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:05:38] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:06:03] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:06:34] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:07:03] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:07:35] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:03] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:34] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:45] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:45] "GET /_dash-layout HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:45] "GET /_dash-dependencies HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:46] "POST /_dash-update-component HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 20:08:46] "[36mGET /_dash-component-suites/dash/dcc/async-graph.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [21/Apr/2026 20:08:46] "[36mGET /_dash-component-suites/plotly/package_data/plotly.min.js HTTP/1.1[0m" 304 -
