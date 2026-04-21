@@ -1,8 +1,10 @@
 import glob
+import json
 import logging
 import pandas as pd
 import sys
 import traceback
+from pathlib import Path
 from .utils import (
     fetch_instruments_list,
     get_instrument_token,
@@ -13,6 +15,41 @@ from .StrongFundamentalsStockList import goodStocks
 from .FetchPricesKite import download_historical_quotes
 
 logger = logging.getLogger("Auto_Trade_Logger")
+ROOT = Path(__file__).resolve().parents[1]
+
+
+EXCLUSION_LIST_PATH = ROOT / "intermediary_files" / "symbol_exclusions.json"
+
+
+def load_exclusion_list() -> set:
+    """Load symbols that should be skipped due to persistent fetch failures."""
+    if not EXCLUSION_LIST_PATH.exists():
+        return set()
+    try:
+        data = json.loads(EXCLUSION_LIST_PATH.read_text())
+        if isinstance(data, dict):
+            return set(str(s).strip().upper() for s in data.get("excluded", []) if str(s).strip())
+    except Exception:
+        pass
+    return set()
+
+
+def add_excluded_symbol(symbol: str, reason: str = "persistent_fetch_failure") -> None:
+    """Add a symbol to the exclusion list."""
+    excluded = load_exclusion_list()
+    sym = str(symbol).strip().upper()
+    if sym and sym not in excluded:
+        excluded.add(sym)
+    entries = []
+    if EXCLUSION_LIST_PATH.exists():
+        try:
+            old = json.loads(EXCLUSION_LIST_PATH.read_text())
+            if isinstance(old, dict):
+                entries = old.get("log", [])
+        except Exception:
+            pass
+    entries.append({"symbol": sym, "reason": reason, "at": pd.Timestamp.now().isoformat()})
+    EXCLUSION_LIST_PATH.write_text(json.dumps({"excluded": sorted(excluded), "log": entries[-200:]}, indent=2))
 
 
 def create_master(message_queue):
@@ -62,6 +99,16 @@ def create_master(message_queue):
             mapped_df = pd.concat([mapped_df, holdings], ignore_index=True)
             # Drop duplicates based on the 'Symbol' column
             mapped_df.drop_duplicates(subset=["Symbol"], inplace=True)
+
+            # Filter out excluded symbols
+            excluded = load_exclusion_list()
+            if excluded:
+                before = len(mapped_df)
+                mapped_df = mapped_df[~mapped_df["Symbol"].astype(str).str.upper().isin(excluded)]
+                after = len(mapped_df)
+                if before != after:
+                    logger.info(f"Excluded {before - after} symbols from exclusion list: {sorted(excluded)[:10]}")
+
             if "AssetClass" not in mapped_df.columns:
                 mapped_df["AssetClass"] = "EQUITY"
             mapped_df["AssetClass"] = mapped_df["AssetClass"].fillna("EQUITY")

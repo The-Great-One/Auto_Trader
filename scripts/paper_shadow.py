@@ -186,10 +186,10 @@ def run_equity_shadow() -> dict:
     topic_summary = {"topics": []}
     try:
         fetch_and_analyze_symbol(symbol, asset_class="ETF", etf_theme="NIFTY 50")
-        topic_summary = fetch_and_analyze_topics(["trump_market"])
+        topic_summary = fetch_and_analyze_topics(["trump_market", "gift_nifty", "india_vix"])
     except Exception as exc:
         logger.warning("equity shadow: news refresh failed: %s", exc)
-        topic_summary = latest_topic_snapshot(["trump_market"])
+        topic_summary = latest_topic_snapshot(["trump_market", "gift_nifty", "india_vix"])
 
     try:
         df, price_history_meta = load_hist(symbol)

@@ -224,6 +224,78 @@ TOPIC_CONFIGS = {
         ],
         "feeds_env": "AT_TRUMP_RSS_FEEDS",
     },
+    "gift_nifty": {
+        "label": "GIFT Nifty pre-market",
+        "queries": [
+            '"GIFT Nifty" (India OR NSE OR BSE OR SGX) when:1d',
+            '"GIFT Nifty" (sgx OR pre-market OR opening OR outlook) when:1d',
+        ],
+        "feeds_env": "AT_GIFT_NIFTY_RSS_FEEDS",
+    },
+    "india_vix": {
+        "label": "India VIX volatility",
+        "queries": [
+            '"India VIX" (fear OR volatility OR options OR spike OR surge OR low) when:3d',
+            '("India VIX" OR "VIX India") (Nifty OR market OR panic OR calm) when:3d',
+        ],
+        "feeds_env": "AT_INDIA_VIX_RSS_FEEDS",
+    },
+    "sector_it": {
+        "label": "IT sector focus",
+        "queries": [
+            '("IT sector" OR TCS OR Infosys OR Wipro OR HCLTech OR "tech stocks") India when:3d',
+            '(NIFTY IT OR "information technology") (earnings OR outlook OR upgrade OR downgrade) when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_IT_RSS",
+    },
+    "sector_banking": {
+        "label": "Banking sector focus",
+        "queries": [
+            '("banking sector" OR HDFC Bank OR ICICI Bank OR SBI OR Kotak OR Axis) India when:3d',
+            '(NIFTY Bank OR "bank stocks" OR NPAs OR credit growth) when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_BANKING_RSS",
+    },
+    "sector_pharma": {
+        "label": "Pharma sector focus",
+        "queries": [
+            '("pharma sector" OR Sun Pharma OR Dr Reddy OR Cipla OR Divis OR Lupin) India when:3d',
+            '(NIFTY Pharma OR "pharmaceutical" OR "drug approval" OR FDA) when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_PHARMA_RSS",
+    },
+    "sector_energy": {
+        "label": "Energy & Oil sector focus",
+        "queries": [
+            '("oil and gas" OR Reliance OR ONGC OR BPCL OR HPCL OR IOC) India when:3d',
+            '(crude oil OR "energy stocks" OR NIFTY Energy) India when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_ENERGY_RSS",
+    },
+    "sector_auto": {
+        "label": "Auto sector focus",
+        "queries": [
+            '("auto sector" OR Maruti OR M&M OR Tata Motors OR Bajaj Auto OR Hero Moto) India when:3d',
+            '(NIFTY Auto OR "car sales" OR "EV" OR "vehicle sales") when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_AUTO_RSS",
+    },
+    "sector_metals": {
+        "label": "Metals sector focus",
+        "queries": [
+            '("metal stocks" OR Tata Steel OR JSW Steel OR Hindalco OR Vedanta) India when:3d',
+            '(NIFTY Metal OR copper OR aluminium OR steel prices) when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_METALS_RSS",
+    },
+    "sector_fmcg": {
+        "label": "FMCG sector focus",
+        "queries": [
+            '("FMCG sector" OR ITC OR HUL OR Nestle OR Britannia OR Dabur) India when:3d',
+            '(NIFTY FMCG OR "consumer goods" OR rural demand) when:3d',
+        ],
+        "feeds_env": "AT_SECTOR_FMCG_RSS",
+    },
 }
 
 
@@ -324,11 +396,19 @@ def discover_symbols(limit: int = 30) -> List[str]:
         try:
             instruments = pd.read_feather(instruments_path)
             col = instruments.get("tradingsymbol", pd.Series(dtype=str)).astype(str)
+            held = set()
+            if holdings_path.exists():
+                try:
+                    h = pd.read_feather(holdings_path)
+                    held = set(h["tradingsymbol"].astype(str).str.upper().tolist())
+                except Exception:
+                    pass
             for sym in col.head(limit * 4):
                 sym_n = _normalize_symbol(sym)
                 if sym_n and sym_n not in seen:
-                    symbols.append(sym_n)
-                    seen.add(sym_n)
+                    if sym_n in held or len(symbols) < limit // 2:
+                        symbols.append(sym_n)
+                        seen.add(sym_n)
                 if len(symbols) >= limit:
                     break
         except Exception as exc:
@@ -982,3 +1062,67 @@ def fetch_and_analyze_many(symbols: Sequence[str]) -> List[dict]:
     analyses = [fetch_and_analyze_symbol(symbol) for symbol in symbols]
     write_summary(analyses)
     return analyses
+
+
+SECTOR_TOPIC_PREFIX = "sector_"
+
+SECTOR_STOCK_MAP: Dict[str, List[str]] = {
+    "sector_it": ["TCS", "INFY", "WIPRO", "HCLTECH", "TECHM"],
+    "sector_banking": ["HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK", "BANKBARODA"],
+    "sector_pharma": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "LUPIN", "AUROPHARMA"],
+    "sector_energy": ["RELIANCE", "ONGC", "BPCL", "HINDPETRO", "IOC", "GAIL"],
+    "sector_auto": ["MARUTI", "M&M", "TATAMOTORS", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT"],
+    "sector_metals": ["TATASTEEL", "JSWSTEEL", "HINDALCO", "VEDL", "COALINDIA", "NMDC"],
+    "sector_fmcg": ["ITC", "HINDUNILVR", "NESTLEIND", "BRITANNIA", "DABUR", "MARICO"],
+}
+
+
+def compute_sector_rotation(max_age_minutes: int = 360) -> dict:
+    """Rank sectors by news sentiment and pick the best stock from hot sectors."""
+    sector_scores: List[dict] = []
+    for topic_key, stock_list in SECTOR_STOCK_MAP.items():
+        topic_data = load_topic_analysis(topic_key, max_age_minutes=max_age_minutes)
+        if not topic_data or topic_data.get("status") != "ok":
+            continue
+        weighted = _safe_float(topic_data.get("weighted_sentiment"), 0.0)
+        item_count = _safe_int(topic_data.get("item_count"), 0)
+        dominant = topic_data.get("dominant_types") or []
+        bullish = "bullish" in dominant or "earnings_positive" in dominant
+        bearish = "bearish" in dominant or "earnings_negative" in dominant or "risk" in dominant
+        sector_scores.append({
+            "topic": topic_key,
+            "label": (TOPIC_CONFIGS.get(topic_key) or {}).get("label", topic_key),
+            "weighted_sentiment": weighted,
+            "item_count": item_count,
+            "dominant_types": dominant,
+            "bullish": bullish,
+            "bearish": bearish,
+            "top_picks": stock_list[:3],
+        })
+
+    sector_scores.sort(key=lambda s: s["weighted_sentiment"], reverse=True)
+
+    picks: List[dict] = []
+    for sector in sector_scores:
+        if sector["bullish"] and not sector["bearish"] and sector["item_count"] >= 2:
+            for sym in sector["top_picks"]:
+                sym_data = load_analysis(sym, max_age_minutes=max_age_minutes)
+                if sym_data and sym_data.get("status") == "ok":
+                    sym_sent = _safe_float(sym_data.get("weighted_sentiment"), 0.0)
+                    if sym_sent > 0.0:
+                        picks.append({
+                            "symbol": sym,
+                            "sector": sector["label"],
+                            "sector_sentiment": sector["weighted_sentiment"],
+                            "symbol_sentiment": sym_sent,
+                            "reason": f"Sector {sector['label']} is bullish (sentiment {sector['weighted_sentiment']:.2f}), {sym} sentiment {sym_sent:.2f}",
+                        })
+                        break
+
+    result = {
+        "generated_at": int(time.time()),
+        "sector_ranking": sector_scores,
+        "hot_picks": picks[:5],
+    }
+    (REPORTS_DIR / "sector_rotation_latest.json").write_text(json.dumps(result, indent=2))
+    return result
