@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-04-13T16:10:01.635551",
+  "trade_date": "2026-04-13",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "already_executed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}

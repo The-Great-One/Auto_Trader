@@ -46,6 +46,20 @@ CONFIG = {
         (5, {"k": 1.40, "floor_mult": 1.05}),
         (0, {"k": 1.70, "floor_mult": 0.98}),
     ],
+    # --- Partial exit / target ladder (derived from Shortterm01 channel audit) ---
+    # When profit hits target_pct, exit `exit_frac` of the position and tighten the trailing stop.
+    # Each tier fires once. After a tier fires, SL is moved to max(current_sl, entry * sl_floor_mult).
+    # Enabled via AT_PARTIAL_EXIT_ENABLED=1 env var (off by default to avoid surprise).
+    "partial_exit_enabled": float(os.getenv("AT_PARTIAL_EXIT_ENABLED", "0")),
+    "partial_exit_ladder": [
+        # (profit_pct threshold, fraction of position to exit, SL floor multiplier after exit)
+        (5.0,  0.33, 1.01),   # T1: take 1/3 off at +5%, move SL to breakeven+1%
+        (10.0, 0.33, 1.05),   # T2: take another 1/3 at +10%, lock +5% on remainder
+        (15.0, 0.50, 1.10),   # T3: take half of remainder at +15%, lock +10%
+    ],
+    # Telegram channel overlay: when a FinanceWithSunil option call direction agrees
+    # with the system signal, boost confidence slightly (weight 0-1).
+    "channel_overlay_weight": float(os.getenv("AT_CHANNEL_OVERLAY_WEIGHT", "0.0")),
 }
 
 # Dip-aware sell guard (for long-horizon accumulation symbols like NIFTYETF)
@@ -195,6 +209,22 @@ def upsert_position_state_json(tradingsymbol, stop_loss=None, first_seen_date=No
 
 def update_stop_loss_json(tradingsymbol, stop_loss):
     upsert_position_state_json(tradingsymbol, stop_loss=stop_loss)
+
+
+def _update_position_state(tradingsymbol, updates: dict):
+    """Update arbitrary fields in position state JSON (e.g. partial_exit_tiers)."""
+    symbol = str(tradingsymbol or "").strip()
+    if not symbol or not updates:
+        return
+
+    def _do():
+        data = _read_json_unlocked(HOLDINGS_FILE_PATH)
+        current = _normalize_position_state(data.get(symbol))
+        current.update(updates)
+        data[symbol] = current
+        _atomic_write(data, HOLDINGS_FILE_PATH)
+
+    _with_lock(CONFIG["lock_timeout_s"], _do)
 
 
 def handle_sell(tradingsymbol):
@@ -462,6 +492,27 @@ def buy_or_sell(df, row, holdings):
         be_floor = average_price * (1.0 + CONFIG["breakeven_buffer_pct"] / 100.0)
         new_sl = max(new_sl, be_floor)
 
+    # ---- Partial exit / target ladder (Shortterm01 lesson) ----
+    # If enabled, check if any target ladder tier has been hit and not yet executed.
+    partial_exit = None
+    if CONFIG["partial_exit_enabled"]:
+        exited_tiers = position_state.get("partial_exit_tiers", [])
+        for idx, (tgt_pct, exit_frac, sl_floor_mult) in enumerate(CONFIG["partial_exit_ladder"]):
+            tier_key = str(idx)
+            if tier_key in exited_tiers:
+                continue  # already executed this tier
+            if profit_pct >= tgt_pct:
+                partial_exit = exit_frac
+                # Record this tier as executed
+                exited_tiers = list(exited_tiers) + [tier_key]
+                # Tighten SL: floor at entry * sl_floor_mult
+                ladder_sl = average_price * sl_floor_mult
+                new_sl = max(new_sl, ladder_sl)
+                logger.info(
+                    "Partial exit tier %d hit for %s: profit=%.2f%% >= %.1f%%, exiting %.0f%%, SL floor=%.2f",
+                    idx, tradingsymbol, profit_pct, tgt_pct, exit_frac * 100, ladder_sl,
+                )
+                break  # execute only one tier per bar
     # ---- HARD BREACH first (handles gaps/intrabar) ----
     if np.isfinite(day_low) and np.isfinite(new_sl) and day_low <= new_sl:
         return _maybe_sell()
@@ -611,6 +662,17 @@ def buy_or_sell(df, row, holdings):
                 return _maybe_sell()
             if last_price <= new_sl:
                 return _maybe_sell()
+
+        # ---- Handle partial exit if a tier was hit ----
+        if partial_exit is not None and partial_exit > 0:
+            # Persist exited tiers to position state so they don't re-fire
+            try:
+                _update_position_state(tradingsymbol, {"partial_exit_tiers": exited_tiers})
+            except Exception:
+                logger.warning("Could not persist partial_exit_tiers for %s", tradingsymbol)
+            # Return a structured partial-sell signal
+            # The executor should reduce position by (1 - partial_exit) fraction
+            return f"PARTIAL_SELL_{int(partial_exit * 100)}"
 
         return "HOLD"
     except Exception:

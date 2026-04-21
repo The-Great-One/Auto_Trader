@@ -1,0 +1,2387 @@
+{
+  "generated_at": "2026-04-13T15:50:02.441915",
+  "trade_date": "2026-04-13",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 23842.65,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 493,
+        "last_close": 23842.650390625,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 23842.65,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 493,\n    \"last_close\": 23842.650390625,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "equity_shadow": {
+        "generated_at": "2026-04-13T15:50:17.221117",
+        "paper_mode": true,
+        "symbol": "NIFTYETF",
+        "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "position_qty": 551,
+        "mode": "SELL_RULE_ONLY",
+        "decision": "HOLD",
+        "last_close": 259.56
+      },
+      "options_shadow": {
+        "generated_at": "2026-04-13T15:50:18.700574",
+        "paper_mode": true,
+        "production_rule_model": "OPTIONS=RULE_SET_OPTIONS_1",
+        "manifest_path": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+        "underlying_context_path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "universe_size": 28,
+        "evaluated": 26,
+        "skipped": {
+          "NIFTY2641324000CE": "enrich_failed:incompatible merge keys [0] dtype('<M8[us]') and dtype('<M8[ns]'), must be the same type",
+          "NIFTY2641324000PE": "enrich_failed:incompatible merge keys [0] dtype('<M8[us]') and dtype('<M8[ns]'), must be the same type"
+        },
+        "buy_candidates": [],
+        "top_candidate": {
+          "symbol": "NIFTY2642123950PE",
+          "decision": "HOLD",
+          "score": 2.5,
+          "side": "PE",
+          "reason": [
+            "macd_unavailable",
+            "volume_confirm",
+            "oi_confirm",
+            "breakout"
+          ],
+          "last_close": 345.25,
+          "volume": 1083745.0,
+          "oi": 242385.0,
+          "underlying_close": 24050.599609375,
+          "expiry": "2026-04-21",
+          "strike": 23950.0
+        },
+        "all_ranked": [
+          {
+            "symbol": "NIFTY2642123950PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 345.25,
+            "volume": 1083745.0,
+            "oi": 242385.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23950.0
+          },
+          {
+            "symbol": "NIFTY2642124000PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 370.1,
+            "volume": 5563740.0,
+            "oi": 1296945.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 24000.0
+          },
+          {
+            "symbol": "NIFTY2641323700CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 142.1,
+            "volume": 569597145.0,
+            "oi": 1723670.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23700.0
+          },
+          {
+            "symbol": "NIFTY2641323700PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 0.05,
+            "volume": 1020585865.0,
+            "oi": 12208300.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23700.0
+          },
+          {
+            "symbol": "NIFTY2641323750CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 92.5,
+            "volume": 593316165.0,
+            "oi": 1784185.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23750.0
+          },
+          {
+            "symbol": "NIFTY2641323750PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 0.05,
+            "volume": 953738695.0,
+            "oi": 10138505.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23750.0
+          },
+          {
+            "symbol": "NIFTY2641323800CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 42.6,
+            "volume": 1278472780.0,
+            "oi": 5700695.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23800.0
+          },
+          {
+            "symbol": "NIFTY2641323800PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 0.05,
+            "volume": 1765622365.0,
+            "oi": 27022580.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23800.0
+          },
+          {
+            "symbol": "NIFTY2641323850CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 0.05,
+            "volume": 1896059815.0,
+            "oi": 21555365.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23850.0
+          },
+          {
+            "symbol": "NIFTY2641323850PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "atr_filter_fail"
+            ],
+            "last_close": 7.35,
+            "volume": 1577579445.0,
+            "oi": 11434995.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-13",
+            "strike": 23850.0
+          }
+        ]
+      }
+    },
+    "stdout": "lume\": 953738695.0,\n        \"oi\": 10138505.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-13\",\n        \"strike\": 23750.0\n      },\n      {\n        \"symbol\": \"NIFTY2641323800CE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"CE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\",\n          \"atr_filter_fail\"\n        ],\n        \"last_close\": 42.6,\n        \"volume\": 1278472780.0,\n        \"oi\": 5700695.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-13\",\n        \"strike\": 23800.0\n      },\n      {\n        \"symbol\": \"NIFTY2641323800PE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"PE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\",\n          \"atr_filter_fail\"\n        ],\n        \"last_close\": 0.05,\n        \"volume\": 1765622365.0,\n        \"oi\": 27022580.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-13\",\n        \"strike\": 23800.0\n      },\n      {\n        \"symbol\": \"NIFTY2641323850CE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"CE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\",\n          \"atr_filter_fail\"\n        ],\n        \"last_close\": 0.05,\n        \"volume\": 1896059815.0,\n        \"oi\": 21555365.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-13\",\n        \"strike\": 23850.0\n      },\n      {\n        \"symbol\": \"NIFTY2641323850PE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"PE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\",\n          \"atr_filter_fail\"\n        ],\n        \"last_close\": 7.35,\n        \"volume\": 1577579445.0,\n        \"oi\": 11434995.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-13\",\n        \"strike\": 23850.0\n      }\n    ]\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-13.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-13.md
+{
+  "generated_at": "2026-04-14T15:50:01.809211",
+  "trade_date": "2026-04-14",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 23842.65,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 493,
+        "last_close": 23842.650390625,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 23842.65,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 493,\n    \"last_close\": 23842.650390625,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "equity_shadow": {
+        "generated_at": "2026-04-14T15:50:11.289024",
+        "paper_mode": true,
+        "symbol": "NIFTYETF",
+        "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "position_qty": 551,
+        "mode": "SELL_RULE_ONLY",
+        "decision": "HOLD",
+        "last_close": 257.41
+      },
+      "options_shadow": {
+        "generated_at": "2026-04-14T15:50:12.814072",
+        "paper_mode": true,
+        "production_rule_model": "OPTIONS=RULE_SET_OPTIONS_1",
+        "manifest_path": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+        "underlying_context_path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "universe_size": 28,
+        "evaluated": 28,
+        "skipped": {},
+        "buy_candidates": [],
+        "top_candidate": {
+          "symbol": "NIFTY26APR23850CE",
+          "decision": "HOLD",
+          "score": 3.0,
+          "side": "CE",
+          "reason": [
+            "macd_hist_rising",
+            "volume_confirm",
+            "oi_confirm"
+          ],
+          "last_close": 406.25,
+          "volume": 348855.0,
+          "oi": 146185.0,
+          "underlying_close": 24050.599609375,
+          "expiry": "2026-04-28",
+          "strike": 23850.0
+        },
+        "all_ranked": [
+          {
+            "symbol": "NIFTY26APR23850CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "macd_hist_rising",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 406.25,
+            "volume": 348855.0,
+            "oi": 146185.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-28",
+            "strike": 23850.0
+          },
+          {
+            "symbol": "NIFTY2642123950PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 345.25,
+            "volume": 1083745.0,
+            "oi": 242385.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23950.0
+          },
+          {
+            "symbol": "NIFTY2642124000PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 370.1,
+            "volume": 5563740.0,
+            "oi": 1296945.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 24000.0
+          },
+          {
+            "symbol": "NIFTY26APR23750PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 345.45,
+            "volume": 282880.0,
+            "oi": 85605.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-28",
+            "strike": 23750.0
+          },
+          {
+            "symbol": "NIFTY26APR23900PE",
+            "decision": "HOLD",
+            "score": 2.5,
+            "side": "PE",
+            "reason": [
+              "volume_confirm",
+              "oi_confirm",
+              "breakout"
+            ],
+            "last_close": 408.6,
+            "volume": 1475825.0,
+            "oi": 732550.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-28",
+            "strike": 23900.0
+          },
+          {
+            "symbol": "NIFTY2642123700CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 367.65,
+            "volume": 8851050.0,
+            "oi": 832065.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23700.0
+          },
+          {
+            "symbol": "NIFTY2642123700PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 231.95,
+            "volume": 11277045.0,
+            "oi": 1812655.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23700.0
+          },
+          {
+            "symbol": "NIFTY2642123750CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 341.05,
+            "volume": 3884725.0,
+            "oi": 312455.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23750.0
+          },
+          {
+            "symbol": "NIFTY2642123750PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 247.05,
+            "volume": 3939260.0,
+            "oi": 424840.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23750.0
+          },
+          {
+            "symbol": "NIFTY2642123800CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "last_close": 315.85,
+            "volume": 12750465.0,
+            "oi": 1499940.0,
+            "underlying_close": 24050.599609375,
+            "expiry": "2026-04-21",
+            "strike": 23800.0
+          }
+        ]
+      }
+    },
+    "stdout": "    \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"last_close\": 367.65,\n        \"volume\": 8851050.0,\n        \"oi\": 832065.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 23700.0\n      },\n      {\n        \"symbol\": \"NIFTY2642123700PE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"PE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"last_close\": 231.95,\n        \"volume\": 11277045.0,\n        \"oi\": 1812655.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 23700.0\n      },\n      {\n        \"symbol\": \"NIFTY2642123750CE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"CE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"last_close\": 341.05,\n        \"volume\": 3884725.0,\n        \"oi\": 312455.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 23750.0\n      },\n      {\n        \"symbol\": \"NIFTY2642123750PE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"PE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"last_close\": 247.05,\n        \"volume\": 3939260.0,\n        \"oi\": 424840.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 23750.0\n      },\n      {\n        \"symbol\": \"NIFTY2642123800CE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"CE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"last_close\": 315.85,\n        \"volume\": 12750465.0,\n        \"oi\": 1499940.0,\n        \"underlying_close\": 24050.599609375,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 23800.0\n      }\n    ]\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-14.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-14.md
+{
+  "generated_at": "2026-04-15T15:50:02.120235",
+  "trade_date": "2026-04-15",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 24231.3,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 494,
+        "last_close": 24231.30078125,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 24231.3,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 494,\n    \"last_close\": 24231.30078125,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": false,
+    "returncode": 1,
+    "payload": null,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n",
+    "reason": "failed_rc_1"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-15.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-15.md
+{
+  "generated_at": "2026-04-16T15:50:02.095885",
+  "trade_date": "2026-04-16",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 24196.75,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 494,
+        "last_close": 24196.75,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 24196.75,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 494,\n    \"last_close\": 24196.75,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": false,
+    "returncode": 1,
+    "payload": null,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n",
+    "reason": "failed_rc_1"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-16.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-16.md
+{
+  "generated_at": "2026-04-17T15:50:02.159683",
+  "trade_date": "2026-04-17",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 24353.55,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 494,
+        "last_close": 24353.55078125,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 24353.55,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 494,\n    \"last_close\": 24353.55078125,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": false,
+    "returncode": 1,
+    "payload": null,
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n",
+    "reason": "failed_rc_1"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-17.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-17.md
+{
+  "generated_at": "2026-04-20T15:50:01.981644",
+  "trade_date": "2026-04-20",
+  "market_open": true,
+  "calendar": "NSE",
+  "fetch": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "manifest": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+      "interval": "day",
+      "spot_used": 24364.85,
+      "contracts_selected": 28,
+      "contracts_fetched": 28,
+      "contracts_failed": [],
+      "underlying_context": {
+        "ok": true,
+        "path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "rows": 493,
+        "last_close": 24364.849609375,
+        "interval": "day"
+      }
+    },
+    "stdout": "{\n  \"manifest\": \"/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json\",\n  \"interval\": \"day\",\n  \"spot_used\": 24364.85,\n  \"contracts_selected\": 28,\n  \"contracts_fetched\": 28,\n  \"contracts_failed\": [],\n  \"underlying_context\": {\n    \"ok\": true,\n    \"path\": \"/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather\",\n    \"rows\": 493,\n    \"last_close\": 24364.849609375,\n    \"interval\": \"day\"\n  }\n}\n",
+    "stderr": "",
+    "reason": null
+  },
+  "paper_shadow": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "equity_shadow": {
+        "generated_at": "2026-04-20T15:50:22.356818",
+        "paper_mode": true,
+        "symbol": "NIFTYETF",
+        "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
+        "position_qty": 551,
+        "mode": "SELL_RULE_ONLY",
+        "base_decision": "HOLD",
+        "decision": "HOLD",
+        "decision_changed_by_news": false,
+        "news_overlay": null,
+        "last_close": 24364.849609375,
+        "price_history": {
+          "source": "cache",
+          "cache_name": "NIFTY50_INDEX",
+          "cache_path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather"
+        },
+        "equity_entry_diagnostics": {
+          "decision": "HOLD",
+          "entry_gate_failures": [
+            "vwap",
+            "ich_cloud",
+            "trend_ok",
+            "volume_confirm",
+            "cmf_ok",
+            "macd_hist_rising",
+            "rsi_pullback_trigger",
+            "stoch_pull_ok"
+          ],
+          "hard_blocks": [
+            "vwap",
+            "ich_cloud"
+          ],
+          "nearest_mode": "pullback",
+          "nearest_mode_missing": [
+            "trend_ok",
+            "volume_confirm",
+            "cmf_ok",
+            "macd_hist_rising",
+            "rsi_pullback_trigger",
+            "stoch_pull_ok"
+          ],
+          "nearest_mode_missing_count": 6,
+          "alternate_mode_missing": [
+            "trend_ok",
+            "adx_strong",
+            "volume_confirm",
+            "cmf_ok",
+            "macd_hist_rising",
+            "stoch_momo_ok",
+            "breakout_trigger"
+          ],
+          "reason": [
+            "vwap",
+            "ich_cloud",
+            "nearest_mode:pullback"
+          ],
+          "gate_status": {
+            "trend_ok": false,
+            "trend_slope_ok": true,
+            "adx_ok": true,
+            "adx_strong": false,
+            "volume_confirm": false,
+            "cmf_ok": false,
+            "obv_ok": true,
+            "obv_overextended": true,
+            "macd_signal_ok": true,
+            "macd_hist_rising": false,
+            "rsi_floor_ok": true,
+            "atr_band_ok": true,
+            "extension_ok": true,
+            "supertrend_price_ok": true,
+            "supertrend_direction_ok": true,
+            "weekly_trend_ok": true,
+            "mmi_ok": true,
+            "vwap_ok": false,
+            "ich_cloud_ok": false,
+            "sar_ok": true,
+            "cci_ok": true,
+            "di_cross_ok": true,
+            "di_plus_ok": true,
+            "stoch_pull_ok": false,
+            "stoch_momo_ok": false,
+            "rsi_pullback_trigger": false,
+            "rsi_momo_trigger": false,
+            "prior_high_break": false,
+            "highN_break": false,
+            "pullback_mode": false,
+            "breakout_mode": false
+          },
+          "metric_snapshot": {
+            "close": 24364.8496,
+            "ema20": 23793.7725,
+            "ema50": 24207.2224,
+            "ema200": 24838.3531,
+            "adx": 24.7403,
+            "macd": 31.5417,
+            "macd_signal": -190.8926,
+            "macd_hist": 222.4343,
+            "volume": 0.0,
+            "volume_sma20": 498035.0,
+            "cmf": 0.3455,
+            "obv": 6017300.0,
+            "obv_ema20": 5163291.95,
+            "obv_zscore20": 1.3514,
+            "rsi": 57.2393,
+            "stochastic_k": 94.5399,
+            "atr": 429.6893,
+            "atr_pct": 0.0176,
+            "extension_atr": 1.329,
+            "supertrend": 22934.1994,
+            "weekly_sma_20": 25128.2216,
+            "weekly_sma_200": null,
+            "vwap": 24388.8172,
+            "ich_cloud_bull": false,
+            "sar": 22801.3464,
+            "cci": 110.9554,
+            "williams_r": -5.039,
+            "plus_di": 30.3013,
+            "minus_di": 29.38,
+            "mmi": null,
+            "cmf_gate": 0.05,
+            "rsi_pull_gate": 55.0,
+            "rsi_momo_gate": 60.0
+          },
+          "threshold_snapshot": {
+            "adx_min": 18.0,
+            "adx_strong_min": 25.0,
+            "mmi_risk_off": 65.0,
+            "min_atr_pct": 0.006,
+            "max_atr_pct": 0.09,
+            "max_extension_atr": 2.2,
+            "max_obv_zscore": 3.5,
+            "obv_min_zscore": 0.5,
+            "volume_confirm_mult": 1.1,
+            "cmf_gate": 0.05,
+            "rsi_floor": 45.0,
+            "stoch_pull_max": 75.0,
+            "stoch_momo_max": 85.0,
+            "cci_buy_min": -100.0,
+            "vwap_buy_above": 1.0,
+            "ich_cloud_bull": 1.0,
+            "sar_buy_enabled": 0.0,
+            "di_plus_min": 0.0,
+            "di_cross_enabled": 0.0,
+            "rsi_pull_gate": 55,
+            "rsi_momo_gate": 60
+          },
+          "mode_diagnostics": {
+            "pullback_missing": [
+              "trend_ok",
+              "volume_confirm",
+              "cmf_ok",
+              "macd_hist_rising",
+              "rsi_pullback_trigger",
+              "stoch_pull_ok"
+            ],
+            "breakout_missing": [
+              "trend_ok",
+              "adx_strong",
+              "volume_confirm",
+              "cmf_ok",
+              "macd_hist_rising",
+              "stoch_momo_ok",
+              "breakout_trigger"
+            ]
+          }
+        },
+        "symbol_news_sentiment": {
+          "weighted_sentiment": 0.3699,
+          "item_count": 10,
+          "dominant_types": [
+            "bullish",
+            "risk",
+            "uncategorized"
+          ],
+          "sample_headlines": [
+            "Stock market today: Nifty 50 breaks above 24,400 resistance; next stop 25,000?",
+            "Rajesh Palviya sees Nifty rally extending this week on strong bullish momentum",
+            "Vinay Rajani of HDFC Sec suggests Action Construction Equipment, Moil shares to buy"
+          ]
+        },
+        "market_news_topics": [
+          {
+            "weighted_sentiment": -0.1493,
+            "type_counts": {
+              "risk": 121,
+              "uncategorized": 71,
+              "bearish": 3,
+              "news": 3,
+              "bullish": 2,
+              "rumor": 1,
+              "regulatory": 1
+            },
+            "dominant_types": [
+              "risk",
+              "uncategorized",
+              "bearish",
+              "news"
+            ],
+            "sample_headlines": [
+              "UAE blames Trump for Iran war fallout, warns it may turn to yuan if dollars run short: Report - Moneycontrol.com",
+              "Americans are confused \u2014 and fatigued \u2014 by Trump\u2019s trade war - MSN",
+              "House Dem Sam Liccardo probes suspicious oil trades during Iran war - CNBC",
+              "| Did Prez Trump permanently change the global trade war playbook? - Fibre2Fashion",
+              "India is the big winner in Trump\u2019s trade war - MSN"
+            ],
+            "top_items": [
+              {
+                "title": "UAE blames Trump for Iran war fallout, warns it may turn to yuan if dollars run short: Report - Moneycontrol.com",
+                "summary": "UAE blames Trump for Iran war fallout, warns it may turn to yuan if dollars run short: Report Moneycontrol.com",
+                "link": "https://news.google.com/rss/articles/CBMi4gFBVV95cUxNbktOTHpkTk0xempYbUVFRDdERWpxREpWUUQzaE82dHVIVnFNZWV6NnA5Tm9hdXJ5YWlQMnE3TVNOd0VHeDBzRzFTZ3BHUXVDcVpabTNmOFU4dE82Z2duaV9YZkVFZGVkaGd6RnIxaEVYWXA0Q0J6REg5M3ozc1NRVGt6cGlLNlk4T1JYTUNacUJicDNSM3NzOVo4ZF9BS21MRlQwX3pqbTVIZERtNjlXT1ZTeXBVbFN6YVBYSWw4b2tFU0J4bnBHT2RvOFU4WTI1R3MzVmtiT3NfbDlxT3I3c3B30gHnAUFVX3lxTFBnSjhxUm10aFIxVVNucHkySzZDXzZ1c0Y0bzh6VTVGMG13WDJkYmV2NDZfeGxZb1hwNUwyTmVBUl93MWdSQmtUTXFkWFVkVGhodUNMZF9ZT3BIM04wWWVjQzA3U1FWb0NfQmZwRVZGQm91MmdYb2JLV05EckVDdjdsVV9yN2g3VjMzbWxRTk0teElyd1VZZkJsSFUweUQzQkVGNFU0SXZOVlNJendhX29XOF9fTDNyempRXzY1eXhURGZscEtTU01NTGxIRHJRaW1pWndEVTNqQUNWcFkzVzNleC13V21QWQ?oc=5",
+                "source": "news.google.com",
+                "published_at": 1776654340,
+                "classification": {
+                  "types": [
+                    "bearish",
+                    "risk"
+                  ],
+                  "matches": {
+                    "bearish": [
+                      "short"
+                    ],
+                    "risk": [
+                      "war"
+                    ]
+                  },
+                  "sentiment": -0.65,
+                  "confidence": 0.5
+                },
+                "weight": 0.5938
+              },
+              {
+                "title": "Americans are confused \u2014 and fatigued \u2014 by Trump\u2019s trade war - MSN",
+                "summary": "Americans are confused \u2014 and fatigued \u2014 by Trump\u2019s trade war MSN",
+                "link": "https://news.google.com/rss/articles/CBMihANBVV95cUxNd2FxUGszVy14UWpoNE5pSFFWMGstaklFRW5pT3MyOWg0bExwcFB6QzdERERVZnQ1YkJnbFlTLVhkS05XcXBnMHJOakdpUXBqNS1xSGRCa1c5eUktaFNDUURhdFdTTXFmYksya0VjdjJBMnN4VGNCa0pBTktaV21jNlJDeTNLYkx2dEVDUHRBc2pjdVMtNVg0eFVvck84V3VjREJqRGNYTzNDTnZoWlN6U0pxWVlEc3FMblM1elM4S0l0SjEtSFZVVnNidERHWTRXZldta05RSmxteVU3ZFVsZ1EyRUFNTmcwYnFiVmIzUEw1cXh0SzNad1p4dnd2aUJtbTlEekxiVWlyYWN6QlNVLUtEWlpxNWJaRGhiUm1PZWRkWDdoc0syaDNOYmdmQTFJYk5hT3FQSC1HQ0gwaThndy1mMmZpLUZ5akZMd3haLVZRVDlBeGRrNkRSUS00bC1ESkJlUmJ2SllMTU5QcWNrTmo5RDVVbU1wTFkzWE03RGhEREdB?oc=5",
+                "source": "news.google.com",
+                "published_at": 1776622577,
+                "classification": {
+                  "types": [
+                    "risk"
+                  ],
+                  "matches": {
+                    "risk": [
+                      "war",
+                      "trade war"
+                    ]
+                  },
+                  "sentiment": -0.4,
+                  "confidence": 0.5
+                },
+                "weight": 0.5938
+              },
+              {
+                "title": "House Dem Sam Liccardo probes suspicious oil trades during Iran war - CNBC",
+                "summary": "House Dem Sam Liccardo probes suspicious oil trades during Iran war CNBC",
+                "link": "https://news.google.com/rss/articles/CBMihgFBVV95cUxQX0dKRF9hZWo1OXRuYUJPVllXQjdCS2NTUmxOVVZpMUQ2Sm1ObUtKQzFwdi1QanVRMUtDQ1NWb2ZjaHB2ZTgzYWtUYUtMdGl1ejB0Z0N5Slpfa1drZ1VMRnJOMUtmS0xkX2ZqSGp3WllXQWRLTGRLdmdrQVN1a0N6NnVaU0sxd9IBiwFBVV95cUxNLVR5Q1hPLWZUVEZOQm14TW9ZUGFrYnprMWREVFlYTTdvX3RjV2s5bVBSSXBYMmM4blYydmFOMmxSZGI3d0wzVXh6WkZfSnU5dm45OHJ1MzdWUTc0N21xX3dXT2V4T2NmOHNaN2NaUEI1Ry1iN0QySzVMaUw4VEI5TU95dTB5RW5VMGdB?oc=5",
+                "source": "news.google.com",
+                "published_at": 1776432601,
+                "classification": {
+                  "types": [
+                    "risk"
+                  ],
+                  "matches": {
+                    "risk": [
+                      "oil",
+                      "war"
+                    ]
+                  },
+                  "sentiment": -0.4,
+                  "confidence": 0.5
+                },
+                "weight": 0.4987
+              },
+              {
+                "title": "| Did Prez Trump permanently change the global trade war playbook? - Fibre2Fashion",
+                "summary": "| Did Prez Trump permanently change the global trade war playbook? Fibre2Fashion",
+                "link": "https://news.google.com/rss/articles/CBMizwFBVV95cUxPYkQwa0JVYXNRZHNWcE4xUUI5WjBXSEwydEQ0TUpwLVRhNXZRUWxHbUJxTEVXRTJNdjRhZ2tQLW9JbF9aTUd5MlA2TE5PRlNhOVdvT3FfdlRMY1hxQm91VE5rM2JmWmFSOVlqa3RLQU5NZEJaV1cwQ2NZT3JrWTRFdGhHNFNndDVuT1hSRWJtZ0paaWFsM2Y3NEctaDBaWFhkRzlmR2tkSEwzdHYtOEludVQwZXZPVEhDNWdjQTYxbEdqUWp5S3lid0Zyd0NRUjA?oc=5",
+                "source": "news.google.com",
+                "published_at": 1776466673,
+                "classification": {
+                  "types": [
+                    "risk"
+                  ],
+                  "matches": {
+                    "risk": [
+                      "war",
+                      "trade war"
+                    ]
+                  },
+                  "sentiment": -0.4,
+                  "confidence": 0.5
+                },
+                "weight": 0.4987
+              },
+              {
+                "title": "India is the big winner in Trump\u2019s trade war - MSN",
+                "summary": "India is the big winner in Trump\u2019s trade war MSN",
+                "link": "https://news.google.com/rss/articles/CBMi8gJBVV95cUxOdE1hWHBTbndnNHp2NEZ5Y2lhT3VfeDhxQV9zcG5tbWw5d3JYR1BVMEVQbndzUlJHNGZWY0JHSG1waTdrTDNHdXgycHpqX1o4ckZ1Zl9OUF9Ta1VJT1M0UXVnVWxsRi0zX2xvVUtjdmN5aHZ6V3YxdVV5bklEamVoM3FPY1MwUWxPaHBMZ3VURDhuSFBqTjBnVW1fakh6Q3p6bE9aS0c0NDlVYUVTdUFZZ0h3cGpMajd1R0ItOXMxUnMxQk16WFF3SFRpTGl4NjFxdWxWTXZVRVA1V0U2YlpsRXRYeFo2VVBmRXNRck8tV2Z6UzVVOENYbHI1RGtTT0lkYU0wdWV1LTBzTGQtRU5oRnJ1QWZXQnBXRUF5cUpaTXZsR3RBaFNqM3R4YkU4Y2VCZzc1aUVuX2RuRkgtS1ZtcDZnUTJBekpWelhVdEY3ak53X0Y2RGQyQUNzenh2NzBTTWxLdkJyX1FEeW1kc1dDejl3?oc=5",
+                "source": "news.google.com",
+                "published_at": 1776490316,
+                "classification": {
+                  "types": [
+                    "risk"
+                  ],
+                  "matches": {
+                    "risk": [
+                      "war",
+                      "trade war"
+                    ]
+                  },
+                  "sentiment": -0.4,
+                  "confidence": 0.5
+                },
+                "weight": 0.4987
+              }
+            ],
+            "generated_at": 1776680422,
+            "status": "ok",
+            "topic": "trump_market",
+            "item_count": 194,
+            "bullish_items": 5,
+            "bearish_items": 123,
+            "label": "Trump market impact",
+            "feed_status": [
+              {
+                "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%20OR%20%22Truth%20Social%22%29%20%28tariff%20OR%20tariffs%20OR%20trade%20OR%20market%20OR%20stocks%20OR%20oil%20OR%20fed%20OR%20china%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+                "source": "news.google.com",
+                "status": "ok",
+                "error": null,
+                "entry_count": 100
+              },
+              {
+                "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%29%20%28markets%20OR%20stocks%20OR%20trade%20war%20OR%20tariffs%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+                "source": "news.google.com",
+                "status": "ok",
+                "error": null,
+                "entry_count": 100
+              }
+            ],
+            "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+          }
+        ]
+      },
+      "options_shadow": {
+        "generated_at": "2026-04-20T15:50:24.143778",
+        "paper_mode": true,
+        "production_rule_model": "OPTIONS=RULE_SET_OPTIONS_1",
+        "manifest_path": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+        "underlying_context_path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather",
+        "universe_size": 28,
+        "evaluated": 28,
+        "skipped": {},
+        "buy_candidates": [],
+        "near_miss_candidates": [
+          {
+            "symbol": "NIFTY2642124300PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 127.5,
+              "prev_close": 123.0,
+              "ema5": 249.2353,
+              "ema10": 395.392,
+              "rsi": 33.3146,
+              "macd_hist": null,
+              "atr_pct": 1.1552,
+              "volume": 366623920.0,
+              "volume_sma20": 35012490.5,
+              "oi": 5845645.0,
+              "oi_sma5": 2877810.0,
+              "oi_pct_change": 12.94,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 127.5,
+            "volume": 366623920.0,
+            "oi": 5845645.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24300.0
+          },
+          {
+            "symbol": "NIFTY2642124350PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 151.05,
+              "prev_close": 143.0,
+              "ema5": 269.0937,
+              "ema10": 407.6146,
+              "rsi": 22.7111,
+              "macd_hist": null,
+              "atr_pct": 0.7135,
+              "volume": 238602715.0,
+              "volume_sma20": 17371311.75,
+              "oi": 2557750.0,
+              "oi_sma5": 1027052.0,
+              "oi_pct_change": 25.2228,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 151.05,
+            "volume": 238602715.0,
+            "oi": 2557750.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24350.0
+          },
+          {
+            "symbol": "NIFTY2642124400CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 83.6,
+              "prev_close": 143.25,
+              "ema5": 112.2255,
+              "ema10": 129.4723,
+              "rsi": 36.0272,
+              "macd_hist": null,
+              "atr_pct": 0.4924,
+              "volume": 401054550.0,
+              "volume_sma20": 38035172.5,
+              "oi": 5449470.0,
+              "oi_sma5": 3832400.0,
+              "oi_pct_change": 34.4916,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 83.6,
+            "volume": 401054550.0,
+            "oi": 5449470.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24400.0
+          },
+          {
+            "symbol": "NIFTY2642124400PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 178.55,
+              "prev_close": 165.95,
+              "ema5": 307.4209,
+              "ema10": 464.9021,
+              "rsi": 35.4311,
+              "macd_hist": null,
+              "atr_pct": 0.9627,
+              "volume": 347099805.0,
+              "volume_sma20": 23107350.5,
+              "oi": 3288350.0,
+              "oi_sma5": 1309451.0,
+              "oi_pct_change": 98.47,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 178.55,
+            "volume": 347099805.0,
+            "oi": 3288350.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24400.0
+          },
+          {
+            "symbol": "NIFTY2642124450CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 65.4,
+              "prev_close": 119.2,
+              "ema5": 94.4169,
+              "ema10": 113.2396,
+              "rsi": 34.3719,
+              "macd_hist": null,
+              "atr_pct": 0.5734,
+              "volume": 272179570.0,
+              "volume_sma20": 21318082.5,
+              "oi": 3259035.0,
+              "oi_sma5": 1496794.0,
+              "oi_pct_change": 91.9931,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 65.4,
+            "volume": 272179570.0,
+            "oi": 3259035.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24450.0
+          }
+        ],
+        "near_miss_summary": {
+          "hold_candidates": 28,
+          "closest_symbol": "NIFTY2642124300PE",
+          "closest_score_gap_to_buy": 4.0,
+          "most_common_gate_failures": [
+            {
+              "gate": "underlying_alignment",
+              "count": 28
+            },
+            {
+              "gate": "price_momentum",
+              "count": 28
+            },
+            {
+              "gate": "option_rsi",
+              "count": 28
+            },
+            {
+              "gate": "macd_hist",
+              "count": 14
+            },
+            {
+              "gate": "oi_confirm",
+              "count": 9
+            },
+            {
+              "gate": "atr_filter",
+              "count": 1
+            }
+          ]
+        },
+        "top_candidate": {
+          "symbol": "NIFTY26APR24300CE",
+          "decision": "HOLD",
+          "score": 3.0,
+          "side": "CE",
+          "reason": [
+            "ema_stack",
+            "volume_confirm",
+            "oi_confirm"
+          ],
+          "gate_failures": [
+            "underlying_alignment",
+            "price_momentum",
+            "option_rsi",
+            "macd_hist"
+          ],
+          "gate_failures_count": 4,
+          "score_gap_to_buy": 3.0,
+          "gate_status": {
+            "underlying_alignment": false,
+            "price_momentum": false,
+            "ema_stack": true,
+            "rsi_ok": false,
+            "rsi_available": true,
+            "macd_ok": false,
+            "macd_available": true,
+            "volume_ok": true,
+            "oi_ok": true,
+            "atr_ok": true,
+            "atr_available": true,
+            "breakout_ok": false
+          },
+          "metric_snapshot": {
+            "close": 303.8,
+            "prev_close": 333.0,
+            "ema5": 282.2801,
+            "ema10": 259.681,
+            "rsi": 43.9514,
+            "macd_hist": 67.7703,
+            "atr_pct": 0.3744,
+            "volume": 7088965.0,
+            "volume_sma20": 1617850.0,
+            "oi": 1515020.0,
+            "oi_sma5": 1185366.0,
+            "oi_pct_change": 9.2784,
+            "underlying_close": 24353.5508,
+            "underlying_rsi": 57.1116,
+            "underlying_adx": 26.5247,
+            "underlying_macd_hist": 230.5792
+          },
+          "threshold_snapshot": {
+            "buy_score_min": 6.0,
+            "option_rsi_min": 56.0,
+            "volume_confirm_mult": 1.1,
+            "oi_sma_mult": 1.02,
+            "oi_change_min_pct": 1.0,
+            "atr_pct_min": 0.03,
+            "atr_pct_max": 1.5,
+            "underlying_rsi_bull_min": 55.0,
+            "underlying_rsi_bear_max": 45.0,
+            "underlying_adx_min": 18.0
+          },
+          "last_close": 303.8,
+          "volume": 7088965.0,
+          "oi": 1515020.0,
+          "underlying_close": 24353.55078125,
+          "expiry": "2026-04-28",
+          "strike": 24300.0
+        },
+        "all_ranked": [
+          {
+            "symbol": "NIFTY26APR24300CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "ema_stack",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi",
+              "macd_hist"
+            ],
+            "gate_failures_count": 4,
+            "score_gap_to_buy": 3.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": true,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": true,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 303.8,
+              "prev_close": 333.0,
+              "ema5": 282.2801,
+              "ema10": 259.681,
+              "rsi": 43.9514,
+              "macd_hist": 67.7703,
+              "atr_pct": 0.3744,
+              "volume": 7088965.0,
+              "volume_sma20": 1617850.0,
+              "oi": 1515020.0,
+              "oi_sma5": 1185366.0,
+              "oi_pct_change": 9.2784,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 303.8,
+            "volume": 7088965.0,
+            "oi": 1515020.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-28",
+            "strike": 24300.0
+          },
+          {
+            "symbol": "NIFTY26APR24350CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "ema_stack",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi",
+              "macd_hist"
+            ],
+            "gate_failures_count": 4,
+            "score_gap_to_buy": 3.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": true,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": true,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 278.6,
+              "prev_close": 300.0,
+              "ema5": 256.611,
+              "ema10": 236.8842,
+              "rsi": 43.7478,
+              "macd_hist": 64.0418,
+              "atr_pct": 0.3811,
+              "volume": 2955355.0,
+              "volume_sma20": 353158.0,
+              "oi": 429260.0,
+              "oi_sma5": 211874.0,
+              "oi_pct_change": 86.0282,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 278.6,
+            "volume": 2955355.0,
+            "oi": 429260.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-28",
+            "strike": 24350.0
+          },
+          {
+            "symbol": "NIFTY26APR24400CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "ema_stack",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi",
+              "macd_hist"
+            ],
+            "gate_failures_count": 4,
+            "score_gap_to_buy": 3.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": true,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": true,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 251.0,
+              "prev_close": 272.7,
+              "ema5": 232.2334,
+              "ema10": 215.6107,
+              "rsi": 43.1118,
+              "macd_hist": 60.5036,
+              "atr_pct": 0.4122,
+              "volume": 12921935.0,
+              "volume_sma20": 1551361.5,
+              "oi": 1602705.0,
+              "oi_sma5": 1142869.0,
+              "oi_pct_change": 25.0228,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 251.0,
+            "volume": 12921935.0,
+            "oi": 1602705.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-28",
+            "strike": 24400.0
+          },
+          {
+            "symbol": "NIFTY26APR24450CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "ema_stack",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi",
+              "macd_hist"
+            ],
+            "gate_failures_count": 4,
+            "score_gap_to_buy": 3.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": true,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": true,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 227.85,
+              "prev_close": 246.0,
+              "ema5": 210.5174,
+              "ema10": 196.6965,
+              "rsi": 42.3911,
+              "macd_hist": 59.0927,
+              "atr_pct": 0.4206,
+              "volume": 3431675.0,
+              "volume_sma20": 307274.5,
+              "oi": 409110.0,
+              "oi_sma5": 170482.0,
+              "oi_pct_change": 192.7442,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 227.85,
+            "volume": 3431675.0,
+            "oi": 409110.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-28",
+            "strike": 24450.0
+          },
+          {
+            "symbol": "NIFTY26APR24500CE",
+            "decision": "HOLD",
+            "score": 3.0,
+            "side": "CE",
+            "reason": [
+              "ema_stack",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi",
+              "macd_hist"
+            ],
+            "gate_failures_count": 4,
+            "score_gap_to_buy": 3.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": true,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": true,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 202.55,
+              "prev_close": 222.9,
+              "ema5": 188.6093,
+              "ema10": 177.6941,
+              "rsi": 41.9748,
+              "macd_hist": 56.2035,
+              "atr_pct": 0.5105,
+              "volume": 14481870.0,
+              "volume_sma20": 5009862.0,
+              "oi": 4070755.0,
+              "oi_sma5": 3829189.0,
+              "oi_pct_change": 2.3785,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 202.55,
+            "volume": 14481870.0,
+            "oi": 4070755.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-28",
+            "strike": 24500.0
+          },
+          {
+            "symbol": "NIFTY2642124300PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 127.5,
+              "prev_close": 123.0,
+              "ema5": 249.2353,
+              "ema10": 395.392,
+              "rsi": 33.3146,
+              "macd_hist": null,
+              "atr_pct": 1.1552,
+              "volume": 366623920.0,
+              "volume_sma20": 35012490.5,
+              "oi": 5845645.0,
+              "oi_sma5": 2877810.0,
+              "oi_pct_change": 12.94,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 127.5,
+            "volume": 366623920.0,
+            "oi": 5845645.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24300.0
+          },
+          {
+            "symbol": "NIFTY2642124350PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 151.05,
+              "prev_close": 143.0,
+              "ema5": 269.0937,
+              "ema10": 407.6146,
+              "rsi": 22.7111,
+              "macd_hist": null,
+              "atr_pct": 0.7135,
+              "volume": 238602715.0,
+              "volume_sma20": 17371311.75,
+              "oi": 2557750.0,
+              "oi_sma5": 1027052.0,
+              "oi_pct_change": 25.2228,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 151.05,
+            "volume": 238602715.0,
+            "oi": 2557750.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24350.0
+          },
+          {
+            "symbol": "NIFTY2642124400CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 83.6,
+              "prev_close": 143.25,
+              "ema5": 112.2255,
+              "ema10": 129.4723,
+              "rsi": 36.0272,
+              "macd_hist": null,
+              "atr_pct": 0.4924,
+              "volume": 401054550.0,
+              "volume_sma20": 38035172.5,
+              "oi": 5449470.0,
+              "oi_sma5": 3832400.0,
+              "oi_pct_change": 34.4916,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 83.6,
+            "volume": 401054550.0,
+            "oi": 5449470.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24400.0
+          },
+          {
+            "symbol": "NIFTY2642124400PE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "PE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 178.55,
+              "prev_close": 165.95,
+              "ema5": 307.4209,
+              "ema10": 464.9021,
+              "rsi": 35.4311,
+              "macd_hist": null,
+              "atr_pct": 0.9627,
+              "volume": 347099805.0,
+              "volume_sma20": 23107350.5,
+              "oi": 3288350.0,
+              "oi_sma5": 1309451.0,
+              "oi_pct_change": 98.47,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 178.55,
+            "volume": 347099805.0,
+            "oi": 3288350.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24400.0
+          },
+          {
+            "symbol": "NIFTY2642124450CE",
+            "decision": "HOLD",
+            "score": 2.0,
+            "side": "CE",
+            "reason": [
+              "macd_unavailable",
+              "volume_confirm",
+              "oi_confirm"
+            ],
+            "gate_failures": [
+              "underlying_alignment",
+              "price_momentum",
+              "option_rsi"
+            ],
+            "gate_failures_count": 3,
+            "score_gap_to_buy": 4.0,
+            "gate_status": {
+              "underlying_alignment": false,
+              "price_momentum": false,
+              "ema_stack": false,
+              "rsi_ok": false,
+              "rsi_available": true,
+              "macd_ok": false,
+              "macd_available": false,
+              "volume_ok": true,
+              "oi_ok": true,
+              "atr_ok": true,
+              "atr_available": true,
+              "breakout_ok": false
+            },
+            "metric_snapshot": {
+              "close": 65.4,
+              "prev_close": 119.2,
+              "ema5": 94.4169,
+              "ema10": 113.2396,
+              "rsi": 34.3719,
+              "macd_hist": null,
+              "atr_pct": 0.5734,
+              "volume": 272179570.0,
+              "volume_sma20": 21318082.5,
+              "oi": 3259035.0,
+              "oi_sma5": 1496794.0,
+              "oi_pct_change": 91.9931,
+              "underlying_close": 24353.5508,
+              "underlying_rsi": 57.1116,
+              "underlying_adx": 26.5247,
+              "underlying_macd_hist": 230.5792
+            },
+            "threshold_snapshot": {
+              "buy_score_min": 6.0,
+              "option_rsi_min": 56.0,
+              "volume_confirm_mult": 1.1,
+              "oi_sma_mult": 1.02,
+              "oi_change_min_pct": 1.0,
+              "atr_pct_min": 0.03,
+              "atr_pct_max": 1.5,
+              "underlying_rsi_bull_min": 55.0,
+              "underlying_rsi_bear_max": 45.0,
+              "underlying_adx_min": 18.0
+            },
+            "last_close": 65.4,
+            "volume": 272179570.0,
+            "oi": 3259035.0,
+            "underlying_close": 24353.55078125,
+            "expiry": "2026-04-21",
+            "strike": 24450.0
+          }
+        ]
+      }
+    },
+    "stdout": "  },\n      {\n        \"symbol\": \"NIFTY2642124450CE\",\n        \"decision\": \"HOLD\",\n        \"score\": 2.0,\n        \"side\": \"CE\",\n        \"reason\": [\n          \"macd_unavailable\",\n          \"volume_confirm\",\n          \"oi_confirm\"\n        ],\n        \"gate_failures\": [\n          \"underlying_alignment\",\n          \"price_momentum\",\n          \"option_rsi\"\n        ],\n        \"gate_failures_count\": 3,\n        \"score_gap_to_buy\": 4.0,\n        \"gate_status\": {\n          \"underlying_alignment\": false,\n          \"price_momentum\": false,\n          \"ema_stack\": false,\n          \"rsi_ok\": false,\n          \"rsi_available\": true,\n          \"macd_ok\": false,\n          \"macd_available\": false,\n          \"volume_ok\": true,\n          \"oi_ok\": true,\n          \"atr_ok\": true,\n          \"atr_available\": true,\n          \"breakout_ok\": false\n        },\n        \"metric_snapshot\": {\n          \"close\": 65.4,\n          \"prev_close\": 119.2,\n          \"ema5\": 94.4169,\n          \"ema10\": 113.2396,\n          \"rsi\": 34.3719,\n          \"macd_hist\": null,\n          \"atr_pct\": 0.5734,\n          \"volume\": 272179570.0,\n          \"volume_sma20\": 21318082.5,\n          \"oi\": 3259035.0,\n          \"oi_sma5\": 1496794.0,\n          \"oi_pct_change\": 91.9931,\n          \"underlying_close\": 24353.5508,\n          \"underlying_rsi\": 57.1116,\n          \"underlying_adx\": 26.5247,\n          \"underlying_macd_hist\": 230.5792\n        },\n        \"threshold_snapshot\": {\n          \"buy_score_min\": 6.0,\n          \"option_rsi_min\": 56.0,\n          \"volume_confirm_mult\": 1.1,\n          \"oi_sma_mult\": 1.02,\n          \"oi_change_min_pct\": 1.0,\n          \"atr_pct_min\": 0.03,\n          \"atr_pct_max\": 1.5,\n          \"underlying_rsi_bull_min\": 55.0,\n          \"underlying_rsi_bear_max\": 45.0,\n          \"underlying_adx_min\": 18.0\n        },\n        \"last_close\": 65.4,\n        \"volume\": 272179570.0,\n        \"oi\": 3259035.0,\n        \"underlying_close\": 24353.55078125,\n        \"expiry\": \"2026-04-21\",\n        \"strike\": 24450.0\n      }\n    ]\n  }\n}\n",
+    "stderr": "",
+    "reason": null,
+    "generated_at": "2026-04-20T15:50:24.143778",
+    "stale_report": false,
+    "stale_reason": null
+  },
+  "options_lab": {
+    "ok": true,
+    "returncode": 0,
+    "payload": {
+      "generated_at": "2026-04-20T15:52:05.374402",
+      "lab_type": "options_research_only",
+      "production_rule_model": "OPTIONS=RULE_SET_OPTIONS_1",
+      "supports_live_auto_promotion": false,
+      "scorecard_context": {
+        "scorecard_found": true,
+        "scorecard_path": "/home/ubuntu/Auto_Trader/reports/daily_scorecard_2026-04-17.json",
+        "date": "2026-04-17",
+        "orders": 0,
+        "trades": 0,
+        "buy_placed": 0,
+        "sell_placed": 0,
+        "estimated_realized_pnl": 0,
+        "verdict": "GOOD",
+        "log_counts": {
+          "market_blocked": 0,
+          "tick_size": 0,
+          "ws_close": 1,
+          "order_failed": 0,
+          "buy_placed": 0,
+          "sell_placed": 0
+        },
+        "no_trade_day": true,
+        "optimization_focus": [
+          "expand_buy_sensitivity"
+        ],
+        "code_findings": [
+          "websocket_reconnect_review"
+        ]
+      },
+      "tradebook_context": {
+        "tradebook_found": false,
+        "optimization_focus": [],
+        "code_findings": [],
+        "top_symbols": []
+      },
+      "data_context": {
+        "requested_symbols": [
+          "NIFTY2642124200CE",
+          "NIFTY2642124200PE",
+          "NIFTY2642124250CE",
+          "NIFTY2642124250PE",
+          "NIFTY2642124300CE",
+          "NIFTY2642124300PE",
+          "NIFTY2642124350CE",
+          "NIFTY2642124350PE",
+          "NIFTY2642124400CE",
+          "NIFTY2642124400PE",
+          "NIFTY2642124450CE",
+          "NIFTY2642124450PE",
+          "NIFTY2642124500CE",
+          "NIFTY2642124500PE",
+          "NIFTY26APR24200CE",
+          "NIFTY26APR24200PE",
+          "NIFTY26APR24250CE",
+          "NIFTY26APR24250PE",
+          "NIFTY26APR24300CE",
+          "NIFTY26APR24300PE",
+          "NIFTY26APR24350CE",
+          "NIFTY26APR24350PE",
+          "NIFTY26APR24400CE",
+          "NIFTY26APR24400PE",
+          "NIFTY26APR24450CE",
+          "NIFTY26APR24450PE",
+          "NIFTY26APR24500CE",
+          "NIFTY26APR24500PE"
+        ],
+        "loaded_symbols": [
+          "NIFTY2642124200CE",
+          "NIFTY2642124200PE",
+          "NIFTY2642124250CE",
+          "NIFTY2642124250PE",
+          "NIFTY2642124300CE",
+          "NIFTY2642124300PE",
+          "NIFTY2642124350CE",
+          "NIFTY2642124350PE",
+          "NIFTY2642124400CE",
+          "NIFTY2642124400PE",
+          "NIFTY2642124450CE",
+          "NIFTY2642124450PE",
+          "NIFTY2642124500CE",
+          "NIFTY2642124500PE",
+          "NIFTY26APR24200CE",
+          "NIFTY26APR24200PE",
+          "NIFTY26APR24250CE",
+          "NIFTY26APR24250PE",
+          "NIFTY26APR24300CE",
+          "NIFTY26APR24300PE",
+          "NIFTY26APR24350CE",
+          "NIFTY26APR24350PE",
+          "NIFTY26APR24400CE",
+          "NIFTY26APR24400PE",
+          "NIFTY26APR24450CE",
+          "NIFTY26APR24450PE",
+          "NIFTY26APR24500CE",
+          "NIFTY26APR24500PE"
+        ],
+        "skipped_symbols": {},
+        "side_filter": "BOTH",
+        "underlyings": [
+          "NIFTY"
+        ],
+        "manifest_path": "/home/ubuntu/Auto_Trader/intermediary_files/options/nifty_options_universe.json",
+        "min_bars": 15,
+        "underlying_context_path": "/home/ubuntu/Auto_Trader/intermediary_files/Hist_Data/NIFTY50_INDEX.feather"
+      },
+      "baseline": {
+        "name": "baseline_current",
+        "final_value": 2898930.0,
+        "total_return_pct": 3.53,
+        "trades": 22,
+        "win_rate_pct": 54.55,
+        "max_drawdown_pct": -13.92,
+        "params": {
+          "options": {}
+        },
+        "symbols_tested": [
+          "NIFTY2642124200CE",
+          "NIFTY2642124200PE",
+          "NIFTY2642124250CE",
+          "NIFTY2642124250PE",
+          "NIFTY2642124300CE",
+          "NIFTY2642124300PE",
+          "NIFTY2642124350CE",
+          "NIFTY2642124350PE",
+          "NIFTY2642124400CE",
+          "NIFTY2642124400PE",
+          "NIFTY2642124450CE",
+          "NIFTY2642124450PE",
+          "NIFTY2642124500CE",
+          "NIFTY2642124500PE",
+          "NIFTY26APR24200CE",
+          "NIFTY26APR24200PE",
+          "NIFTY26APR24250CE",
+          "NIFTY26APR24250PE",
+          "NIFTY26APR24300CE",
+          "NIFTY26APR24300PE",
+          "NIFTY26APR24350CE",
+          "NIFTY26APR24350PE",
+          "NIFTY26APR24400CE",
+          "NIFTY26APR24400PE",
+          "NIFTY26APR24450CE",
+          "NIFTY26APR24450PE",
+          "NIFTY26APR24500CE",
+          "NIFTY26APR24500PE"
+        ],
+        "selection_score": 1.907
+      },
+      "best": {
+        "name": "underlying_adx_min_14",
+        "final_value": 2955337.0,
+        "total_return_pct": 5.55,
+        "trades": 24,
+        "win_rate_pct": 75.0,
+        "max_drawdown_pct": -12.37,
+        "params": {
+          "options": {
+            "underlying_adx_min": 14
+          }
+        },
+        "symbols_tested": [
+          "NIFTY2642124200CE",
+          "NIFTY2642124200PE",
+          "NIFTY2642124250CE",
+          "NIFTY2642124250PE",
+          "NIFTY2642124300CE",
+          "NIFTY2642124300PE",
+          "NIFTY2642124350CE",
+          "NIFTY2642124350PE",
+          "NIFTY2642124400CE",
+          "NIFTY2642124400PE",
+          "NIFTY2642124450CE",
+          "NIFTY2642124450PE",
+          "NIFTY2642124500CE",
+          "NIFTY2642124500PE",
+          "NIFTY26APR24200CE",
+          "NIFTY26APR24200PE",
+          "NIFTY26APR24250CE",
+          "NIFTY26APR24250PE",
+          "NIFTY26APR24300CE",
+          "NIFTY26APR24300PE",
+          "NIFTY26APR24350CE",
+          "NIFTY26APR24350PE",
+          "NIFTY26APR24400CE",
+          "NIFTY26APR24400PE",
+          "NIFTY26APR24450CE",
+          "NIFTY26APR24450PE",
+          "NIFTY26APR24500CE",
+          "NIFTY26APR24500PE"
+        ],
+        "selection_score": 4.281
+      },
+      "tested_variants": 87,
+      "improvement_return_pct": 2.02,
+      "improvement_score": 2.374,
+      "should_promote": false,
+      "notes": [
+        "Research-only NIFTY options lab using RULE_SET_OPTIONS_1.",
+        "Search space is context-aware, similar to the equity lab, but still never auto-promotes into live trading.",
+        "Use results to refine options paper trading before any live NFO execution work."
+      ]
+    },
+    "stdout": "PR24250CE\",\n      \"NIFTY26APR24250PE\",\n      \"NIFTY26APR24300CE\",\n      \"NIFTY26APR24300PE\",\n      \"NIFTY26APR24350CE\",\n      \"NIFTY26APR24350PE\",\n      \"NIFTY26APR24400CE\",\n      \"NIFTY26APR24400PE\",\n      \"NIFTY26APR24450CE\",\n      \"NIFTY26APR24450PE\",\n      \"NIFTY26APR24500CE\",\n      \"NIFTY26APR24500PE\"\n    ],\n    \"selection_score\": 1.907\n  },\n  \"best\": {\n    \"name\": \"underlying_adx_min_14\",\n    \"final_value\": 2955337.0,\n    \"total_return_pct\": 5.55,\n    \"trades\": 24,\n    \"win_rate_pct\": 75.0,\n    \"max_drawdown_pct\": -12.37,\n    \"params\": {\n      \"options\": {\n        \"underlying_adx_min\": 14\n      }\n    },\n    \"symbols_tested\": [\n      \"NIFTY2642124200CE\",\n      \"NIFTY2642124200PE\",\n      \"NIFTY2642124250CE\",\n      \"NIFTY2642124250PE\",\n      \"NIFTY2642124300CE\",\n      \"NIFTY2642124300PE\",\n      \"NIFTY2642124350CE\",\n      \"NIFTY2642124350PE\",\n      \"NIFTY2642124400CE\",\n      \"NIFTY2642124400PE\",\n      \"NIFTY2642124450CE\",\n      \"NIFTY2642124450PE\",\n      \"NIFTY2642124500CE\",\n      \"NIFTY2642124500PE\",\n      \"NIFTY26APR24200CE\",\n      \"NIFTY26APR24200PE\",\n      \"NIFTY26APR24250CE\",\n      \"NIFTY26APR24250PE\",\n      \"NIFTY26APR24300CE\",\n      \"NIFTY26APR24300PE\",\n      \"NIFTY26APR24350CE\",\n      \"NIFTY26APR24350PE\",\n      \"NIFTY26APR24400CE\",\n      \"NIFTY26APR24400PE\",\n      \"NIFTY26APR24450CE\",\n      \"NIFTY26APR24450PE\",\n      \"NIFTY26APR24500CE\",\n      \"NIFTY26APR24500PE\"\n    ],\n    \"selection_score\": 4.281\n  },\n  \"tested_variants\": 87,\n  \"improvement_return_pct\": 2.02,\n  \"improvement_score\": 2.374,\n  \"should_promote\": false,\n  \"notes\": [\n    \"Research-only NIFTY options lab using RULE_SET_OPTIONS_1.\",\n    \"Search space is context-aware, similar to the equity lab, but still never auto-promotes into live trading.\",\n    \"Use results to refine options paper trading before any live NFO execution work.\"\n  ]\n}\nSaved: /home/ubuntu/Auto_Trader/reports/options_strategy_lab_20260420_155205.json\nSaved: /home/ubuntu/Auto_Trader/reports/options_strategy_lab_20260420_155205.csv\n",
+    "stderr": "",
+    "reason": null,
+    "generated_at": "2026-04-20T15:52:05.374402",
+    "stale_report": false,
+    "stale_reason": null
+  },
+  "iteration_plan": {
+    "enabled": true,
+    "asset_class": "options",
+    "objective": "Improve options paper research quality with fresh daily iteration.",
+    "items": [
+      {
+        "priority": "medium",
+        "focus": "broaden_options_search",
+        "detail": "Daily options lab did not improve on baseline. Broaden the search across underlying trend filters, score thresholds, and exit logic."
+      },
+      {
+        "priority": "medium",
+        "focus": "deeper_options_weekend_sweep",
+        "detail": "Latest options lab tested 0 variants. Keep daily runs lean, but use deeper weekend sweeps for better separation."
+      },
+      {
+        "priority": "medium",
+        "focus": "add_options_near_miss_diagnostics",
+        "detail": "Top options paper candidate is still HOLD with score 3.0. Add gate-by-gate miss diagnostics so daily iteration can tune the last blockers."
+      }
+    ]
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-20.json
+Saved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-04-20.md

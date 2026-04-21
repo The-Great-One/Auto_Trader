@@ -1,0 +1,203 @@
+[2025-10-03 10:45:47,078] {wednesday.py <module>:67 MainThread} ERROR - Monitor stopped by user.
+[2025-10-03 10:45:47,088] {kite_ticker.py on_close:34 MainThread} ERROR - Error stopping WebSocket: Can't stop reactor that isn't running., Traceback: Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/kite_ticker.py", line 32, in on_close
+    ws.stop()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/kiteconnect/ticker.py", line 560, in stop
+    reactor.stop()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/twisted/internet/base.py", line 794, in stop
+    raise error.ReactorNotRunning("Can't stop reactor that isn't running.")
+twisted.internet.error.ReactorNotRunning: Can't stop reactor that isn't running.
+
+[2026-03-25 22:00:33,062] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,086] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,091] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,095] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,098] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,102] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,105] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,108] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,112] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,115] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,118] {RULE_SET_2.py buy_or_sell:465 MainThread} ERROR - Error applying trading logic
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 462, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-03-25 22:00:33,132] {RULE_SET_2.py buy_or_sell:491 MainThread} ERROR - Error finalizing stop-loss and breach check
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 485, in buy_or_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 345, in _maybe_sell
+    return _maybe_sell()
+  [Previous line repeated 991 more times]
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 343, in _maybe_sell
+    if _dip_guard_blocks_sell(tradingsymbol, profit_pct, last_rsi, macd_hist):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/RULE_SET_2.py", line 169, in _dip_guard_blocks_sell
+    symbol_u = (tradingsymbol or "").upper()
+RecursionError: maximum recursion depth exceeded while calling a Python object
+[2026-04-18 12:46:06,347] {paper_shadow.py run_equity_shadow:123 MainThread} ERROR - equity shadow: load_hist failed: No usable historical data found for shadow mode, local cache and yfinance fallback both failed

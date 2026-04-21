@@ -1,0 +1,903 @@
+{
+  "generated_at": "2026-03-28T16:10:02.125607",
+  "trade_date": "2026-03-28",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "0:11,964] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-28 16:10:11,968] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-28 16:10:12,914] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-28 16:10:12,918] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-28 16:10:13,948] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-28 16:10:13,951] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-28 16:10:14,976] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-28 16:10:14,980] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n",
+    "stdout": "{\n  \"generated_at\": \"2026-03-28T16:10:15.842847\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260328_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260328_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260328_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-28.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-28.md
+{
+  "generated_at": "2026-03-29T16:10:01.865758",
+  "trade_date": "2026-03-29",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "0:11,105] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-29 16:10:11,108] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-29 16:10:12,055] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-29 16:10:12,059] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-29 16:10:13,076] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-29 16:10:13,080] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n[2026-03-29 16:10:14,107] {RULE_SET_2.py _dip_guard_blocks_sell:189 MainThread} INFO - Dip guard HOLD NIFTYETF at -0.19% (RSI=61.612687084002694, MACD_Hist=0.46533982974030397)\n[2026-03-29 16:10:14,111] {RULE_SET_2.py handle_sell:164 MainThread} INFO - Removed NIFTYETF from stop-loss JSON after selling\n",
+    "stdout": "{\n  \"generated_at\": \"2026-03-29T16:10:14.972924\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260329_161014.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260329_161014.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260329_161014.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-29.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-29.md
+{
+  "generated_at": "2026-03-30T16:10:02.135409",
+  "trade_date": "2026-03-30",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-03-30T16:10:15.976509\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260330_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260330_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260330_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-30.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-30.md
+{
+  "generated_at": "2026-03-31T16:10:01.580318",
+  "trade_date": "2026-03-31",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-03-31T16:10:15.195780\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260331_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260331_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260331_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "SELL",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-31.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-03-31.md
+{
+  "generated_at": "2026-04-01T16:10:02.076475",
+  "trade_date": "2026-04-01",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-01T16:10:15.667725\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260401_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260401_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260401_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "SELL",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-01.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-01.md
+{
+  "generated_at": "2026-04-02T16:10:02.194266",
+  "trade_date": "2026-04-02",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-02T16:10:15.922494\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260402_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260402_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260402_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-02.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-02.md
+{
+  "generated_at": "2026-04-03T16:10:01.707795",
+  "trade_date": "2026-04-03",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-03T16:10:15.581553\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260403_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260403_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260403_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-03.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-03.md
+{
+  "generated_at": "2026-04-04T16:10:02.166226",
+  "trade_date": "2026-04-04",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-04T16:10:15.651707\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260404_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260404_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260404_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-04.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-04.md
+{
+  "generated_at": "2026-04-05T16:10:01.648425",
+  "trade_date": "2026-04-05",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-05T16:10:15.079360\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260405_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260405_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260405_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-05.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-05.md
+{
+  "generated_at": "2026-04-06T16:10:02.178941",
+  "trade_date": "2026-04-06",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-06T16:10:15.718032\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260406_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260406_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260406_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-06.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-06.md
+{
+  "generated_at": "2026-04-07T16:10:02.259415",
+  "trade_date": "2026-04-07",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-07T16:10:15.866048\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260407_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260407_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260407_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-07.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-07.md
+{
+  "generated_at": "2026-04-08T16:10:02.275128",
+  "trade_date": "2026-04-08",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-08T16:10:15.557820\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260408_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260408_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260408_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-08.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-08.md
+{
+  "generated_at": "2026-04-09T16:10:01.970220",
+  "trade_date": "2026-04-09",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-09T16:10:15.366521\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260409_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260409_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260409_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "HOLD",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-09.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-09.md
+{
+  "generated_at": "2026-04-10T16:10:02.051906",
+  "trade_date": "2026-04-10",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "n shouldRollover\n    self.stream = self._open()\n                  ^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/logging/__init__.py\", line 1263, in _open\n    return open_func(self.baseFilename, self.mode,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/home/ubuntu/Auto_Trader/log/output.log'\nCall stack:\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 229, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 195, in main\n    results.append(run_variant(name, df, b, s))\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 121, in run_variant\n    sig = r2.buy_or_sell(part, row, hold_df)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 462, in buy_or_sell\n    return _maybe_sell()\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 345, in _maybe_sell\n    return handle_sell(tradingsymbol)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/RULE_SET_2.py\", line 164, in handle_sell\n    logger.info(\"Removed %s from stop-loss JSON after selling\", tradingsymbol)\nMessage: 'Removed %s from stop-loss JSON after selling'\nArguments: ('NIFTYETF',)\n",
+    "stdout": "{\n  \"generated_at\": \"2026-04-10T16:10:15.426772\",\n  \"production_rule_model\": \"BUY=RULE_SET_7, SELL=RULE_SET_2\",\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"best\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 100618.8,\n    \"total_return_pct\": 0.62,\n    \"trades\": 6,\n    \"win_rate_pct\": 100.0,\n    \"max_drawdown_pct\": -1.31,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    }\n  },\n  \"tested_variants\": 11,\n  \"improvement_return_pct\": 0.0,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260410_161015.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260410_161015.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260410_161015.json",
+    "tested_variants": 11,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": true,
+    "decision": "SELL",
+    "reason": "self_heal_run",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-10.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-10.md
+{
+  "generated_at": "2026-04-11T16:10:01.896269",
+  "trade_date": "2026-04-11",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "Error in generating session: [Errno 13] Permission denied: 'HITECH.feather', Traceback: Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 91, in build_access_token\n    shutil.rmtree(item_path)\n  File \"/usr/lib/python3.12/shutil.py\", line 785, in rmtree\n    _rmtree_safe_fd(fd, path, onexc)\n  File \"/usr/lib/python3.12/shutil.py\", line 717, in _rmtree_safe_fd\n    onexc(os.unlink, fullname, err)\n  File \"/usr/lib/python3.12/shutil.py\", line 715, in _rmtree_safe_fd\n    os.unlink(entry.name, dir_fd=topfd)\nPermissionError: [Errno 13] Permission denied: 'HITECH.feather'\n\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260410_213250.json",
+    "requested_variants": 200,
+    "tested_variants": 2,
+    "baseline_return_pct": 0.62,
+    "best_return_pct": 0.62,
+    "improvement_return_pct": 0.0,
+    "should_promote": false
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-11.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-11.md
+{
+  "generated_at": "2026-04-12T16:10:02.285067",
+  "trade_date": "2026-04-12",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": true,
+    "returncode": 0,
+    "stderr": "",
+    "stdout": "],\n    \"skipped_symbols\": {}\n  },\n  \"baseline\": {\n    \"name\": \"baseline_current\",\n    \"final_value\": 803236.2,\n    \"total_return_pct\": 0.4,\n    \"trades\": 26,\n    \"win_rate_pct\": 69.23,\n    \"max_drawdown_pct\": -6.7,\n    \"params\": {\n      \"buy\": {},\n      \"sell\": {}\n    },\n    \"symbols_tested\": [\n      \"NIFTYETF\",\n      \"INFY\",\n      \"WIPRO\",\n      \"HAL\",\n      \"NTPC\",\n      \"CANBK\",\n      \"HINDPETRO\",\n      \"HEROMOTOCO\"\n    ],\n    \"selection_score\": -0.08\n  },\n  \"best\": {\n    \"name\": \"buy_max_obv_zscore_3.5\",\n    \"final_value\": 815320.03,\n    \"total_return_pct\": 1.92,\n    \"trades\": 34,\n    \"win_rate_pct\": 70.59,\n    \"max_drawdown_pct\": -6.71,\n    \"params\": {\n      \"buy\": {\n        \"max_obv_zscore\": 3.5\n      },\n      \"sell\": {}\n    },\n    \"symbols_tested\": [\n      \"NIFTYETF\",\n      \"INFY\",\n      \"WIPRO\",\n      \"HAL\",\n      \"NTPC\",\n      \"CANBK\",\n      \"HINDPETRO\",\n      \"HEROMOTOCO\"\n    ],\n    \"selection_score\": 1.589\n  },\n  \"tested_variants\": 138,\n  \"improvement_return_pct\": 1.52,\n  \"improvement_score\": 1.669,\n  \"should_promote\": true\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 200,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "should_promote": true
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-12.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-12.md
+{
+  "generated_at": "2026-04-13T16:10:01.635551",
+  "trade_date": "2026-04-13",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "already_executed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-13.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-13.md
+{
+  "generated_at": "2026-04-14T16:10:01.793675",
+  "trade_date": "2026-04-14",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "already_executed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-14.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-14.md
+{
+  "generated_at": "2026-04-15T16:10:01.676884",
+  "trade_date": "2026-04-15",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "failed_rc_1",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "error": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-15.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-15.md
+{
+  "generated_at": "2026-04-16T16:10:01.983776",
+  "trade_date": "2026-04-16",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "failed_rc_1",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "error": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-16.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-16.md
+{
+  "generated_at": "2026-04-17T16:10:02.477848",
+  "trade_date": "2026-04-17",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 686, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 631, in main\n    data_map, data_context = load_data(tradebook_context, fundamental_context)\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/weekly_strategy_lab.py\", line 168, in load_data\n    raise RuntimeError(\"Could not load any lab symbols with usable history\")\nRuntimeError: Could not load any lab symbols with usable history\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260412_164921.json",
+    "requested_variants": 50,
+    "tested_variants": 138,
+    "baseline_return_pct": 0.4,
+    "best_return_pct": 1.92,
+    "improvement_return_pct": 1.52,
+    "improvement_score": 1.669,
+    "should_promote": true,
+    "best_name": "buy_max_obv_zscore_3.5",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    }
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "failed_rc_1",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "error": "Traceback (most recent call last):\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 181, in <module>\n    main()\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 175, in main\n    equity_payload = run_equity_shadow()\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 73, in run_equity_shadow\n    df = load_hist(symbol)\n         ^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/scripts/paper_shadow.py\", line 37, in load_hist\n    out = at_utils.Indicators(df)\n          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 373, in Indicators\n    compute_supertrend(df, ATR, multiplier=2.0)\n  File \"/home/ubuntu/Auto_Trader/Auto_Trader/utils.py\", line 166, in compute_supertrend\n    up_shift[0] = dn_shift[0] = np.nan\n    ~~~~~~~~^^^\nIndexError: index 0 is out of bounds for axis 0 with size 0\n"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": {
+      "key": "{\"buy\": {\"max_obv_zscore\": 3.5}, \"sell\": {}}",
+      "name": "buy_max_obv_zscore_3.5",
+      "buy": {
+        "max_obv_zscore": 3.5
+      },
+      "sell": {},
+      "env_updates": {
+        "AT_BUY_MAX_OBV_ZSCORE": "3.5"
+      },
+      "return_pct": 1.92,
+      "selection_score": 1.589,
+      "max_drawdown_pct": -6.71,
+      "trades": 34,
+      "empty": false
+    },
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-17.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-17.md
+{
+  "generated_at": "2026-04-18T16:10:02.449013",
+  "trade_date": "2026-04-18",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 0,
+    "stderr": "\n1 Failed download:\n['VERTIS.NS']: YFPricesMissingError('possibly delisted; no price data found  (period=3y) (Yahoo error = \"No data found, symbol may be delisted\")')\n\n1 Failed download:\n['KAMAHOLD.NS']: HTTPError('HTTP Error 404: ')\n\n1 Failed download:\n['BENGALASM.NS']: YFPricesMissingError('possibly delisted; no price data found  (period=3y) (Yahoo error = \"No data found, symbol may be delisted\")')\n",
+    "stdout": " \"RKFORGE\",\n      \"NCC\",\n      \"MANYAVAR\",\n      \"PGINVIT\",\n      \"GRINFRA\",\n      \"KTKBANK\",\n      \"BATAINDIA\",\n      \"TITAGARH\",\n      \"PGHL\",\n      \"IIFLCAPS\",\n      \"GRWRHITECH\",\n      \"GMRP&UI\",\n      \"ASKAUTOLTD\",\n      \"TIMETECHNO\",\n      \"PNGJL\",\n      \"BANCOINDIA\",\n      \"SANOFI\",\n      \"JYOTHYLAB\",\n      \"MARKSANS\",\n      \"SKFINDIA\",\n      \"MAHSEAMLES\",\n      \"JKLAKSHMI\",\n      \"NESCO\",\n      \"AKUMS\",\n      \"GPPL\",\n      \"KIRLPNU\",\n      \"TCI\",\n      \"ZEEL\",\n      \"TRANSRAILL\",\n      \"KRBL\",\n      \"ISGEC\",\n      \"PGIL\",\n      \"IMFA\",\n      \"SAREGAMA\",\n      \"DBL\",\n      \"EMBDL\",\n      \"TIPSMUSIC\",\n      \"PCJEWELLER\",\n      \"SONATSOFTW\",\n      \"REDTAPE\",\n      \"BIRLACORPN\",\n      \"RCF\",\n      \"SHREMINVIT\",\n      \"GARFIBRES\",\n      \"NEWGEN\",\n      \"DODLA\",\n      \"WELENT\",\n      \"BLUEJET\",\n      \"CERA\",\n      \"EPL\"\n    ],\n    \"selection_score\": 4.893,\n    \"rnn_enabled\": false,\n    \"rnn_avg_test_accuracy\": 0.0\n  },\n  \"tested_variants\": 200,\n  \"improvement_return_pct\": -0.1,\n  \"improvement_score\": 2.624,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260419_074441.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260419_074441.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260419_074441.json",
+    "requested_variants": 200,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "best_return_pct": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": "2026-04-19T07:44:41.736305",
+    "stale_report": true,
+    "stale_reason": "strategy_lab_completed_but_no_fresh_report_found"
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "lab_failed",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-18.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-18.md
+{
+  "generated_at": "2026-04-19T16:10:01.876090",
+  "trade_date": "2026-04-19",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": 0,
+    "stderr": "\n1 Failed download:\n['VERTIS.NS']: YFPricesMissingError('possibly delisted; no price data found  (period=3y) (Yahoo error = \"No data found, symbol may be delisted\")')\n\n1 Failed download:\n['KAMAHOLD.NS']: HTTPError('HTTP Error 404: ')\n\n1 Failed download:\n['BENGALASM.NS']: YFPricesMissingError('possibly delisted; no price data found  (period=3y) (Yahoo error = \"No data found, symbol may be delisted\")')\n",
+    "stdout": "   \"RKFORGE\",\n      \"NCC\",\n      \"MANYAVAR\",\n      \"PGINVIT\",\n      \"GRINFRA\",\n      \"KTKBANK\",\n      \"BATAINDIA\",\n      \"TITAGARH\",\n      \"PGHL\",\n      \"IIFLCAPS\",\n      \"GRWRHITECH\",\n      \"GMRP&UI\",\n      \"ASKAUTOLTD\",\n      \"TIMETECHNO\",\n      \"PNGJL\",\n      \"BANCOINDIA\",\n      \"SANOFI\",\n      \"JYOTHYLAB\",\n      \"MARKSANS\",\n      \"SKFINDIA\",\n      \"MAHSEAMLES\",\n      \"JKLAKSHMI\",\n      \"NESCO\",\n      \"AKUMS\",\n      \"GPPL\",\n      \"KIRLPNU\",\n      \"TCI\",\n      \"ZEEL\",\n      \"TRANSRAILL\",\n      \"KRBL\",\n      \"ISGEC\",\n      \"PGIL\",\n      \"IMFA\",\n      \"SAREGAMA\",\n      \"DBL\",\n      \"EMBDL\",\n      \"TIPSMUSIC\",\n      \"PCJEWELLER\",\n      \"SONATSOFTW\",\n      \"REDTAPE\",\n      \"BIRLACORPN\",\n      \"RCF\",\n      \"SHREMINVIT\",\n      \"GARFIBRES\",\n      \"NEWGEN\",\n      \"DODLA\",\n      \"WELENT\",\n      \"BLUEJET\",\n      \"CERA\",\n      \"EPL\"\n    ],\n    \"selection_score\": 4.672,\n    \"rnn_enabled\": false,\n    \"rnn_avg_test_accuracy\": 0.0\n  },\n  \"tested_variants\": 200,\n  \"improvement_return_pct\": 0.2,\n  \"improvement_score\": 2.52,\n  \"should_promote\": false\n}\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260420_074331.json\nSaved: /home/ubuntu/Auto_Trader/reports/strategy_lab_20260420_074331.csv\n",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260420_074331.json",
+    "requested_variants": 200,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "best_return_pct": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": "2026-04-20T07:43:31.883279",
+    "stale_report": true,
+    "stale_reason": "strategy_lab_completed_but_no_fresh_report_found"
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json"
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "lab_failed",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-19.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-19.md

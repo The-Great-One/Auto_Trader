@@ -3,11 +3,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts import weekly_strategy_lab as lab
 
