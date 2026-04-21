@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -218,4 +219,6 @@ def refresh(_: int):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8051, debug=False)
+    host = os.environ.get("DASH_HOST", "0.0.0.0")
+    port = int(os.environ.get("DASH_PORT", "8504"))
+    app.run(host=host, port=port, debug=False)
