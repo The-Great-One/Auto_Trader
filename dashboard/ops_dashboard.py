@@ -20,6 +20,12 @@ LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity
 SERVER_KEY = Path("REDACTED_KEY_PATH")
 SERVER_HOST = os.getenv("AT_SERVER_HOST", "REDACTED_SERVER")
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
+COMBINED_LAB_STATUS_FILES = [
+    "sizing_exit_sweep_latest.json",
+    "volatility_sizing_lab_latest.json",
+    "regime_filter_lab_latest.json",
+    "focused_cluster_lab_latest.json",
+]
 
 st.set_page_config(page_title="Auto Trader Ops Dashboard", layout="wide")
 
@@ -81,6 +87,59 @@ def load_lab_table(limit: int = 20) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=20)
+def load_combined_lab_table(limit: int = 20) -> pd.DataFrame:
+    rows = []
+    for path, data in recent_strategy_reports(limit=limit):
+        rec = data.get("recommendation") or {}
+        best = rec.get("best") or {}
+        baseline = rec.get("baseline") or {}
+        rows.append(
+            {
+                "report": path.name,
+                "lab_type": rec.get("lab_type") or "strategy_lab",
+                "source": "strategy_lab",
+                "generated_at": rec.get("generated_at"),
+                "best_name": best.get("name"),
+                "best_return_pct": best.get("total_return_pct"),
+                "best_score": best.get("selection_score"),
+                "best_drawdown_pct": best.get("max_drawdown_pct"),
+                "baseline_return_pct": baseline.get("total_return_pct"),
+                "improvement_return_pct": rec.get("improvement_return_pct"),
+                "improvement_score": rec.get("improvement_score"),
+                "tested_variants": rec.get("tested_variants"),
+            }
+        )
+
+    for file_name in COMBINED_LAB_STATUS_FILES:
+        payload = load_json(REPORTS_DIR / file_name) or {}
+        if not payload:
+            continue
+        rows.append(
+            {
+                "report": file_name,
+                "lab_type": payload.get("message") or file_name.removesuffix("_latest.json"),
+                "source": file_name.removesuffix("_latest.json"),
+                "generated_at": payload.get("generated_at"),
+                "best_name": payload.get("best_variant"),
+                "best_return_pct": payload.get("best_return_pct"),
+                "best_score": payload.get("best_score"),
+                "best_drawdown_pct": payload.get("best_drawdown_pct"),
+                "baseline_return_pct": None,
+                "improvement_return_pct": None,
+                "improvement_score": None,
+                "tested_variants": payload.get("variants_done") or payload.get("variants_total"),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    if "generated_at" in df.columns:
+        df["generated_at"] = pd.to_datetime(df["generated_at"], errors="coerce")
+    return df.dropna(subset=["generated_at"]).sort_values("generated_at")
 
 
 @st.cache_data(ttl=20)
@@ -240,6 +299,7 @@ with st.sidebar:
         latest_report.clear()
         recent_strategy_reports.clear()
         load_lab_table.clear()
+        load_combined_lab_table.clear()
         load_ranked_variants.clear()
         load_sentiment_rows.clear()
         load_lab_status.clear()
@@ -252,17 +312,19 @@ portfolio_path, portfolio = latest_report("portfolio_intel_*.json")
 paper = load_json(REPORTS_DIR / "paper_shadow_latest.json") or {}
 live_paper = load_json(REPORTS_DIR / "paper_shadow_live_latest.json") or {}
 lab_df = load_lab_table()
+combined_lab_df = load_combined_lab_table()
 lab_status = load_lab_status()
 sentiment_df = load_sentiment_rows()
 telegram_options_df = load_telegram_options_table()
 live_telegram_ledger = load_live_telegram_ledger()
 live_telegram_history = load_live_telegram_equity_history()
-latest_lab = lab_df.sort_values("generated_at").iloc[-1].to_dict() if not lab_df.empty else {}
+latest_lab = combined_lab_df.iloc[-1].to_dict() if not combined_lab_df.empty else {}
+best_lab = combined_lab_df.sort_values("best_return_pct").iloc[-1].to_dict() if not combined_lab_df.empty else {}
 
 hero1, hero2, hero3, hero4, hero5, hero6 = st.columns(6)
 hero1.metric("Lab status", status_badge_text(lab_status) if lab_status else "idle")
 hero2.metric("Latest best return %", latest_lab.get("best_return_pct", "-"))
-hero3.metric("Latest best score", latest_lab.get("best_score", "-"))
+hero3.metric("Best known return %", best_lab.get("best_return_pct", "-"))
 hero4.metric("Paper decision", paper.get("decision", live_paper.get("mode", "-")))
 hero5.metric("Sentiment symbols", len(sentiment_df))
 hero6.metric("Telegram paper equity", live_telegram_ledger.get("equity", "-"))
@@ -273,8 +335,11 @@ if lab_status:
         st.progress(min(100, int(progress)), text=f"Lab running, {lab_status.get('current_variant') or lab_status.get('current_symbol') or lab_status.get('message', 'working')}")
     elif lab_status.get("status") == "failed":
         st.error(f"Latest lab run failed: {lab_status.get('error', 'unknown error')}")
-    elif lab_status.get("status") == "done":
-        st.success(f"Latest lab finished: {lab_status.get('best_variant', 'n/a')} | best return {lab_status.get('best_return_pct', '-')}")
+
+if latest_lab:
+    st.success(f"Latest completed lab: {latest_lab.get('best_name', 'n/a')} | best return {latest_lab.get('best_return_pct', '-')} | source {latest_lab.get('source', latest_lab.get('report', 'n/a'))}")
+if best_lab and latest_lab.get('report') != best_lab.get('report'):
+    st.info(f"Best known completed lab: {best_lab.get('best_name', 'n/a')} | return {best_lab.get('best_return_pct', '-')} | source {best_lab.get('source', best_lab.get('report', 'n/a'))}")
 
 quick1, quick2, quick3, quick4 = st.columns(4)
 if scorecard:
@@ -296,15 +361,17 @@ with summary_tab:
     left, right = st.columns([1.15, 0.85])
     with left:
         st.subheader("Lab timeline")
-        if lab_df.empty:
+        if combined_lab_df.empty:
             st.info("No lab reports found yet.")
         else:
-            ordered = lab_df.sort_values("generated_at")
+            ordered = combined_lab_df.sort_values("generated_at")
+            line_cols = [c for c in ["best_return_pct", "baseline_return_pct"] if c in ordered.columns]
             fig = px.line(
                 ordered,
                 x="generated_at",
-                y=["best_return_pct", "baseline_return_pct"],
+                y=line_cols,
                 markers=True,
+                color_discrete_sequence=px.colors.qualitative.Set2,
                 title="Best vs baseline return across recent lab runs",
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -312,12 +379,17 @@ with summary_tab:
                 ordered,
                 x="best_drawdown_pct",
                 y="best_return_pct",
-                color="best_rnn_enabled",
-                size=ordered["improvement_score"].abs().fillna(0) + 0.1,
+                color="source",
+                size=ordered.get("tested_variants", pd.Series([1] * len(ordered))).fillna(1) + 0.1,
                 hover_name="report",
-                title="Best variant, return vs drawdown",
+                title="Completed lab winners, return vs drawdown",
             )
             st.plotly_chart(fig2, use_container_width=True)
+            st.dataframe(
+                ordered.sort_values("generated_at", ascending=False)[[c for c in ["generated_at", "source", "best_name", "best_return_pct", "best_score", "best_drawdown_pct", "tested_variants", "report"] if c in ordered.columns]],
+                use_container_width=True,
+                hide_index=True,
+            )
     with right:
         st.subheader("What is happening now")
         if lab_status:
@@ -406,12 +478,19 @@ with telegram_tab:
 
 with labs_tab:
     st.subheader("Lab reports")
+    if combined_lab_df.empty:
+        st.info("No completed lab reports found.")
+    else:
+        st.markdown("**Completed lab summary**")
+        st.dataframe(combined_lab_df.sort_values("generated_at", ascending=False), use_container_width=True, hide_index=True)
+
+    st.markdown("**Strategy lab deep dive**")
     if lab_df.empty:
         st.info("No strategy lab reports found.")
     else:
         st.dataframe(lab_df.sort_values("generated_at", ascending=False), use_container_width=True)
         report_options = list(reversed([p.name for p, _ in recent_strategy_reports(limit=25)]))
-        selected = st.selectbox("Inspect lab report", options=report_options)
+        selected = st.selectbox("Inspect strategy lab report", options=report_options)
         ranked_df = load_ranked_variants(selected)
         if ranked_df.empty:
             st.warning("No ranked variants in that report.")
