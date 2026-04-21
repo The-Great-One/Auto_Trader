@@ -65,6 +65,7 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
 - `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
 - `telegram_options_paper_trader.py` - paper-trader framework for Telegram option-call strategies that resolves NFO contracts through Kite on Oracle, simulates example-capital entries/exits from channel calls, and reports weekly/monthly returns
+- `live_telegram_options_paper_ledger.py` - stateful live paper ledger for tracked Telegram option calls, with MTM equity, cash, open/closed positions, and accumulating weekly/monthly return snapshots
 - `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
 - `walkforward_validate.py` - validation helper
