@@ -33,7 +33,8 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `README.md` - setup and ops notes
 - `requirements.txt` - Python deps
 - `PROJECT_MAP.md` - this file
-- `dashboard/ops_dashboard.py` - Streamlit ops dashboard for labs, live/paper snapshots, sentiment cache, and Oracle server visibility
+- `dashboard/ops_dashboard.py` - legacy Streamlit ops dashboard for labs, live/paper snapshots, sentiment cache, and Oracle server visibility
+- `dashboard/ops_dash_app.py` - default Dash ops cockpit on port 8504, covering service health, portfolios, paper trading, news, Telegram, research outputs, and recent reports
 
 ### `Auto_Trader/`
 - `__init__.py` - exports runtime entrypoints and sets up logging
