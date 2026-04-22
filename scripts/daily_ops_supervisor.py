@@ -414,15 +414,17 @@ def run_weekly_universe_cagr_check(now: datetime, market_open: bool) -> dict:
 
 
 def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
-    """If market open, ensure paper_shadow file exists for today. If missing, run it."""
-    file_latest = REPORTS / "paper_shadow_latest.json"
+    """If market open, ensure both paper_shadow files exist for today. If either is missing, run it."""
+    file_equity = REPORTS / "paper_shadow_latest.json"
+    file_options = REPORTS / "paper_shadow_options_latest.json"
     result = {
         "market_open": market_open,
         "paper_executed": False,
         "self_healed": False,
         "decision": None,
         "reason": None,
-        "file": str(file_latest),
+        "file": str(file_equity),
+        "options_file": str(file_options),
     }
 
     if not market_open:
@@ -439,21 +441,24 @@ def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
         except Exception:
             return False, None
 
-    ok_today, payload = _is_today_payload(file_latest)
-    if ok_today:
+    equity_ok, equity_payload = _is_today_payload(file_equity)
+    options_ok, options_payload = _is_today_payload(file_options)
+
+    if equity_ok and options_ok:
         result["paper_executed"] = True
-        result["decision"] = payload.get("decision") if payload else None
+        result["decision"] = equity_payload.get("decision") if equity_payload else None
         result["reason"] = "already_executed"
         return result
 
     # try to self-heal by running paper shadow now
     cmd = ["/home/ubuntu/Auto_Trader/venv/bin/python", str(SCRIPTS / "paper_shadow.py")]
     proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
-    ok_today, payload = _is_today_payload(file_latest)
+    equity_ok, equity_payload = _is_today_payload(file_equity)
+    options_ok, _ = _is_today_payload(file_options)
 
-    result["paper_executed"] = ok_today and proc.returncode == 0
+    result["paper_executed"] = equity_ok and options_ok and proc.returncode == 0
     result["self_healed"] = result["paper_executed"]
-    result["decision"] = (payload or {}).get("decision")
+    result["decision"] = (equity_payload or {}).get("decision")
     result["reason"] = "self_heal_run" if result["paper_executed"] else f"failed_rc_{proc.returncode}"
     if not result["paper_executed"]:
         result["error"] = (proc.stderr or proc.stdout)[-1200:]
