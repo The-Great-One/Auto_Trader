@@ -22,6 +22,7 @@ LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.
 LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
 LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
 TELEGRAM_TRADE_AUDIT_PATH = REPORTS_DIR / "telegram_trade_audit_latest.json"
+ECO_CALENDAR_PATH = REPORTS_DIR / "economic_calendar_sector_latest.json"
 GLOBAL_MACRO_PATH = REPORTS_DIR / "global_macro_latest.json"
 WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
 WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
@@ -37,10 +38,12 @@ COMBINED_LAB_STATUS_FILES = [
 ]
 SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+ECO_CALENDAR_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
 GLOBAL_MACRO_TTL_SECONDS = 600
+ECO_CALENDAR_TTL_SECONDS = 600
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def to_ist(dt_str: str | None) -> str:
@@ -549,6 +552,37 @@ def load_global_macro() -> dict[str, Any]:
     return out
 
 
+def load_eco_calendar() -> dict[str, Any]:
+    now = time.time()
+    cached = ECO_CALENDAR_CACHE.get("data")
+    if cached is not None and now - float(ECO_CALENDAR_CACHE.get("ts", 0.0)) < ECO_CALENDAR_TTL_SECONDS:
+        return cached
+
+    payload = load_json(ECO_CALENDAR_PATH)
+    file_fresh = False
+    if ECO_CALENDAR_PATH.exists():
+        try:
+            file_fresh = now - ECO_CALENDAR_PATH.stat().st_mtime < ECO_CALENDAR_TTL_SECONDS
+        except Exception:
+            file_fresh = False
+
+    if not payload or not file_fresh:
+        try:
+            subprocess.run(
+                [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "fetch_economic_calendar_sectors.py")],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            payload = load_json(ECO_CALENDAR_PATH)
+        except Exception:
+            payload = payload or {}
+
+    out = payload if isinstance(payload, dict) else {}
+    ECO_CALENDAR_CACHE.update({"ts": now, "data": out})
+    return out
+
+
 def recent_report_files(limit: int = 80) -> pd.DataFrame:
     rows = []
     for path in REPORTS_DIR.iterdir():
@@ -1010,22 +1044,26 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     # ── TELEGRAM EQUITY ──
     shortterm = audit.get("shortterm01") or {}
     sunil_cash = audit.get("finance_with_sunil") or {}
+    darkhorse = audit.get("darkhorseofstockmarket") or {}
+    milind = audit.get("milind4profits") or {}
     equity_rows = []
     equity_cards = html.Div(
         [
-            metric_card("Equity channels", len([x for x in [shortterm, sunil_cash] if x]), "tracked"),
+            metric_card("Equity channels", len([x for x in [shortterm, sunil_cash, darkhorse, milind] if x]), "tracked"),
             metric_card("Shortterm01 signals", shortterm.get("signals_evaluated", 0), f"extracted {shortterm.get('signals_extracted', 0)}"),
             metric_card("Sunil cash signals", sunil_cash.get("signals_evaluated", 0), f"extracted {sunil_cash.get('signals_extracted', 0)}"),
+            metric_card("Dark Horse signals", darkhorse.get("signals_evaluated", 0), f"extracted {darkhorse.get('signals_extracted', 0)}"),
             metric_card("Shortterm01 20d avg %", audit_stat(shortterm.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(shortterm.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
             metric_card("Shortterm01 tgt1 hit %", (audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") or 0) * 100 if audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") is not None else None, "within 20d"),
             metric_card("Sunil cash 20d avg %", audit_stat(sunil_cash.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(sunil_cash.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
+            metric_card("Dark Horse 20d avg %", audit_stat(darkhorse.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(darkhorse.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     equity_rows.append(equity_cards)
 
     equity_audit_rows = []
-    for label, payload in [("Shortterm01 cash/equity", shortterm), ("FinanceWithSunil cash/equity", sunil_cash)]:
+    for label, payload in [("Shortterm01 cash/equity", shortterm), ("FinanceWithSunil cash/equity", sunil_cash), ("Dark Horse cash/equity", darkhorse), ("Milind4Profits cash/equity", milind)]:
         if not payload:
             continue
         summary = payload.get("summary") or {}
@@ -1042,7 +1080,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             "best_date": to_ist(sample.get("date")) if sample.get("date") else "-",
         })
     if equity_audit_rows:
-        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "Separate cash/equity signal audit. If 20d stats are blank, the watched signal is too recent to score yet."))
+        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All channel equity signal audits side by side. If 20d stats are blank, the signal is too recent to score."))
     else:
         children.append(section("Telegram equity", [equity_cards, empty_message("No Telegram equity audit rows yet.")]))
 
@@ -1296,7 +1334,7 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
                     size=map_sizes, color=map_colors,
                     colorscale=[[0, BLOOMBERG_RED], [0.5, BLOOMBERG_ORANGE], [1, BLOOMBERG_GREEN]],
                     cmin=-3, cmax=3, line=dict(width=1, color="#1e2a3a"),
-                    colorbar=dict(title="% chg", thickness=10, tickfont=dict(size=9, color=BLOOMBERG_GRAY), titlefont=dict(size=9, color=BLOOMBERG_GRAY)),
+                    colorbar=dict(title="% chg", thickness=10, tickfont=dict(size=9, color=BLOOMBERG_GRAY), title_font=dict(size=9, color=BLOOMBERG_GRAY)),
                 ),
                 mode="markers+text", textposition="top center",
                 textfont=dict(size=9, color="#c0c0c0"),
@@ -1405,6 +1443,117 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
     return children
 
 
+def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
+    eco = load_eco_calendar()
+    if not eco:
+        return [empty_message("Calendar + sector data not yet available. Refreshing in ~30s.")]
+
+    children: list[Any] = []
+
+    # ── 1. ECONOMIC EVENTS ─────────────────────────────────
+    eco_events = eco.get("economic_events") or []
+    if eco_events:
+        high_events = [e for e in eco_events if e.get("impact") == "high"]
+        med_events = [e for e in eco_events if e.get("impact") == "medium"]
+        low_events = [e for e in eco_events if e.get("impact") == "low"]
+
+        event_cards = html.Div([
+            metric_card("Total events", len(eco_events), "from RSS feeds"),
+            metric_card("High impact", len(high_events), "Fed, RBI, CPI, GDP..."),
+            metric_card("Medium impact", len(med_events), "PMI, IP, trade..."),
+            metric_card("Low impact", len(low_events), "confidence, housing..."),
+        ], style={"display": "flex", "gap": "12px", "flexWrap": "wrap"})
+
+        event_rows = []
+        for e in eco_events[:25]:
+            impact = e.get("impact", "low")
+            impact_color = BLOOMBERG_RED if impact == "high" else BLOOMBERG_ORANGE if impact == "medium" else BLOOMBERG_GRAY
+            sent = e.get("sentiment", 0.0)
+            event_rows.append(html.Div([
+                html.Span(f"{'🔴' if impact=='high' else '🟡' if impact=='medium' else '⚪'} {e.get('title','')[:100]}", style={"fontSize": "12px", "fontWeight": "600", "color": impact_color}),
+                html.Span(f"  [{e.get('region','')}] [{impact}]", style={"fontSize": "10px", "color": BLOOMBERG_GRAY}),
+                html.Span(f"  sent {sent:+.2f}" if sent else "", style={"fontSize": "10px", "color": BLOOMBERG_GRAY}),
+            ], style={**CARD_STYLE, "marginBottom": "4px"}))
+
+        children.append(section("ECONOMIC CALENDAR", [event_cards] + event_rows, "🔴 high  🟡 medium  ⚪ low — from Investing.com RSS"))
+    else:
+        children.append(section("ECONOMIC CALENDAR", [empty_message("No economic events found in RSS feeds.")]))
+
+    # ── 2. EARNINGS ────────────────────────────────────────
+    earnings = eco.get("earnings") or []
+    if earnings:
+        earn_rows = []
+        for e in earnings:
+            earn_rows.append({
+                "symbol": e.get("symbol"),
+                "earnings_date": e.get("earnings_date"),
+                "type": e.get("type"),
+            })
+        children.append(section("EARNINGS CALENDAR", [table_from_df(pd.DataFrame(earn_rows), "earnings-table", page_size=10)], "Upcoming earnings for tracked universe symbols"))
+    else:
+        children.append(section("EARNINGS CALENDAR", [empty_message("No upcoming earnings found for tracked symbols.")]))
+
+    # ── 3. SECTOR HEATMAP ──────────────────────────────────
+    sectors = eco.get("sectors") or []
+    ok_sectors = [s for s in sectors if s.get("status") == "ok" and s.get("change_pct") is not None]
+    if ok_sectors:
+        # Treemap
+        labels = [s["label"] for s in ok_sectors]
+        parents = ["" for _ in ok_sectors]
+        values = [max(0.1, abs(float(s["change_pct"]))) for s in ok_sectors]
+        colors = [float(s["change_pct"]) for s in ok_sectors]
+        hover_texts = [f"{s['label']}<br>{s['change_pct']:+.2f}%" for s in ok_sectors]
+
+        fig = go.Figure(go.Treemap(
+            labels=labels,
+            parents=parents,
+            values=values,
+            marker=dict(
+                colors=colors,
+                colorscale=[[0, BLOOMBERG_RED], [0.5, "#1a1a2e"], [1, BLOOMBERG_GREEN]],
+                cmin=-4, cmax=4,
+                line=dict(width=2, color="#0a0e17"),
+            ),
+            text=hover_texts,
+            textinfo="text",
+            textfont=dict(size=13, color="#e0e0e0"),
+            hoverinfo="text",
+        ))
+        fig.update_layout(
+            paper_bgcolor="#030712", plot_bgcolor="#111827",
+            margin=dict(l=0, r=0, t=30, b=0),
+            height=450,
+        )
+        children.append(section("SECTOR HEATMAP", [dcc.Graph(figure=fig)], "Green = up, Red = down. Size = absolute move. NSE sector indices via yfinance."))
+
+        # Also show sector cards as simple bar list
+        sector_cards = []
+        ok_sectors_sorted = sorted(ok_sectors, key=lambda x: float(x.get("change_pct", 0)), reverse=True)
+        for s in ok_sectors_sorted:
+            ch = float(s["change_pct"])
+            color = BLOOMBERG_GREEN if ch > 0 else BLOOMBERG_RED if ch < 0 else BLOOMBERG_ORANGE
+            sector_cards.append(html.Div([
+                html.Div(s["label"].upper(), style={"fontSize": "9px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px", "fontWeight": "600"}),
+                html.Div(f"{ch:+.2f}%", style={"fontSize": "16px", "fontWeight": "700", "color": color}),
+            ], style={**CARD_STYLE, "flex": "1", "minWidth": "110px", "maxWidth": "160px"}))
+        children.append(section("SECTOR RANKING", [html.Div(sector_cards, style={"display": "flex", "gap": "6px", "flexWrap": "wrap"})], "Ranked by today's move"))
+    else:
+        children.append(section("SECTOR HEATMAP", [empty_message("No sector data available yet.")]))
+
+    # ── 4. TIMESTAMP ────────────────────────────────────────
+    gen_at = eco.get("generated_at", "?")
+    try:
+        gen_dt = pd.Timestamp(gen_at)
+        if gen_dt.tzinfo is None:
+            gen_dt = gen_dt.tz_localize("UTC")
+        gen_at = gen_dt.tz_convert(IST).strftime("%H:%M IST")
+    except Exception:
+        pass
+    children.append(html.Div(f"Calendar + sector data updated: {gen_at}", style={"fontSize": "10px", "color": "#5a6a7a", "marginTop": "8px"}))
+
+    return children
+
+
 def build_reports_tab(data: dict[str, Any]) -> list[Any]:
     reports_df = data["reports_df"]
     children: list[Any] = [section("Recent report files", [table_from_df(reports_df, "reports-table", page_size=20)], "All generated reports on disk.")]
@@ -1435,6 +1584,8 @@ def render_tab(tab: str, data: dict[str, Any]) -> list[Any]:
         return build_news_tab(data)
     if tab == "global_macro":
         return build_global_macro_tab(data)
+    if tab == "calendar":
+        return build_calendar_tab(data)
     if tab == "telegram":
         return build_telegram_tab(data)
     if tab == "research":
@@ -1581,6 +1732,7 @@ app.layout = html.Div(
                 dcc.Tab(label="PAPER", value="paper"),
                 dcc.Tab(label="NEWS", value="news"),
                 dcc.Tab(label="GLOBAL MACRO", value="global_macro"),
+                dcc.Tab(label="CALENDAR + SECTORS", value="calendar"),
                 dcc.Tab(label="TELEGRAM", value="telegram"),
                 dcc.Tab(label="RESEARCH", value="research"),
                 dcc.Tab(label="REPORTS", value="reports"),
