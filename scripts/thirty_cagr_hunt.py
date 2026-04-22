@@ -63,12 +63,26 @@ EXPOSURE_PROFILES = {
         "target_equity": 1.00,
         "max_single_symbol_weight": 0.65,
     },
+    "tight5_55": {
+        "risk_per_trade_pct": 0.055,
+        "atr_stop_mult": 2.0,
+        "max_position_notional_pct": 1.00,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 0.70,
+    },
     "tight6": {
         "risk_per_trade_pct": 0.06,
         "atr_stop_mult": 2.0,
         "max_position_notional_pct": 1.00,
         "target_equity": 1.00,
         "max_single_symbol_weight": 0.80,
+    },
+    "tight6_70": {
+        "risk_per_trade_pct": 0.06,
+        "atr_stop_mult": 2.0,
+        "max_position_notional_pct": 1.00,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 0.70,
     },
     "wide5": {
         "risk_per_trade_pct": 0.05,
@@ -126,6 +140,42 @@ ENTRY_PATCHES = {
         "regime_ema_fast": 30,
         "regime_ema_slow": 150,
     },
+    "regime30_150_loose_e26": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.75,
+        "max_extension_atr": 2.6,
+        "ich_cloud_bull": 0,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
+    "regime30_150_loose_e28": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.75,
+        "max_extension_atr": 2.8,
+        "ich_cloud_bull": 0,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
+    "regime30_150_loose_v07": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.70,
+        "ich_cloud_bull": 0,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
+    "regime30_150_loose_rsi42": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.75,
+        "ich_cloud_bull": 0,
+        "rsi_floor": 42,
+        "stoch_momo_max": 88,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
     "regime20_100_loose": {
         "adx_min": 8,
         "volume_confirm_mult": 0.75,
@@ -173,7 +223,7 @@ ENTRY_PATCHES = {
     },
 }
 
-VARIANT_BLUEPRINTS = [
+FULL_VARIANT_BLUEPRINTS = [
     ("scale4_base", "base"),
     ("scale5", "base"),
     ("tight5", "base"),
@@ -210,6 +260,34 @@ VARIANT_BLUEPRINTS = [
     ("tight6", "regime30_150_ultra_loose"),
     ("tight6", "momentum_rsi"),
 ]
+
+PASS3_TIGHT_VARIANT_BLUEPRINTS = [
+    ("tight5", "regime30_150_loose"),
+    ("tight5", "regime30_150_loose", "bep25_ts8"),
+    ("tight5", "regime30_150_loose", "bep30_ts8"),
+    ("tight5", "regime30_150_loose_e26"),
+    ("tight5", "regime30_150_loose_e28"),
+    ("tight5", "regime30_150_loose_rsi42"),
+    ("tight5", "loose_a8_v075"),
+    ("tight5", "loose_a8_v075", "bep25_ts8"),
+    ("tight5", "base", "bep25_ts8"),
+    ("tight5_55", "regime30_150_loose"),
+    ("tight5_55", "regime30_150_loose_e26"),
+    ("tight6", "base"),
+    ("tight6", "base", "bep25_ts8"),
+    ("tight6", "momentum_rsi"),
+    ("tight6", "momentum_rsi", "bep25_ts8"),
+    ("tight6", "regime30_150_loose"),
+    ("tight6", "regime30_150_loose_e26"),
+    ("tight6", "regime30_150_loose_rsi42"),
+    ("tight6_70", "regime30_150_loose"),
+    ("tight6_70", "momentum_rsi"),
+]
+
+BLUEPRINT_SETS = {
+    "full": FULL_VARIANT_BLUEPRINTS,
+    "tight_pass3": PASS3_TIGHT_VARIANT_BLUEPRINTS,
+}
 
 
 def now_iso() -> str:
@@ -253,6 +331,17 @@ def profile_env(profile: dict) -> dict[str, str]:
 
 
 SELL_PATCHES = {
+    "base": {},
+    "bep25_ts8": {
+        "breakeven_trigger_pct": 2.5,
+        "equity_time_stop_bars": 8,
+        "equity_time_stop_min_profit_pct": 1.0,
+    },
+    "bep30_ts8": {
+        "breakeven_trigger_pct": 3.0,
+        "equity_time_stop_bars": 8,
+        "equity_time_stop_min_profit_pct": 1.0,
+    },
     "long_hold": {
         "breakeven_trigger_pct": 4.0,
         "equity_time_stop_bars": 10,
@@ -268,29 +357,41 @@ SELL_PATCHES = {
 }
 
 
-def build_variants(base_buy: dict, base_sell: dict, base_env: dict[str, str]) -> list[dict]:
+def build_variants(base_buy: dict, base_sell: dict, base_env: dict[str, str], variant_blueprints: list[tuple] | None = None) -> list[dict]:
     variants = []
-    for profile_name, entry_name in VARIANT_BLUEPRINTS:
+    blueprints = variant_blueprints or FULL_VARIANT_BLUEPRINTS
+    for blueprint in blueprints:
+        if len(blueprint) == 2:
+            profile_name, entry_name = blueprint
+            sell_patch_name = "base"
+        elif len(blueprint) == 3:
+            profile_name, entry_name, sell_patch_name = blueprint
+        else:
+            raise ValueError(f"Unsupported blueprint shape: {blueprint!r}")
         exposure = EXPOSURE_PROFILES[profile_name]
         entry_patch = ENTRY_PATCHES[entry_name]
+        sell_patch = SELL_PATCHES.get(sell_patch_name, {})
         merged_buy = dict(base_buy)
         merged_buy.update(entry_patch)
         merged_sell = dict(base_sell)
+        merged_sell.update(sell_patch)
         # Apply longer hold sell patches for variants that need it
-        if entry_name.endswith("_long") or entry_name == "momentum_rsi":
+        if sell_patch_name == "base" and (entry_name.endswith("_long") or entry_name == "momentum_rsi"):
             merged_sell.update(SELL_PATCHES["long_hold"])
-        if entry_name == "ultra_loose_a6_v06":
+        if sell_patch_name == "base" and entry_name == "ultra_loose_a6_v06":
             merged_sell.update(SELL_PATCHES["very_long_hold"])
         env_patch = dict(base_env)
         env_patch.update(profile_env(exposure))
+        variant_name = f"{profile_name}__{entry_name}" if sell_patch_name == "base" else f"{profile_name}__{entry_name}__{sell_patch_name}"
         variants.append(
             {
-                "name": f"{profile_name}__{entry_name}",
+                "name": variant_name,
                 "buy": merged_buy,
                 "sell": merged_sell,
                 "env": env_patch,
                 "profile": {"name": profile_name, **exposure},
                 "entry_patch": {"name": entry_name, **entry_patch},
+                "sell_patch": {"name": sell_patch_name, **sell_patch},
             }
         )
     return variants
@@ -341,6 +442,10 @@ def save_checkpoint(*, payload: dict) -> None:
 def main() -> int:
     report_path = Path(os.getenv("AT_30_CAGR_REPORT", str(DEFAULT_REPORT)))
     variant_name = os.getenv("AT_30_CAGR_VARIANT", DEFAULT_VARIANT).strip() or DEFAULT_VARIANT
+    blueprint_set = os.getenv("AT_30_CAGR_BLUEPRINT_SET", "full").strip() or "full"
+    hunt_label = os.getenv("AT_30_CAGR_HUNT_LABEL", "30% CAGR hunt").strip() or "30% CAGR hunt"
+    if blueprint_set not in BLUEPRINT_SETS:
+        raise ValueError(f"Unknown AT_30_CAGR_BLUEPRINT_SET={blueprint_set!r}")
 
     report_obj = _load_report(report_path)
     variant = _pick_variant(report_obj, variant_name)
@@ -351,11 +456,11 @@ def main() -> int:
     if not symbols:
         raise ValueError("No symbols found for 30% CAGR hunt")
 
-    variants = build_variants(base_buy, base_sell, base_env)
+    variants = build_variants(base_buy, base_sell, base_env, BLUEPRINT_SETS[blueprint_set])
     total = len(variants)
     checkpoint = load_checkpoint(total)
 
-    if checkpoint.get("symbols") == symbols and checkpoint.get("report_path") == str(report_path) and checkpoint.get("variant_name") == variant_name:
+    if checkpoint.get("symbols") == symbols and checkpoint.get("report_path") == str(report_path) and checkpoint.get("variant_name") == variant_name and checkpoint.get("blueprint_set") == blueprint_set:
         done_names = set(checkpoint.get("completed_names") or [])
         rows = list(checkpoint.get("rows") or [])
         data_context = checkpoint.get("data_context") or {}
@@ -376,9 +481,11 @@ def main() -> int:
             "generated_at": now_iso(),
             "status": "running",
             "phase": "initializing",
-            "message": "resuming 30% CAGR hunt" if done_names else "starting 30% CAGR hunt",
+            "message": f"resuming {hunt_label}" if done_names else f"starting {hunt_label}",
             "report_path": str(report_path),
             "variant_name": variant_name,
+            "blueprint_set": blueprint_set,
+            "hunt_label": hunt_label,
             "variants_total": total,
             "variants_done": len(done_names),
             "best_variant": (best_row or {}).get("name"),
@@ -419,6 +526,7 @@ def main() -> int:
             "generated_at": now_iso(),
             "report_path": str(report_path),
             "variant_name": variant_name,
+            "blueprint_set": blueprint_set,
             "symbols": symbols,
             "variants_total": total,
             "completed_names": sorted(done_names),
@@ -431,9 +539,11 @@ def main() -> int:
                 "generated_at": now_iso(),
                 "status": "running",
                 "phase": "evaluating_variants",
-                "message": "30% CAGR hunt in progress",
+                "message": f"{hunt_label} in progress",
                 "report_path": str(report_path),
                 "variant_name": variant_name,
+                "blueprint_set": blueprint_set,
+                "hunt_label": hunt_label,
                 "variants_total": total,
                 "variants_done": len(done_names),
                 "current_variant": name,
@@ -450,6 +560,8 @@ def main() -> int:
         "generated_at": now_iso(),
         "status": "completed",
         "objective": "Find a credible >=30% CAGR path on 5Y live-parity validation",
+        "blueprint_set": blueprint_set,
+        "hunt_label": hunt_label,
         "anchor": {
             "report_path": str(report_path),
             "variant_name": variant_name,
@@ -473,6 +585,7 @@ def main() -> int:
         "generated_at": now_iso(),
         "report_path": str(report_path),
         "variant_name": variant_name,
+        "blueprint_set": blueprint_set,
         "symbols": symbols,
         "variants_total": total,
         "completed_names": sorted(done_names),
@@ -486,9 +599,11 @@ def main() -> int:
             "generated_at": now_iso(),
             "status": "completed",
             "phase": "done",
-            "message": "30% CAGR hunt complete",
+            "message": f"{hunt_label} complete",
             "report_path": str(report_path),
             "variant_name": variant_name,
+            "blueprint_set": blueprint_set,
+            "hunt_label": hunt_label,
             "variants_total": total,
             "variants_done": total,
             "best_variant": (ranked[0] or {}).get("name") if ranked else None,
