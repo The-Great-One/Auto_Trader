@@ -35,6 +35,7 @@ MARKETS: list[dict[str, Any]] = [
     {"label": "Hang Seng", "ticker": "^HSI", "region": "Asia", "country": "Hong Kong", "city": "Hong Kong", "lat": 22.3193, "lon": 114.1694, "kind": "equity"},
     {"label": "Shanghai Comp", "ticker": "000001.SS", "region": "Asia", "country": "China", "city": "Shanghai", "lat": 31.2304, "lon": 121.4737, "kind": "equity"},
     {"label": "Nifty 50", "ticker": "^NSEI", "region": "Asia", "country": "India", "city": "Mumbai", "lat": 19.0760, "lon": 72.8777, "kind": "equity"},
+    {"label": "Sensex", "ticker": "^BSESN", "region": "Asia", "country": "India", "city": "Mumbai", "lat": 19.0760, "lon": 72.8777, "kind": "equity"},
     {"label": "USD/INR", "ticker": "INR=X", "region": "FX", "country": "India", "city": "Mumbai", "lat": 19.0760, "lon": 72.8777, "kind": "fx"},
     {"label": "Brent", "ticker": "BZ=F", "region": "Commodities", "country": "Global", "city": "London", "lat": 51.5072, "lon": -0.1276, "kind": "commodity"},
     {"label": "Gold", "ticker": "GC=F", "region": "Commodities", "country": "Global", "city": "Zurich", "lat": 47.3769, "lon": 8.5417, "kind": "commodity"},
