@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Dash, Input, Output, dcc, html, dash_table
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +21,8 @@ TWITTER_DIR = INTERMEDIARY_DIR / "twitter_sentiment"
 LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.json"
 LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
 LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
+TELEGRAM_TRADE_AUDIT_PATH = REPORTS_DIR / "telegram_trade_audit_latest.json"
+GLOBAL_MACRO_PATH = REPORTS_DIR / "global_macro_latest.json"
 WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
 WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
 SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key")))
@@ -33,9 +36,11 @@ COMBINED_LAB_STATUS_FILES = [
     "meta_label_lab_latest.json",
 ]
 SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
+GLOBAL_MACRO_TTL_SECONDS = 600
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def to_ist(dt_str: str | None) -> str:
@@ -275,6 +280,23 @@ def metric_card(title: str, value: Any, subtitle: str | None = None) -> html.Div
     )
 
 
+def market_move_card(title: str, last: Any, change_pct: float | None, subtitle: str | None = None) -> html.Div:
+    color = BLOOMBERG_ORANGE
+    change_text = "-"
+    if change_pct is not None:
+        change_text = f"{change_pct:+.2f}%"
+        color = BLOOMBERG_GREEN if change_pct > 0 else BLOOMBERG_RED if change_pct < 0 else BLOOMBERG_ORANGE
+    last_text = friendly(last)
+    return html.Div(
+        [
+            html.Div(title.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "1px", "fontWeight": "600"}),
+            html.Div(change_text, style={"fontSize": "20px", "fontWeight": "700", "marginTop": "4px", "fontFamily": "'JetBrains Mono', monospace", "color": color}),
+            html.Div(f"last {last_text}" + (f" | {subtitle}" if subtitle else ""), style={"fontSize": "11px", "color": "#5a6a7a", "marginTop": "2px"}),
+        ],
+        style={**CARD_STYLE, "flex": "1", "minWidth": "150px"},
+    )
+
+
 def section(title: str, children: list[Any], subtitle: str | None = None) -> html.Div:
     header = [html.Div(title.upper(), style={"fontSize": "12px", "fontWeight": "700", "color": BLOOMBERG_ORANGE, "letterSpacing": "1px", "borderBottom": f"1px solid {BLOOMBERG_ORANGE}", "paddingBottom": "4px", "marginBottom": "8px"})]
     if subtitle:
@@ -491,6 +513,42 @@ def load_market_topics_rows() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def load_telegram_trade_audit() -> dict[str, Any]:
+    payload = load_json(TELEGRAM_TRADE_AUDIT_PATH)
+    return payload if isinstance(payload, dict) else {}
+
+
+def load_global_macro() -> dict[str, Any]:
+    now = time.time()
+    cached = GLOBAL_MACRO_CACHE.get("data")
+    if cached is not None and now - float(GLOBAL_MACRO_CACHE.get("ts", 0.0)) < GLOBAL_MACRO_TTL_SECONDS:
+        return cached
+
+    payload = load_json(GLOBAL_MACRO_PATH)
+    file_fresh = False
+    if GLOBAL_MACRO_PATH.exists():
+        try:
+            file_fresh = now - GLOBAL_MACRO_PATH.stat().st_mtime < GLOBAL_MACRO_TTL_SECONDS
+        except Exception:
+            file_fresh = False
+
+    if not payload or not file_fresh:
+        try:
+            subprocess.run(
+                [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "fetch_global_macro.py")],
+                capture_output=True,
+                text=True,
+                timeout=150,
+            )
+            payload = load_json(GLOBAL_MACRO_PATH)
+        except Exception:
+            payload = payload or {}
+
+    out = payload if isinstance(payload, dict) else {}
+    GLOBAL_MACRO_CACHE.update({"ts": now, "data": out})
+    return out
+
+
 def recent_report_files(limit: int = 80) -> pd.DataFrame:
     rows = []
     for path in REPORTS_DIR.iterdir():
@@ -654,6 +712,7 @@ def collect_data() -> dict[str, Any]:
         "telegram_updates": telegram_updates,
         "telegram_latest_by_chat": telegram_latest_by_chat,
         "telegram_receipts": telegram_receipts,
+        "telegram_trade_audit": load_telegram_trade_audit(),
         "server": server,
         "sentiment_df": load_sentiment_rows(),
         "topics_df": load_market_topics_rows(),
@@ -940,9 +999,54 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     history = data["telegram_history"]
     updates = data.get("telegram_updates", pd.DataFrame())
     latest_by_chat = data.get("telegram_latest_by_chat", pd.DataFrame())
+    backtests = data.get("telegram_backtests", pd.DataFrame())
+    audit = data.get("telegram_trade_audit") or {}
     children: list[Any] = []
 
-    # ── Portfolio metrics ──
+    def audit_stat(summary: dict[str, Any], key: str, field: str) -> Any:
+        node = (summary or {}).get(key) or {}
+        return node.get(field)
+
+    # ── TELEGRAM EQUITY ──
+    shortterm = audit.get("shortterm01") or {}
+    sunil_cash = audit.get("finance_with_sunil") or {}
+    equity_rows = []
+    equity_cards = html.Div(
+        [
+            metric_card("Equity channels", len([x for x in [shortterm, sunil_cash] if x]), "tracked"),
+            metric_card("Shortterm01 signals", shortterm.get("signals_evaluated", 0), f"extracted {shortterm.get('signals_extracted', 0)}"),
+            metric_card("Sunil cash signals", sunil_cash.get("signals_evaluated", 0), f"extracted {sunil_cash.get('signals_extracted', 0)}"),
+            metric_card("Shortterm01 20d avg %", audit_stat(shortterm.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(shortterm.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
+            metric_card("Shortterm01 tgt1 hit %", (audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") or 0) * 100 if audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") is not None else None, "within 20d"),
+            metric_card("Sunil cash 20d avg %", audit_stat(sunil_cash.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(sunil_cash.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
+        ],
+        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+    )
+    equity_rows.append(equity_cards)
+
+    equity_audit_rows = []
+    for label, payload in [("Shortterm01 cash/equity", shortterm), ("FinanceWithSunil cash/equity", sunil_cash)]:
+        if not payload:
+            continue
+        summary = payload.get("summary") or {}
+        best_examples = summary.get("best_examples") or []
+        sample = best_examples[0] if best_examples else {}
+        equity_audit_rows.append({
+            "channel": label,
+            "signals_extracted": payload.get("signals_extracted", 0),
+            "signals_evaluated": payload.get("signals_evaluated", 0),
+            "20d_avg_%": audit_stat(summary, "ret_20d_pct", "avg"),
+            "20d_positive_rate": audit_stat(summary, "ret_20d_pct", "positive_rate"),
+            "max_20d_avg_%": audit_stat(summary, "max_20d_pct", "avg"),
+            "best_symbol": sample.get("symbol"),
+            "best_date": to_ist(sample.get("date")) if sample.get("date") else "-",
+        })
+    if equity_audit_rows:
+        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "Separate cash/equity signal audit. If 20d stats are blank, the watched signal is too recent to score yet."))
+    else:
+        children.append(section("Telegram equity", [equity_cards, empty_message("No Telegram equity audit rows yet.")]))
+
+    # ── TELEGRAM OPTIONS ──
     equity = ledger.get("equity", 0)
     cash = ledger.get("cash", 0)
     starting = ledger.get("starting_capital", 100000)
@@ -953,21 +1057,24 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     open_pos = ledger.get("open_positions", [])
     closed_pos = ledger.get("closed_positions", [])
     updated_at = to_ist(ledger.get("updated_at"))
+    sunil_options = audit.get("finance_with_sunil_options") or {}
+    opt_summary = sunil_options.get("summary") or {}
 
-    metrics = html.Div(
+    option_metrics = html.Div(
         [
-            metric_card("Portfolio", f"₹{equity:,.0f}" if isinstance(equity, (int, float)) else "-", f"Updated {updated_at}"),
-            metric_card("Net PnL", fmt_pnl(net_pnl, "₹"), fmt_pct(net_pct)),
+            metric_card("Options portfolio", f"₹{equity:,.0f}" if isinstance(equity, (int, float)) else "-", f"Updated {updated_at}"),
+            metric_card("Options net PnL", fmt_pnl(net_pnl, "₹"), fmt_pct(net_pct)),
             metric_card("Realized", fmt_pnl(realized, "₹"), "Booked"),
             metric_card("Unrealized", fmt_pnl(unrealized, "₹"), "Open MTM"),
+            metric_card("Option signals", sunil_options.get("signals_evaluated", 0), f"extracted {sunil_options.get('signals_extracted', 0)}"),
+            metric_card("Options 20d dir avg %", audit_stat(opt_summary, "dir_ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(opt_summary, 'dir_ret_20d_pct', 'positive_rate'))}"),
             metric_card("Open", len(open_pos), "positions"),
             metric_card("Closed", len(closed_pos), "positions"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
-    children.append(section("Portfolio", [metrics]))
+    children.append(section("Telegram options", [option_metrics], "Live Telegram options paper ledger kept separate from Telegram equity signal audit."))
 
-    # ── Open positions ──
     if open_pos:
         rows = []
         for p in open_pos:
@@ -978,62 +1085,40 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             tgt = p.get("targets_hit", [])
             sl = p.get("stop_loss", "-")
             color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if mtm > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if mtm < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
-            rows.append(
-                html.Div(
-                    [
-                        html.Div([
-                            html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
-                            html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"}),
-                        ], style={"flex": "1"}),
-                        html.Div(f"Entry ₹{entry} → Last ₹{last}", style={"fontSize": "12px", "color": "#9ca3af"}),
-                        html.Div(f"{mtm:+.2f}% (₹{pnl:+,.0f})", style=color_style),
-                        html.Div(f"SL: {sl} | Targets hit: {tgt if tgt else '-'}", style={"fontSize": "11px", "color": "#6b7280"}),
-                    ],
-                    style={**CARD_STYLE, "marginBottom": "8px"},
-                )
-            )
-        children.append(section(f"Open positions ({len(open_pos)})", rows))
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"Entry ₹{entry} → Last ₹{last}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                html.Div(f"{mtm:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                html.Div(f"SL: {sl} | Targets hit: {tgt if tgt else '-'}", style={"fontSize": "11px", "color": "#6b7280"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram options open positions ({len(open_pos)})", rows))
     else:
-        children.append(section("Open positions", [empty_message("No open positions")]))
+        children.append(section("Telegram options open positions", [empty_message("No open Telegram options positions")]))
 
-    # ── Closed positions ──
     if closed_pos:
         rows = []
         for p in closed_pos:
             pnl = p.get("pnl", 0) or 0
             ret = p.get("return_pct", 0) or 0
             color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if pnl < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN}
-            rows.append(
-                html.Div(
-                    [
-                        html.Div([
-                            html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
-                            html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"}),
-                        ], style={"flex": "1"}),
-                        html.Div(f"{ret:+.2f}% (₹{pnl:+,.0f})", style=color_style),
-                        html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
-                    ],
-                    style={**CARD_STYLE, "marginBottom": "8px"},
-                )
-            )
-        children.append(section(f"Closed positions ({len(closed_pos)})", rows))
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"{ret:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram options closed positions ({len(closed_pos)})", rows))
 
-    # ── Equity curve ──
     if not history.empty:
         fig = px.line(history, x="timestamp", y=[c for c in ["equity", "cash"] if c in history.columns], markers=False)
-        fig.update_layout(
-            template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827",
-            margin=dict(l=40, r=20, t=30, b=30),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-            xaxis_title="", yaxis_title="₹",
-            title=dict(text="Equity curve", font=dict(size=14)),
-        )
-        # Convert x-axis timestamps to IST
-        if not history.empty and "timestamp" in history.columns:
-            fig.update_xaxes(tickformat="%b %d %H:%M")
-        children.append(section("Equity curve", [dcc.Graph(figure=fig)]))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827", margin=dict(l=40, r=20, t=30, b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02), xaxis_title="", yaxis_title="₹", title=dict(text="Telegram options equity curve", font=dict(size=14)))
+        fig.update_xaxes(tickformat="%b %d %H:%M")
+        children.append(section("Telegram options equity curve", [dcc.Graph(figure=fig)]))
 
-    # ── Latest channel posts ──
+    if not backtests.empty:
+        show = backtests.sort_values("generated_at", ascending=False).copy()
+        children.append(section("Telegram options backtests", [table_from_df(show, "tg-options-backtests-table", page_size=8)], "Historical options paper reports, kept separate from live Telegram options ledger."))
+
+    # ── Shared channel visibility ──
     if not latest_by_chat.empty:
         display = latest_by_chat.copy()
         for col in ["date", "captured_at"]:
@@ -1044,7 +1129,6 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         cols = [c for c in ["chat", "date", "text_excerpt"] if c in display.columns]
         children.append(section("Latest channel posts", [table_from_df(display[cols], "tg-latest-by-chat-table", page_size=8)], "Newest post from each tracked channel."))
 
-    # ── Recent channel updates ──
     if not updates.empty:
         display = updates.head(30).copy()
         for col in ["date", "captured_at"]:
@@ -1055,7 +1139,6 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         cols = [c for c in ["chat", "date", "message_id", "text_excerpt"] if c in display.columns]
         children.append(section("Recent updates", [table_from_df(display[cols], "tg-channel-updates-table", page_size=15)], "Last 30 channel messages."))
 
-    # ── Channel learning scores ──
     channel_scores = load_json(Path(ROOT) / "reports" / "channel_learning_scores.json") if hasattr(ROOT, 'exists') else None
     if channel_scores and isinstance(channel_scores, dict):
         channels = channel_scores.get("channels") or {}
@@ -1150,6 +1233,178 @@ def build_research_tab(data: dict[str, Any]) -> list[Any]:
     return children
 
 
+def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
+    macro = load_global_macro()
+    if not macro:
+        return [empty_message("Global macro data not yet available. Refreshing in ~30s.")]
+
+    children: list[Any] = []
+
+    # ── 1. LIVE MARKET RIBBON ────────────────────────────────
+    markets = macro.get("markets") or []
+    ribbon_cards = []
+    for m in markets:
+        if m.get("status") != "ok":
+            continue
+        ch = safe_num(m.get("change_pct"))
+        color = BLOOMBERG_GREEN if (ch or 0) > 0 else BLOOMBERG_RED if (ch or 0) < 0 else BLOOMBERG_ORANGE
+        label = m.get("label", "?")
+        kind_badge = m.get("kind", "")[:3].upper()
+        ribbon_cards.append(html.Div(
+            [
+                html.Div(f"{kind_badge} {label}", style={"fontSize": "9px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px", "fontWeight": "600"}),
+                html.Div(f"{ch:+.2f}%" if ch is not None else "-", style={"fontSize": "18px", "fontWeight": "700", "color": color, "fontFamily": "'JetBrains Mono', monospace"}),
+                html.Div(friendly(m.get("last")), style={"fontSize": "11px", "color": "#5a6a7a"}),
+            ],
+            style={**CARD_STYLE, "flex": "1", "minWidth": "120px", "maxWidth": "180px"},
+        ))
+    children.append(section("GLOBAL MARKETS RIBBON", [html.Div(ribbon_cards, style={"display": "flex", "gap": "8px", "flexWrap": "wrap"})], "Live index & macro moves, refreshed every 10 min"))
+
+    # ── 2. WORLD MAP ────────────────────────────────────────
+    try:
+        map_lats, map_lons, map_texts, map_colors, map_sizes = [], [], [], [], []
+        for m in markets:
+            if m.get("status") != "ok" or m.get("lat") is None:
+                continue
+            ch = safe_num(m.get("change_pct"))
+            map_lats.append(float(m["lat"]))
+            map_lons.append(float(m["lon"]))
+            map_texts.append(f"{m['label']}<br>{ch:+.2f}%" if ch is not None else f"{m['label']}<br>N/A")
+            map_colors.append(ch if ch is not None else 0)
+            map_sizes.append(18 if m.get("kind") == "equity" else 14)
+
+        # Add event markers
+        events = macro.get("events") or []
+        ev_lats, ev_lons, ev_texts, ev_colors, ev_sizes = [], [], [], [], []
+        for e in events:
+            sev = e.get("severity", 0)
+            if sev < 15:
+                continue
+            ev_lats.append(float(e.get("lat", 0)))
+            ev_lons.append(float(e.get("lon", 0)))
+            ev_texts.append(f"⚡ {e['label']}<br>severity {sev}")
+            ev_colors.append(-sev / 10.0)  # negative = warm = risk
+            ev_sizes.append(max(12, min(30, sev)))
+
+        fig = go.Figure()
+
+        # Market markers
+        if map_lats:
+            fig.add_trace(go.Scattergeo(
+                lon=map_lons, lat=map_lats, text=map_texts,
+                marker=dict(
+                    size=map_sizes, color=map_colors,
+                    colorscale=[[0, BLOOMBERG_RED], [0.5, BLOOMBERG_ORANGE], [1, BLOOMBERG_GREEN]],
+                    cmin=-3, cmax=3, line=dict(width=1, color="#1e2a3a"),
+                    colorbar=dict(title="% chg", thickness=10, tickfont=dict(size=9, color=BLOOMBERG_GRAY), titlefont=dict(size=9, color=BLOOMBERG_GRAY)),
+                ),
+                mode="markers+text", textposition="top center",
+                textfont=dict(size=9, color="#c0c0c0"),
+                name="Markets",
+            ))
+
+        # Event markers
+        if ev_lats:
+            fig.add_trace(go.Scattergeo(
+                lon=ev_lons, lat=ev_lats, text=ev_texts,
+                marker=dict(
+                    size=ev_sizes, color=ev_colors,
+                    colorscale=[[0, BLOOMBERG_RED], [0.5, "#ff8800"], [1, "#ffcc00"]],
+                    cmin=-10, cmax=0, symbol="diamond", line=dict(width=1, color="#ff4444"),
+                ),
+                mode="markers+text", textposition="bottom center",
+                textfont=dict(size=9, color="#ff8800"),
+                name="Events",
+            ))
+
+        fig.update_layout(
+            geo=dict(
+                projection_type="natural earth",
+                showland=True, landcolor="#111827", showocean=True, oceancolor="#0a0e17",
+                showcountries=True, countrycolor="#1e2a3a", showlakes=False,
+                coastlinecolor="#1e2a3a",
+            ),
+            paper_bgcolor="#030712", plot_bgcolor="#111827",
+            margin=dict(l=0, r=0, t=30, b=0),
+            height=420,
+            legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY)),
+        )
+        fig.update_layout(title_font=dict(size=12, color=BLOOMBERG_ORANGE))
+        children.append(section("WORLD MAP — markets & event hotspots", [dcc.Graph(figure=fig)], "Green = up, Red = down ◆ = geopolitical event severity"))
+    except Exception as exc:
+        children.append(section("WORLD MAP", [empty_message(f"Map render error: {exc}")]))
+
+    # ── 3. REGION SUMMARY ───────────────────────────────────
+    regions = macro.get("region_summary") or []
+    if regions:
+        r_cards = []
+        for r in regions:
+            ch = safe_num(r.get("avg_change_pct"))
+            color = BLOOMBERG_GREEN if (ch or 0) > 0 else BLOOMBERG_RED if (ch or 0) < 0 else BLOOMBERG_ORANGE
+            r_cards.append(html.Div(
+                [
+                    html.Div(r["region"].upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "1px", "fontWeight": "600"}),
+                    html.Div(f"{ch:+.2f}%" if ch is not None else "-", style={"fontSize": "18px", "fontWeight": "700", "color": color}),
+                    html.Div(f"{r.get('count', '?')} indices", style={"fontSize": "11px", "color": "#5a6a7a"}),
+                ],
+                style={**CARD_STYLE, "flex": "1", "minWidth": "130px"},
+            ))
+        children.append(section("REGION BREADTH", [html.Div(r_cards, style={"display": "flex", "gap": "8px", "flexWrap": "wrap"})], "Average index move by region"))
+
+    # ── 4. GEOPOLITICAL & MACRO EVENTS ──────────────────────
+    event_rows = []
+    for e in events:
+        sev = e.get("severity", 0)
+        sent = e.get("weighted_sentiment", 0.0)
+        sev_color = BLOOMBERG_RED if sev >= 35 else BLOOMBERG_ORANGE if sev >= 20 else BLOOMBERG_GRAY
+        sent_color = BLOOMBERG_RED if sent < -0.15 else BLOOMBERG_GREEN if sent > 0.15 else BLOOMBERG_GRAY
+        status_badge = e.get("status", "quiet").upper()
+        headline = e.get("headline") or e.get("summary") or "No recent headline"
+        event_rows.append(html.Div([
+            html.Div([
+                html.Span(f"◆ {e['label']}", style={"fontSize": "13px", "fontWeight": "700", "color": sev_color}),
+                html.Span(f"  [{status_badge}]", style={"fontSize": "10px", "color": BLOOMBERG_GRAY}),
+            ], style={"marginBottom": "2px"}),
+            html.Div(headline, style={"fontSize": "12px", "color": "#c0c0c0", "marginBottom": "4px"}),
+            html.Div([
+                html.Span(f"severity {sev}", style={"fontSize": "11px", "color": sev_color, "marginRight": "12px"}),
+                html.Span(f"sentiment {sent:+.2f}", style={"fontSize": "11px", "color": sent_color, "marginRight": "12px"}),
+                html.Span(f"sectors: {', '.join(e.get('sectors') or [])}", style={"fontSize": "10px", "color": BLOOMBERG_GRAY}),
+            ], style={"marginBottom": "4px"}),
+            html.Div(f"India: {e.get('india_impact', '-')}", style={"fontSize": "11px", "color": BLOOMBERG_BLUE, "fontStyle": "italic", "marginBottom": "4px"}),
+            html.Div(f"Market: {', '.join(e.get('market_impacts') or [])}", style={"fontSize": "10px", "color": "#5a6a7a"}),
+        ], style={**CARD_STYLE, "marginBottom": "8px"}))
+    if event_rows:
+        children.append(section("GEOPOLITICAL & MACRO EVENTS", event_rows, "Severity: 5-100 based on headline keywords, recency, and event type. ◆ = hotspot on map."))
+
+    # ── 5. TOP MACRO DRIVERS ────────────────────────────────
+    drivers = macro.get("drivers") or []
+    if drivers:
+        d_rows = []
+        for d in drivers:
+            impact_color = BLOOMBERG_RED if d.get("impact") == "risk_off" else BLOOMBERG_GREEN if d.get("impact") == "risk_on" else BLOOMBERG_ORANGE
+            icon = "📉" if d.get("impact") == "risk_off" else "📈" if d.get("impact") == "risk_on" else "📊"
+            d_rows.append(html.Div([
+                html.Span(f"{icon} {d['label']}", style={"fontSize": "12px", "fontWeight": "700", "color": impact_color}),
+                html.Span(f"  — {d.get('headline', '')}", style={"fontSize": "12px", "color": "#c0c0c0"}),
+                html.Span(f"  [strength {d.get('strength', '?')} | {d.get('impact', '?')}]", style={"fontSize": "10px", "color": BLOOMBERG_GRAY}),
+            ], style={**CARD_STYLE, "marginBottom": "4px"}))
+        children.append(section("WHY MARKETS ARE MOVING", d_rows, "Top drivers right now: market moves + event severity combined and ranked"))
+
+    # ── 6. TIMESTAMP ────────────────────────────────────────
+    gen_at = macro.get("generated_at", "?")
+    try:
+        gen_dt = pd.Timestamp(gen_at)
+        if gen_dt.tzinfo is None:
+            gen_dt = gen_dt.tz_localize("UTC")
+        gen_at = gen_dt.tz_convert(IST).strftime("%H:%M IST")
+    except Exception:
+        pass
+    children.append(html.Div(f"Macro data updated: {gen_at}", style={"fontSize": "10px", "color": "#5a6a7a", "marginTop": "8px"}))
+
+    return children
+
+
 def build_reports_tab(data: dict[str, Any]) -> list[Any]:
     reports_df = data["reports_df"]
     children: list[Any] = [section("Recent report files", [table_from_df(reports_df, "reports-table", page_size=20)], "All generated reports on disk.")]
@@ -1178,6 +1433,8 @@ def render_tab(tab: str, data: dict[str, Any]) -> list[Any]:
         return build_paper_tab(data)
     if tab == "news":
         return build_news_tab(data)
+    if tab == "global_macro":
+        return build_global_macro_tab(data)
     if tab == "telegram":
         return build_telegram_tab(data)
     if tab == "research":
@@ -1323,6 +1580,7 @@ app.layout = html.Div(
                 dcc.Tab(label="PORTFOLIO", value="portfolio"),
                 dcc.Tab(label="PAPER", value="paper"),
                 dcc.Tab(label="NEWS", value="news"),
+                dcc.Tab(label="GLOBAL MACRO", value="global_macro"),
                 dcc.Tab(label="TELEGRAM", value="telegram"),
                 dcc.Tab(label="RESEARCH", value="research"),
                 dcc.Tab(label="REPORTS", value="reports"),
