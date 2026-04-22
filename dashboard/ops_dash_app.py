@@ -1049,6 +1049,36 @@ def compute_market_prediction(data: dict[str, Any]) -> dict[str, Any]:
         if e.get("headline"):
             key_drivers.append(f"{e.get('label', '?')}: {e['headline'][:80]}")
 
+    # Build component-level explanation
+    components = [
+        {"name": "Symbol sentiment", "weight": "25%", "score": round(sym_score, 1), "raw": f"avg={avg_sent:+.3f}, bull={bull_count}, bear={bear_count}, neutral={neutral_count}",
+         "why": f"{bull_count} bullish symbols vs {bear_count} bearish. Avg sentiment {avg_sent:+.3f}. " + ("Mildly positive but not enough to offset macro headwinds." if avg_sent > 0 and score < 0 else "Contributing to bullish bias." if avg_sent > 0 else "Contributing to bearish bias.")},
+        {"name": "Topic sentiment", "weight": "20%", "score": round(top_score, 1), "raw": f"avg={topic_sent:+.3f}, bull_topics={bull_topics}, risk_topics={risk_topics}",
+         "why": f"{bull_topics} bullish topics vs {risk_topics} risk-flagged topics. Avg topic sentiment {topic_sent:+.3f}. " + ("Topics lean positive." if topic_sent > 0.05 else "Topics lean negative." if topic_sent < -0.05 else "Topics are neutral.")},
+        {"name": "Macro risk drivers", "weight": "30%", "score": round(macro_score, 1), "raw": f"risk_off={risk_drivers}/{len(drivers)}, risk_strength={risk_strength:.1f}/{total_driver_strength:.1f}",
+         "why": f"{risk_drivers}/{len(drivers)} drivers are risk-off (strength {risk_strength:.1f}/{total_driver_strength:.1f}). " + ("Heavy risk-off bias in macro drivers." if risk_ratio > 0.6 else "Moderate risk-off tilt." if risk_ratio > 0.4 else "Macro drivers balanced.")},
+        {"name": "Region breadth (Asia)", "weight": "15%", "score": round(region_score, 1), "raw": f"asia_change={asia_change:+.2f}%",
+         "why": f"Asia session moved {asia_change:+.2f}% average. " + ("Positive Asia lead." if asia_change > 0.3 else "Negative Asia lead — markets sold off." if asia_change < -0.3 else "Flat Asia session.")},
+        {"name": "Bull vs bear count", "weight": "10%", "score": round(breadth_score, 1), "raw": f"bull={bull_count}, bear={bear_count}",
+         "why": f"{bull_count} bullish symbols vs {bear_count} bearish. " + ("Broad positive breadth." if bull_count > bear_count * 2 else "Narrow breadth." if bull_count <= bear_count else "Moderate breadth.")},
+    ]
+
+    # Build natural-language explanation
+    explanation_parts = []
+    if score > 15:
+        explanation_parts.append("Overall: Bullish bias driven by")
+    elif score < -15:
+        explanation_parts.append("Overall: Bearish bias driven by")
+    else:
+        explanation_parts.append("Overall: Neutral — mixed signals:")
+    top_components = sorted(components, key=lambda c: abs(c["score"]), reverse=True)
+    for c in top_components[:3]:
+        direction_word = "positive" if c["score"] > 0 else "negative"
+        explanation_parts.append(f"{c['name']} ({direction_word} contribution {c['score']:+.1f}): {c['why']}")
+    if risk_events > 0:
+        explanation_parts.append(f"{risk_events} high-severity geopolitical event(s) adding risk premium.")
+    explanation = " ".join(explanation_parts)
+
     return {
         "direction": direction,
         "score": round(score, 1),
@@ -1064,6 +1094,8 @@ def compute_market_prediction(data: dict[str, Any]) -> dict[str, Any]:
         "total_drivers": len(drivers),
         "asia_change_pct": round(asia_change, 2),
         "key_drivers": key_drivers[:5],
+        "components": components,
+        "explanation": explanation,
     }
 
 
@@ -1125,7 +1157,29 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "alignItems": "stretch"},
     )
-    children.append(section("Market prediction — next session", [pred_cards], "Based on symbol sentiment, topic sentiment, macro drivers, region breadth, and bull/bear counts. Score range: -100 (max bearish) to +100 (max bullish). NOT financial advice."))
+    # ── WHY EXPLANATION (tap to expand) ──
+    why_rows = []
+    for comp in pred.get("components", []):
+        arrow = "▲" if comp["score"] > 0 else "▼" if comp["score"] < 0 else "─"
+        arrow_color = BLOOMBERG_GREEN if comp["score"] > 0 else BLOOMBERG_RED if comp["score"] < 0 else "#9ca3af"
+        why_rows.append(html.Div([
+            html.Span(f"{arrow} ", style={"fontSize": "13px", "color": arrow_color, "fontWeight": "700"}),
+            html.Span(f"{comp['name']} ({comp['weight']})", style={"fontSize": "12px", "fontWeight": "700", "color": "#d1d5db"}),
+            html.Span(f"  {comp['score']:+.1f}", style={"fontSize": "12px", "color": arrow_color, "fontWeight": "600"}),
+            html.Div(f"{comp['raw']}", style={"fontSize": "10px", "color": "#6b7280", "marginLeft": "18px"}),
+            html.Div(f"{comp['why']}", style={"fontSize": "11px", "color": "#9ca3af", "marginLeft": "18px", "marginBottom": "6px"}),
+        ]))
+
+    explanation = pred.get("explanation", "")
+    why_panel = html.Details([
+        html.Summary("▸ WHY THIS SCORE? — tap to expand", style={"cursor": "pointer", "fontWeight": "700", "fontSize": "13px", "color": BLOOMBERG_ORANGE, "padding": "8px 12px", "border": f"1px solid {BLOOMBERG_ORANGE}", "borderRadius": "4px", "backgroundColor": "#111827", "marginBottom": "4px"}),
+        html.Div(why_rows + [
+            html.Div("─" * 40, style={"fontSize": "10px", "color": "#3a4a5a", "margin": "8px 0"}),
+            html.Div(explanation, style={"fontSize": "12px", "color": "#d1d5db", "lineHeight": "1.6", "padding": "8px 12px"}),
+        ], style={"padding": "8px 12px", "backgroundColor": "#0d1117", "borderRadius": "0 0 4px 4px", "border": f"1px solid #1e2a3a"}),
+    ], style={"marginBottom": "12px"})
+
+    children.append(section("Market prediction — next session", [pred_cards, why_panel], "Based on symbol sentiment, topic sentiment, macro drivers, region breadth, and bull/bear counts. Score range: -100 (max bearish) to +100 (max bullish). Tap WHY to see the breakdown. NOT financial advice."))
 
     children.append(section("Active symbol sentiment", [table_from_df(sentiment_df, "sentiment-table", page_size=10)]))
     children.append(section("Market topics", [table_from_df(topics_df, "topics-table", page_size=10)]))
