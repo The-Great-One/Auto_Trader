@@ -13,7 +13,7 @@ import math
 import re
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -139,9 +139,39 @@ def fetch_economic_events() -> list[dict[str, Any]]:
     return events[:50]
 
 
+def normalize_earnings_date(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            normalized = normalize_earnings_date(item)
+            if normalized:
+                return normalized
+        return None
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    if hasattr(value, "to_pydatetime"):
+        try:
+            return value.to_pydatetime().date().strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    if hasattr(value, "tolist") and not isinstance(value, (str, bytes, dict)):
+        try:
+            return normalize_earnings_date(value.tolist())
+        except Exception:
+            pass
+    text = str(value).strip()
+    if not text:
+        return None
+    match = re.search(r"(\d{4}-\d{2}-\d{2})", text)
+    if match:
+        return match.group(1)
+    return text
+
+
 def fetch_earnings_calendar() -> list[dict[str, Any]]:
     earnings: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for sym in EARNINGS_SYMBOLS:
         try:
             tk = yf.Ticker(sym)
@@ -149,19 +179,20 @@ def fetch_earnings_calendar() -> list[dict[str, Any]]:
             if cal is None or (isinstance(cal, dict) and not cal):
                 continue
             if isinstance(cal, dict):
-                earnings_date = cal.get("Earnings Date")
+                earnings_date = normalize_earnings_date(cal.get("Earnings Date"))
                 if earnings_date:
-                    date_str = str(earnings_date)
-                    if date_str not in seen:
-                        seen.add(date_str)
-                        clean_sym = sym.replace(".NS", "").replace(".BO", "")
+                    clean_sym = sym.replace(".NS", "").replace(".BO", "")
+                    key = (clean_sym, earnings_date)
+                    if key not in seen:
+                        seen.add(key)
                         earnings.append({
                             "symbol": clean_sym,
-                            "earnings_date": date_str,
+                            "earnings_date": earnings_date,
                             "type": "earnings",
                         })
         except Exception:
             continue
+    earnings.sort(key=lambda row: (row.get("earnings_date") or "9999-99-99", row.get("symbol") or ""))
     return earnings[:30]
 
 

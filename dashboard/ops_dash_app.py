@@ -1484,12 +1484,22 @@ def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
     if earnings:
         earn_rows = []
         for e in earnings:
+            raw_date = e.get("earnings_date")
+            parsed_date = pd.to_datetime(raw_date, errors="coerce")
+            if pd.notna(parsed_date):
+                display_date = parsed_date.strftime("%b %d, %Y")
+            else:
+                display_date = str(raw_date) if raw_date is not None else "-"
             earn_rows.append({
                 "symbol": e.get("symbol"),
-                "earnings_date": e.get("earnings_date"),
+                "earnings_date": display_date,
                 "type": e.get("type"),
+                "_sort_date": parsed_date,
             })
-        children.append(section("EARNINGS CALENDAR", [table_from_df(pd.DataFrame(earn_rows), "earnings-table", page_size=10)], "Upcoming earnings for tracked universe symbols"))
+        earn_df = pd.DataFrame(earn_rows)
+        if not earn_df.empty and "_sort_date" in earn_df.columns:
+            earn_df = earn_df.sort_values("_sort_date", na_position="last").drop(columns=["_sort_date"])
+        children.append(section("EARNINGS CALENDAR", [table_from_df(earn_df, "earnings-table", page_size=10)], "Upcoming earnings for tracked universe symbols"))
     else:
         children.append(section("EARNINGS CALENDAR", [empty_message("No upcoming earnings found for tracked symbols.")]))
 
