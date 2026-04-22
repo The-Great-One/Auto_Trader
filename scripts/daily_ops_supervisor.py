@@ -73,6 +73,9 @@ PARAM_ENV_MAP = {
         "risk_per_trade_pct": "AT_BACKTEST_RISK_PER_TRADE_PCT",
         "atr_stop_mult": "AT_BACKTEST_ATR_STOP_MULT",
         "max_position_notional_pct": "AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT",
+        "target_equity": "AT_TARGET_EQUITY",
+        "target_etf": "AT_TARGET_ETF",
+        "max_single_symbol_weight": "AT_MAX_SINGLE_SYMBOL_WEIGHT",
     },
 }
 
@@ -143,7 +146,16 @@ def _extract_candidate(rec: dict) -> dict:
         for k, v in (params.get("sell", {}) or {}).items()
         if k in PARAM_ENV_MAP["sell"]
     }
-    raw_sim = ((params.get("simulation", {}) or {}).get("volatility_sizing_env", {}) or {})
+    sim_params = params.get("simulation", {}) or {}
+    raw_sim = (
+        (sim_params.get("volatility_sizing_env", {}) or {})
+        or (sim_params.get("sizing_exit_sweep_env", {}) or {})
+        or {
+            env_name: sim_params.get(logical_key)
+            for logical_key, env_name in PARAM_ENV_MAP["simulation"].items()
+            if sim_params.get(logical_key) is not None
+        }
+    )
     simulation = {
         logical_key: _normalize_param_value(raw_sim[env_name])
         for logical_key, env_name in PARAM_ENV_MAP["simulation"].items()

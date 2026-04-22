@@ -68,6 +68,100 @@ def _safe_float(x, default=None):
         return default
 
 
+def _env_float(primary: str, fallback: str | None, default: float) -> float:
+    raw = os.getenv(primary)
+    if raw in {None, ""} and fallback:
+        raw = os.getenv(fallback)
+    return float(raw if raw not in {None, ""} else default)
+
+
+def _env_flag(primary: str, fallback: str | None = None, default: bool = False) -> bool:
+    raw = os.getenv(primary)
+    if raw in {None, ""} and fallback:
+        raw = os.getenv(fallback)
+    if raw in {None, ""}:
+        return default
+    return str(raw).strip().lower() not in {"0", "false", "no"}
+
+
+def _live_position_sizing_config() -> dict:
+    return {
+        "enabled": _env_flag("AT_LIVE_VOL_SIZING_ENABLED", "AT_BACKTEST_VOL_SIZING_ENABLED", False),
+        "risk_per_trade_pct": max(
+            0.0,
+            _env_float("AT_LIVE_RISK_PER_TRADE_PCT", "AT_BACKTEST_RISK_PER_TRADE_PCT", 0.01),
+        ),
+        "atr_stop_mult": max(
+            0.1,
+            _env_float("AT_LIVE_ATR_STOP_MULT", "AT_BACKTEST_ATR_STOP_MULT", 2.5),
+        ),
+        "max_position_notional_pct": max(
+            0.01,
+            _env_float(
+                "AT_LIVE_MAX_POSITION_NOTIONAL_PCT",
+                "AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT",
+                0.25,
+            ),
+        ),
+        "fallback_allocation": max(0.0, _env_float("FUND_ALLOCATION", None, 20000.0)),
+    }
+
+
+def _calc_buy_quantity(
+    price: float,
+    atr: float | None,
+    *,
+    available_cash: float,
+    portfolio_value: float,
+    sizing_cfg: dict,
+) -> tuple[int, dict]:
+    if price <= 0 or available_cash <= 0:
+        return 0, {"method": "invalid_inputs"}
+
+    fallback_notional = min(max(0.0, available_cash), sizing_cfg["fallback_allocation"])
+    if not sizing_cfg.get("enabled"):
+        qty = int(floor(fallback_notional / price))
+        return qty, {
+            "method": "fixed_allocation",
+            "target_notional": fallback_notional,
+            "available_cash": available_cash,
+        }
+
+    max_notional = max(0.0, portfolio_value) * sizing_cfg["max_position_notional_pct"]
+    if max_notional <= 0:
+        max_notional = fallback_notional
+
+    atr_value = _safe_float(atr)
+    stop_distance = None
+    if atr_value is not None and atr_value > 0:
+        stop_distance = atr_value * sizing_cfg["atr_stop_mult"]
+
+    risk_budget = max(0.0, portfolio_value) * sizing_cfg["risk_per_trade_pct"]
+    if stop_distance is None or stop_distance <= 0 or risk_budget <= 0:
+        target_notional = min(available_cash, max_notional, fallback_notional)
+        qty = int(floor(target_notional / price))
+        return qty, {
+            "method": "vol_sizing_fallback",
+            "target_notional": target_notional,
+            "available_cash": available_cash,
+            "max_notional": max_notional,
+            "risk_budget": risk_budget,
+            "stop_distance": stop_distance,
+        }
+
+    risk_qty = risk_budget / stop_distance
+    target_notional = min(available_cash, max_notional, risk_qty * price)
+    qty = int(floor(target_notional / price))
+    return qty, {
+        "method": "atr_risk",
+        "target_notional": target_notional,
+        "available_cash": available_cash,
+        "max_notional": max_notional,
+        "risk_budget": risk_budget,
+        "stop_distance": stop_distance,
+    }
+
+
 def _order_key(symbol: str, side: str) -> tuple[str, str]:
     return ((symbol or "").upper(), (side or "").upper())
 
@@ -691,8 +785,7 @@ def handle_decisions(message_queue, decisions: List[dict]):
 
     # --- BUYs next ---
     buy_futures = []
-    # Session fund allocation per buy
-    per_buy_allocation = int(os.environ.get("FUND_ALLOCATION", 20000))
+    sizing_cfg = _live_position_sizing_config()
     # Track local committed spend to avoid over-alloc during concurrency
     committed = 0.0
     planned_class_notional = defaultdict(float)
@@ -703,6 +796,7 @@ def handle_decisions(message_queue, decisions: List[dict]):
             symbol = d["Symbol"]
             exchange = d["Exchange"]
             price = _safe_float(d.get("Close"))
+            atr = _safe_float(d.get("ATR"))
             rules = d.get("ContributingRules")
             asset_class = _classify_asset_class(
                 symbol, d.get("AssetClass"), symbol_metadata
@@ -724,8 +818,8 @@ def handle_decisions(message_queue, decisions: List[dict]):
                 logger.error(f"Failed to fetch margins; skipping {symbol}: {e}")
                 continue
 
-            # Check available vs allocation & committed
-            if funds - committed <= per_buy_allocation:
+            available_cash = max(0.0, funds - committed)
+            if available_cash <= 0:
                 logger.warning(
                     "Insufficient funds to place more buy orders. Stopping buy order processing."
                 )
@@ -735,10 +829,21 @@ def handle_decisions(message_queue, decisions: List[dict]):
                 blocked_buy_symbols.add(symbol)
                 continue
 
-            qty = int(floor(per_buy_allocation / price))
+            portfolio_base = holdings_notional + max(funds, 0.0)
+            qty, sizing_meta = _calc_buy_quantity(
+                price,
+                atr,
+                available_cash=available_cash,
+                portfolio_value=portfolio_base,
+                sizing_cfg=sizing_cfg,
+            )
             if qty <= 0:
                 logger.warning(
-                    f"Calculated qty {qty} for {symbol} at {price} is not positive. Skipping."
+                    "Calculated qty %s for %s at %.2f is not positive. Sizing meta=%s",
+                    qty,
+                    symbol,
+                    price,
+                    sizing_meta,
                 )
                 continue
 
@@ -751,7 +856,15 @@ def handle_decisions(message_queue, decisions: List[dict]):
                 continue
 
             order_notional = qty * price
-            portfolio_base = holdings_notional + max(funds, 0.0)
+            logger.info(
+                "BUY sizing %s qty=%s notional=%.2f method=%s atr=%s meta=%s",
+                symbol,
+                qty,
+                order_notional,
+                sizing_meta.get("method"),
+                atr,
+                sizing_meta,
+            )
             can_buy, reason = _portfolio_allows_buy(
                 symbol,
                 asset_class,

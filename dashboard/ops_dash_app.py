@@ -20,6 +20,8 @@ TWITTER_DIR = INTERMEDIARY_DIR / "twitter_sentiment"
 LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.json"
 LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
 LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
+WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
+WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
 SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key")))
 SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", ""))
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
@@ -286,6 +288,34 @@ def load_live_telegram_equity_history() -> pd.DataFrame:
     return df.dropna(subset=["timestamp"]).sort_values("timestamp").drop_duplicates(subset=["timestamp"])
 
 
+def load_telegram_channel_updates(limit: int = 120) -> pd.DataFrame:
+    rows = load_jsonl(WATCH_UPDATES_PATH)
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    for col in ["captured_at", "date"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    if "text_excerpt" not in df.columns and "text" in df.columns:
+        df["text_excerpt"] = df["text"].fillna("").astype(str).str.slice(0, 180)
+    wanted = [c for c in ["captured_at", "chat", "message_id", "date", "has_media", "media_kind", "media_path", "text_excerpt"] if c in df.columns]
+    if wanted:
+        df = df[wanted]
+    sort_col = "captured_at" if "captured_at" in df.columns else "date"
+    return df.sort_values(sort_col, ascending=False).head(limit)
+
+
+def load_telegram_receipts(limit: int = 120) -> pd.DataFrame:
+    rows = load_jsonl(WATCH_RECEIPTS_PATH)
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    for col in ["captured_at", "date"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    return df.sort_values("captured_at", ascending=False).head(limit) if "captured_at" in df.columns else df.head(limit)
+
+
 def load_sentiment_rows() -> pd.DataFrame:
     payload = load_json(REPORTS_DIR / "news_sentiment_latest.json")
     active = payload.get("active") if isinstance(payload, dict) else []
@@ -432,6 +462,7 @@ def collect_data() -> dict[str, Any]:
     options_supervisor_path, options_supervisor = latest_report("options_research_supervisor_*.json")
     improvement_path, improvement = latest_report("daily_improvement_audit_*.json")
     five_year_path, five_year = latest_report("five_year_validation_*.json")
+    exposure_sweep_path, exposure_sweep = latest_report("five_year_exposure_sweep_*.json")
     rulesets_path, telegram_rulesets = latest_report("telegram_channel_rulesets_*.json")
     paper = load_json(REPORTS_DIR / "paper_shadow_latest.json") or {}
     live_paper = load_json(REPORTS_DIR / "paper_shadow_live_latest.json") or {}
@@ -444,6 +475,8 @@ def collect_data() -> dict[str, Any]:
     telegram_ledger = load_live_telegram_ledger()
     telegram_history = load_live_telegram_equity_history()
     telegram_backtests = load_telegram_options_table(limit=30)
+    telegram_updates = load_telegram_channel_updates(limit=120)
+    telegram_receipts = load_telegram_receipts(limit=120)
     server = fetch_server_snapshot()
     reports_df = recent_report_files(limit=120)
     return {
@@ -460,6 +493,8 @@ def collect_data() -> dict[str, Any]:
         "improvement": improvement or {},
         "five_year_path": five_year_path.name if five_year_path else None,
         "five_year": five_year or {},
+        "exposure_sweep_path": exposure_sweep_path.name if exposure_sweep_path else None,
+        "exposure_sweep": exposure_sweep or {},
         "rulesets_path": rulesets_path.name if rulesets_path else None,
         "telegram_rulesets": telegram_rulesets or {},
         "paper": paper,
@@ -473,6 +508,8 @@ def collect_data() -> dict[str, Any]:
         "telegram_ledger": telegram_ledger,
         "telegram_history": telegram_history,
         "telegram_backtests": telegram_backtests,
+        "telegram_updates": telegram_updates,
+        "telegram_receipts": telegram_receipts,
         "server": server,
         "sentiment_df": load_sentiment_rows(),
         "topics_df": load_market_topics_rows(),
@@ -483,15 +520,17 @@ def collect_data() -> dict[str, Any]:
 def build_hero(data: dict[str, Any]) -> list[Any]:
     combined = data["combined_labs"]
     latest_lab = combined.iloc[-1].to_dict() if not combined.empty else {}
-    best_lab = combined.sort_values("best_return_pct", na_position="last").iloc[-1].to_dict() if not combined.empty else {}
     server = data["server"]
+    exposure_best = ((data.get("exposure_sweep") or {}).get("best") or {})
+    validated_cagr = exposure_best.get("cagr_pct") or (data["five_year"].get("vol_sizing") or {}).get("cagr_pct", "-")
+    validated_name = exposure_best.get("name") or data.get("exposure_sweep_path") or data.get("five_year_path") or "5y validation"
     return [
         metric_card("auto_trade.service", server.get("service", "unknown"), server.get("substate", "")),
         metric_card("Paper decision", data["paper"].get("decision", data["live_paper"].get("mode", "-")), data["paper"].get("symbol", "paper shadow")),
         metric_card("Telegram paper equity", data["telegram_ledger"].get("equity", "-"), f"cash {friendly(data['telegram_ledger'].get('cash'))}"),
         metric_card("Live portfolio value", data["portfolio"].get("total_value", "-"), data.get("portfolio_path") or "portfolio_intel"),
         metric_card("Latest lab return %", latest_lab.get("best_return_pct", "-"), latest_lab.get("best_name", "-")),
-        metric_card("Best known 5y CAGR %", (data["five_year"].get("vol_sizing") or {}).get("cagr_pct", "-"), data.get("five_year_path") or "5y validation"),
+        metric_card("Best validated 5y CAGR %", validated_cagr, validated_name),
     ]
 
 
@@ -711,14 +750,19 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     history = data["telegram_history"]
     backtests = data["telegram_backtests"]
     rulesets = data["telegram_rulesets"]
+    updates = data.get("telegram_updates", pd.DataFrame())
+    receipts = data.get("telegram_receipts", pd.DataFrame())
     children: list[Any] = []
 
+    latest_update = updates.iloc[0].to_dict() if not updates.empty else {}
     cards = html.Div(
         [
             metric_card("Live equity", ledger.get("equity", "-"), "Telegram paper ledger"),
             metric_card("Cash", ledger.get("cash", "-"), "Telegram paper ledger"),
             metric_card("Unrealized PnL", ledger.get("unrealized_pnl", "-"), "Telegram paper ledger"),
             metric_card("Open positions", len(ledger.get("open_positions") or []), "Telegram paper ledger"),
+            metric_card("Watcher updates", len(updates), str(latest_update.get("chat") or "watch_channel_updates.jsonl")),
+            metric_card("Latest watched post", latest_update.get("date", "-"), latest_update.get("text_excerpt", "")),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
@@ -731,6 +775,9 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
 
     children.append(section("Open positions", [table_from_df(to_df(ledger.get("open_positions") or []), "tg-open-table", page_size=10)]))
     children.append(section("Closed positions", [table_from_df(to_df(ledger.get("closed_positions") or []), "tg-closed-table", page_size=10)]))
+    children.append(section("Watched channel updates", [table_from_df(updates, "tg-channel-updates-table", page_size=12)]))
+    if not receipts.empty:
+        children.append(section("Watcher receipts", [table_from_df(receipts, "tg-receipts-table", page_size=10)]))
     children.append(section("Backtest archive", [table_from_df(backtests.sort_values("generated_at", ascending=False) if not backtests.empty else backtests, "tg-backtests-table", page_size=12)]))
 
     if isinstance(rulesets, dict) and rulesets.get("rulesets"):
@@ -754,21 +801,30 @@ def build_research_tab(data: dict[str, Any]) -> list[Any]:
     improvement = data["improvement"]
     options_supervisor = data["options_supervisor"]
     five_year = data["five_year"]
+    exposure_sweep = data.get("exposure_sweep") or {}
     hourly = data["hourly_lab"]
     children: list[Any] = []
 
     five_vol = five_year.get("vol_sizing") or {}
     five_base = five_year.get("baseline") or {}
+    exposure_best = exposure_sweep.get("best") or {}
     cards = html.Div(
         [
             metric_card("5y vol-sizing CAGR %", five_vol.get("cagr_pct", "-"), data.get("five_year_path") or "5y validation"),
             metric_card("5y vol-sizing return %", five_vol.get("return_pct", "-"), f"drawdown {friendly(five_vol.get('drawdown_pct'))}%"),
+            metric_card("Exposure sweep best CAGR %", exposure_best.get("cagr_pct", "-"), exposure_best.get("name", data.get("exposure_sweep_path") or "5y exposure sweep")),
+            metric_card("Exposure best drawdown %", exposure_best.get("drawdown_pct", "-"), f"return {friendly(exposure_best.get('return_pct'))}%"),
             metric_card("5y baseline return %", five_base.get("return_pct", "-"), f"CAGR {friendly(five_base.get('cagr_pct'))}%"),
             metric_card("Improvement %", (five_year.get("improvement") or {}).get("return_pct", "-"), "vol sizing minus baseline"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("Research scoreboard", [cards]))
+
+    exposure_rows_raw = exposure_sweep.get("ranked") or exposure_sweep.get("results") or []
+    if exposure_rows_raw:
+        exposure_rows = pd.DataFrame(exposure_rows_raw).sort_values("cagr_pct", ascending=False)
+        children.append(section("5 year exposure sweep", [table_from_df(exposure_rows, "research-exposure-sweep-table", page_size=10)]))
 
     if not combined.empty:
         show = combined.sort_values("generated_at", ascending=False).copy()
@@ -825,8 +881,56 @@ def render_tab(tab: str, data: dict[str, Any]) -> list[Any]:
     return build_overview_tab(data)
 
 
+def empty_figure(title: str) -> dict[str, Any]:
+    return {
+        "data": [],
+        "layout": {
+            "template": "plotly_dark",
+            "paper_bgcolor": "#030712",
+            "plot_bgcolor": "#111827",
+            "title": {"text": title},
+        },
+    }
+
+
+def legacy_lab_figure(data: dict[str, Any]) -> dict[str, Any]:
+    combined = data["combined_labs"]
+    if combined.empty:
+        return empty_figure("Completed lab returns")
+    ordered = combined.sort_values("generated_at")
+    line_cols = [c for c in ["best_return_pct", "baseline_return_pct"] if c in ordered.columns]
+    if not line_cols:
+        return empty_figure("Completed lab returns")
+    fig = px.line(ordered, x="generated_at", y=line_cols, markers=True, title="Completed lab returns")
+    fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827")
+    return fig
+
+
+def legacy_telegram_figure(data: dict[str, Any]) -> dict[str, Any]:
+    history = data["telegram_history"]
+    if history.empty:
+        return empty_figure("Telegram live paper equity")
+    cols = [c for c in ["equity", "cash"] if c in history.columns]
+    if not cols:
+        return empty_figure("Telegram live paper equity")
+    fig = px.line(history, x="timestamp", y=cols, markers=True, title="Telegram live paper equity")
+    fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827")
+    return fig
+
+
+def table_payload(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    if df is None or df.empty:
+        return [], []
+    show = df.copy()
+    for col in show.columns:
+        if pd.api.types.is_datetime64_any_dtype(show[col]):
+            show[col] = show[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+    return show.to_dict("records"), [{"name": c, "id": c} for c in show.columns]
+
+
 app = Dash(__name__)
 app.title = "Auto Trader Ops"
+app.config.suppress_callback_exceptions = True
 app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
@@ -851,6 +955,15 @@ app.layout = html.Div(
             colors={"border": "#1f2937", "primary": "#60a5fa", "background": "#0f172a"},
         ),
         html.Div(id="tab-content", style={"marginTop": "12px"}),
+        html.Div(
+            style={"display": "none"},
+            children=[
+                dcc.Graph(id="lab-line", figure=empty_figure("Completed lab returns")),
+                dcc.Graph(id="telegram-line", figure=empty_figure("Telegram live paper equity")),
+                dash_table.DataTable(id="lab-table", data=[], columns=[]),
+                dash_table.DataTable(id="telegram-open-table", data=[], columns=[]),
+            ],
+        ),
     ],
 )
 
@@ -866,6 +979,34 @@ def refresh(_: int, tab: str):
     data = collect_data()
     updated = f"Last refresh: {data['generated_at']} | server cache TTL {SSH_TTL_SECONDS}s | default dashboard now points here on port 8504"
     return updated, build_hero(data), render_tab(tab, data)
+
+
+@app.callback(
+    Output("hero-row", "children", allow_duplicate=True),
+    Output("lab-line", "figure"),
+    Output("telegram-line", "figure"),
+    Output("lab-table", "data"),
+    Output("lab-table", "columns"),
+    Output("telegram-open-table", "data"),
+    Output("telegram-open-table", "columns"),
+    Input("refresh", "n_intervals"),
+    Input("main-tab", "value"),
+    prevent_initial_call=True,
+)
+def refresh_legacy(_: int, __: str):
+    data = collect_data()
+    lab_data, lab_columns = table_payload(data["combined_labs"].sort_values("generated_at", ascending=False) if not data["combined_labs"].empty else data["combined_labs"])
+    open_df = to_df((data.get("telegram_ledger") or {}).get("open_positions") or [])
+    open_data, open_columns = table_payload(open_df)
+    return (
+        build_hero(data),
+        legacy_lab_figure(data),
+        legacy_telegram_figure(data),
+        lab_data,
+        lab_columns,
+        open_data,
+        open_columns,
+    )
 
 
 if __name__ == "__main__":
