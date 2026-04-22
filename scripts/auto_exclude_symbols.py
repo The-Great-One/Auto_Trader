@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from Auto_Trader.Build_Master import load_exclusion_list, add_excluded_symbol
 
-SSH_KEY = os.getenv("AT_SERVER_KEY", os.path.expanduser("~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key"))
+SSH_KEY = os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key"))
 SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", ""))
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
 FAILURE_PATTERNS = [

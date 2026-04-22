@@ -21,7 +21,7 @@ REPORTS = ROOT / 'reports'
 REPORTS.mkdir(exist_ok=True)
 
 EXPORT_DEFAULT = Path(os.getenv('AT_TELEGRAM_EXPORT', os.path.expanduser('~/.openclaw/telegram-user/exports/telegram_export_latest.json')))
-SSH_KEY = os.getenv('AT_SERVER_KEY', os.path.expanduser('~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key'))
+SSH_KEY = os.getenv('AT_SERVER_KEY', os.path.expanduser('~/.openclaw/credentials/oracle_ssh_key'))
 ORACLE = os.getenv('AT_SERVER_HOST', os.getenv('AT_ORACLE', ''))
 
 OPTION_CALL_RE = re.compile(
