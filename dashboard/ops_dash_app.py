@@ -1364,11 +1364,11 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
             ),
             paper_bgcolor="#030712", plot_bgcolor="#111827",
             margin=dict(l=0, r=0, t=30, b=0),
-            height=420,
+            height=720,
             legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY)),
         )
         fig.update_layout(title_font=dict(size=12, color=BLOOMBERG_ORANGE))
-        children.append(section("WORLD MAP — markets & event hotspots", [dcc.Graph(figure=fig)], "Green = up, Red = down ◆ = geopolitical event severity"))
+        children.append(section("WORLD MAP — markets & event hotspots", [dcc.Graph(figure=fig, style={"height": "78vh", "minHeight": "720px"})], "Green = up, Red = down ◆ = geopolitical event severity"))
     except Exception as exc:
         children.append(section("WORLD MAP", [empty_message(f"Map render error: {exc}")]))
 
