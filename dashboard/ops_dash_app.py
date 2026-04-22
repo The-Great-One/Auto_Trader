@@ -13,6 +13,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, dcc, html, dash_table, no_update
+from dash.exceptions import PreventUpdate
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "reports"
@@ -59,6 +60,22 @@ def to_ist(dt_str: str | None) -> str:
             dt = dt.tz_localize("UTC")
         dt = dt.tz_convert(IST)
         return dt.strftime("%b %d, %H:%M")
+    except Exception:
+        return str(dt_str)
+
+
+def to_ist_verbose(dt_str: str | None) -> str:
+    """Convert UTC/ISO timestamp to an IST string with timezone label."""
+    if not dt_str:
+        return "-"
+    try:
+        dt = pd.Timestamp(dt_str)
+        if pd.isna(dt):
+            return "-"
+        if dt.tzinfo is None:
+            dt = dt.tz_localize("UTC")
+        dt = dt.tz_convert(IST)
+        return dt.strftime("%b %d, %H:%M:%S IST")
     except Exception:
         return str(dt_str)
 
@@ -1128,7 +1145,14 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
-    children.append(section("News and sentiment", [cards], "This covers both symbol-level sentiment and macro topic feeds used by the paper overlay."))
+    news_timestamp = html.Div(
+        [
+            html.Div(f"News feed updated: {to_ist_verbose(news_payload.get('generated_at') if isinstance(news_payload, dict) else None)}", style={"fontSize": "11px", "color": "#9ca3af"}),
+            html.Div(f"Topic feed updated: {to_ist_verbose(topics_payload.get('generated_at') if isinstance(topics_payload, dict) else None)}", style={"fontSize": "11px", "color": "#9ca3af"}),
+        ],
+        style={**CARD_STYLE, "padding": "10px 12px"},
+    )
+    children.append(section("News and sentiment", [cards, news_timestamp], "This covers both symbol-level sentiment and macro topic feeds used by the paper overlay."))
 
     # ── MARKET PREDICTION ──
     pred = compute_market_prediction(data)
@@ -1190,7 +1214,11 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
         ], style={"padding": "8px 12px", "backgroundColor": "#0d1117", "borderRadius": "0 0 4px 4px", "border": f"1px solid #1e2a3a"}),
     ], style={"marginBottom": "12px"})
 
-    children.append(section("Market prediction — next session", [pred_cards, why_panel], "Based on symbol sentiment, topic sentiment, macro drivers, region breadth, and bull/bear counts. Score range: -100 (max bearish) to +100 (max bullish). Tap WHY to see the breakdown. NOT financial advice."))
+    prediction_timestamp = html.Div(
+        f"Prediction snapshot time: {to_ist_verbose(news_payload.get('generated_at') if isinstance(news_payload, dict) else None)}",
+        style={"fontSize": "10px", "color": "#5a6a7a", "marginTop": "4px"},
+    )
+    children.append(section("Market prediction — next session", [pred_cards, why_panel, prediction_timestamp], "Based on symbol sentiment, topic sentiment, macro drivers, region breadth, and bull/bear counts. Score range: -100 (max bearish) to +100 (max bullish). Tap WHY to see the breakdown. NOT financial advice."))
 
     children.append(section("Active symbol sentiment", [table_from_df(sentiment_df, "sentiment-table", page_size=10)]))
     children.append(section("Market topics", [table_from_df(topics_df, "topics-table", page_size=10)]))
@@ -1574,6 +1602,81 @@ def build_research_tab(data: dict[str, Any]) -> list[Any]:
     return children
 
 
+def build_world_map_figure(macro: dict[str, Any], rotation_lon: float = 78.0, pulse_phase: int = 0) -> go.Figure:
+    markets = macro.get("markets") or []
+    events = macro.get("events") or []
+    pulse = 1.0 + 0.08 * math.sin(pulse_phase * 0.8)
+
+    map_lats, map_lons, map_texts, map_colors, map_sizes = [], [], [], [], []
+    for m in markets:
+        if m.get("status") != "ok" or m.get("lat") is None:
+            continue
+        ch = safe_num(m.get("change_pct"))
+        map_lats.append(float(m["lat"]))
+        map_lons.append(float(m["lon"]))
+        map_texts.append(f"{m['label']}<br>{ch:+.2f}%" if ch is not None else f"{m['label']}<br>N/A")
+        map_colors.append(ch if ch is not None else 0)
+        base_size = 18 if m.get("kind") == "equity" else 14
+        map_sizes.append(round(base_size * pulse, 1))
+
+    ev_lats, ev_lons, ev_texts, ev_colors, ev_sizes = [], [], [], [], []
+    for e in events:
+        sev = e.get("severity", 0)
+        if sev < 15:
+            continue
+        ev_lats.append(float(e.get("lat", 0)))
+        ev_lons.append(float(e.get("lon", 0)))
+        ev_texts.append(f"⚡ {e['label']}<br>severity {sev}")
+        ev_colors.append(-sev / 10.0)
+        ev_sizes.append(round(max(12, min(30, sev)) * (1.0 + 0.12 * math.sin((pulse_phase + sev) * 0.6)), 1))
+
+    fig = go.Figure()
+
+    if map_lats:
+        fig.add_trace(go.Scattergeo(
+            lon=map_lons, lat=map_lats, text=map_texts,
+            marker=dict(
+                size=map_sizes, color=map_colors,
+                colorscale=[[0, BLOOMBERG_RED], [0.5, BLOOMBERG_ORANGE], [1, BLOOMBERG_GREEN]],
+                cmin=-3, cmax=3, line=dict(width=1, color="#1e2a3a"),
+                colorbar=dict(title="% chg", thickness=10, x=1.12, xpad=24, tickfont=dict(size=9, color=BLOOMBERG_GRAY), title_font=dict(size=9, color=BLOOMBERG_GRAY)),
+            ),
+            mode="markers+text", textposition="top center",
+            textfont=dict(size=9, color="#c0c0c0"),
+            name="Markets",
+        ))
+
+    if ev_lats:
+        fig.add_trace(go.Scattergeo(
+            lon=ev_lons, lat=ev_lats, text=ev_texts,
+            marker=dict(
+                size=ev_sizes, color=ev_colors,
+                colorscale=[[0, BLOOMBERG_RED], [0.5, "#ff8800"], [1, "#ffcc00"]],
+                cmin=-10, cmax=0, symbol="diamond", line=dict(width=1, color="#ff4444"),
+            ),
+            mode="markers+text", textposition="bottom center",
+            textfont=dict(size=9, color="#ff8800"),
+            name="Events",
+        ))
+
+    fig.update_layout(
+        geo=dict(
+            projection_type="orthographic",
+            projection_rotation=dict(lon=rotation_lon, lat=12),
+            showland=True, landcolor="#111827", showocean=True, oceancolor="#0a0e17",
+            showcountries=True, countrycolor="#1e2a3a", showlakes=False,
+            coastlinecolor="#1e2a3a", bgcolor="#030712", showframe=False,
+        ),
+        paper_bgcolor="#030712", plot_bgcolor="#111827",
+        margin=dict(l=0, r=0, t=30, b=0),
+        height=720,
+        legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY), x=1.02, y=1, xanchor="left"),
+        title_font=dict(size=12, color=BLOOMBERG_ORANGE),
+        uirevision="macro-world-map",
+    )
+    return fig
+
+
 def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
     macro = load_global_macro()
     if not macro:
@@ -1583,6 +1686,7 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
 
     # ── 1. LIVE MARKET RIBBON ────────────────────────────────
     markets = macro.get("markets") or []
+    events = macro.get("events") or []
     ribbon_cards = []
     for m in markets:
         if m.get("status") != "ok":
@@ -1603,75 +1707,20 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
 
     # ── 2. WORLD MAP ────────────────────────────────────────
     try:
-        map_lats, map_lons, map_texts, map_colors, map_sizes = [], [], [], [], []
-        for m in markets:
-            if m.get("status") != "ok" or m.get("lat") is None:
-                continue
-            ch = safe_num(m.get("change_pct"))
-            map_lats.append(float(m["lat"]))
-            map_lons.append(float(m["lon"]))
-            map_texts.append(f"{m['label']}<br>{ch:+.2f}%" if ch is not None else f"{m['label']}<br>N/A")
-            map_colors.append(ch if ch is not None else 0)
-            map_sizes.append(18 if m.get("kind") == "equity" else 14)
-
-        # Add event markers
-        events = macro.get("events") or []
-        ev_lats, ev_lons, ev_texts, ev_colors, ev_sizes = [], [], [], [], []
-        for e in events:
-            sev = e.get("severity", 0)
-            if sev < 15:
-                continue
-            ev_lats.append(float(e.get("lat", 0)))
-            ev_lons.append(float(e.get("lon", 0)))
-            ev_texts.append(f"⚡ {e['label']}<br>severity {sev}")
-            ev_colors.append(-sev / 10.0)  # negative = warm = risk
-            ev_sizes.append(max(12, min(30, sev)))
-
-        fig = go.Figure()
-
-        # Market markers
-        if map_lats:
-            fig.add_trace(go.Scattergeo(
-                lon=map_lons, lat=map_lats, text=map_texts,
-                marker=dict(
-                    size=map_sizes, color=map_colors,
-                    colorscale=[[0, BLOOMBERG_RED], [0.5, BLOOMBERG_ORANGE], [1, BLOOMBERG_GREEN]],
-                    cmin=-3, cmax=3, line=dict(width=1, color="#1e2a3a"),
-                    colorbar=dict(title="% chg", thickness=10, x=1.12, xpad=24, tickfont=dict(size=9, color=BLOOMBERG_GRAY), title_font=dict(size=9, color=BLOOMBERG_GRAY)),
-                ),
-                mode="markers+text", textposition="top center",
-                textfont=dict(size=9, color="#c0c0c0"),
-                name="Markets",
-            ))
-
-        # Event markers
-        if ev_lats:
-            fig.add_trace(go.Scattergeo(
-                lon=ev_lons, lat=ev_lats, text=ev_texts,
-                marker=dict(
-                    size=ev_sizes, color=ev_colors,
-                    colorscale=[[0, BLOOMBERG_RED], [0.5, "#ff8800"], [1, "#ffcc00"]],
-                    cmin=-10, cmax=0, symbol="diamond", line=dict(width=1, color="#ff4444"),
-                ),
-                mode="markers+text", textposition="bottom center",
-                textfont=dict(size=9, color="#ff8800"),
-                name="Events",
-            ))
-
-        fig.update_layout(
-            geo=dict(
-                projection_type="natural earth",
-                showland=True, landcolor="#111827", showocean=True, oceancolor="#0a0e17",
-                showcountries=True, countrycolor="#1e2a3a", showlakes=False,
-                coastlinecolor="#1e2a3a",
-            ),
-            paper_bgcolor="#030712", plot_bgcolor="#111827",
-            margin=dict(l=0, r=0, t=30, b=0),
-            height=720,
-            legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY), x=1.02, y=1, xanchor="left"),
-        )
-        fig.update_layout(title_font=dict(size=12, color=BLOOMBERG_ORANGE))
-        children.append(section("WORLD MAP — markets & event hotspots", [dcc.Graph(figure=fig, style={"height": "78vh", "minHeight": "720px"})], "Green = up, Red = down ◆ = geopolitical event severity"))
+        fig = build_world_map_figure(macro)
+        children.append(section(
+            "WORLD MAP — animated globe & event hotspots",
+            [
+                dcc.Graph(
+                    id="macro-world-map",
+                    figure=fig,
+                    animate=False,
+                    config={"displayModeBar": False},
+                    style={"height": "78vh", "minHeight": "720px"},
+                )
+            ],
+            "Auto-rotating globe. Green = up, Red = down, ◆ = geopolitical event severity.",
+        ))
     except Exception as exc:
         children.append(section("WORLD MAP", [empty_message(f"Map render error: {exc}")]))
 
@@ -1959,7 +2008,7 @@ def table_payload(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str
     return show.to_dict("records"), [{"name": c, "id": c} for c in show.columns]
 
 
-app = Dash(__name__)
+app = Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Auto Trader Ops"
 app.config.suppress_callback_exceptions = True
 app.index_string = """<!DOCTYPE html>
@@ -2031,6 +2080,7 @@ app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
         dcc.Interval(id="refresh", interval=30_000, n_intervals=0),
+        dcc.Interval(id="globe-anim", interval=2200, n_intervals=0),
         dcc.Store(id="data-version", data={"ts": 0.0}),
         html.H1("AUTO TRADER OPS", style={"fontSize": "18px", "fontWeight": "700", "letterSpacing": "2px", "color": BLOOMBERG_ORANGE, "marginBottom": "2px"}),
         html.Div("Live dashboard — service health, portfolios, paper trading, research, Telegram.", style={"color": BLOOMBERG_GRAY, "marginBottom": "8px", "fontSize": "11px"}),
@@ -2115,6 +2165,22 @@ def render_active_tab(tab: str, _data_version: dict[str, Any] | None):
         traceback.print_exc()
         err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
         return [html.Div(err_msg, style={**CARD_STYLE, "color": BLOOMBERG_RED})]
+
+
+@app.callback(
+    Output("macro-world-map", "figure"),
+    Input("globe-anim", "n_intervals"),
+    Input("main-tab", "value"),
+    prevent_initial_call=True,
+)
+def animate_macro_world_map(n_intervals: int, active_tab: str):
+    if active_tab != "global_macro":
+        raise PreventUpdate
+    macro = load_global_macro()
+    if not macro:
+        raise PreventUpdate
+    rotation_lon = (78 + (n_intervals * 12)) % 360
+    return build_world_map_figure(macro, rotation_lon=rotation_lon, pulse_phase=n_intervals)
 
 
 # Legacy hidden-table callback removed — refresh and tab rendering are now decoupled
