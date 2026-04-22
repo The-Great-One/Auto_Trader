@@ -1041,46 +1041,55 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         node = (summary or {}).get(key) or {}
         return node.get(field)
 
+    audit_channels = audit.get("channels") or {}
+
+    def pick_audit_channel(*names: str) -> dict[str, Any]:
+        for name in names:
+            payload = audit_channels.get(name) or audit.get(name)
+            if payload:
+                return payload
+        return {}
+
     # ── TELEGRAM EQUITY ──
-    shortterm = audit.get("shortterm01") or {}
-    sunil_cash = audit.get("finance_with_sunil") or {}
-    darkhorse = audit.get("darkhorseofstockmarket") or {}
-    milind = audit.get("milind4profits") or {}
-    equity_rows = []
-    equity_cards = html.Div(
-        [
-            metric_card("Equity channels", len([x for x in [shortterm, sunil_cash, darkhorse, milind] if x]), "tracked"),
-            metric_card("Shortterm01 signals", shortterm.get("signals_evaluated", 0), f"extracted {shortterm.get('signals_extracted', 0)}"),
-            metric_card("Sunil cash signals", sunil_cash.get("signals_evaluated", 0), f"extracted {sunil_cash.get('signals_extracted', 0)}"),
-            metric_card("Dark Horse signals", darkhorse.get("signals_evaluated", 0), f"extracted {darkhorse.get('signals_extracted', 0)}"),
-            metric_card("Shortterm01 20d avg %", audit_stat(shortterm.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(shortterm.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
-            metric_card("Shortterm01 tgt1 hit %", (audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") or 0) * 100 if audit_stat(shortterm.get("summary") or {}, "target_1_hit_20d", "hit_rate") is not None else None, "within 20d"),
-            metric_card("Sunil cash 20d avg %", audit_stat(sunil_cash.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(sunil_cash.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
-            metric_card("Dark Horse 20d avg %", audit_stat(darkhorse.get("summary") or {}, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(darkhorse.get('summary') or {}, 'ret_20d_pct', 'positive_rate'))}"),
-        ],
-        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
-    )
-    equity_rows.append(equity_cards)
+    shortterm = pick_audit_channel("shortterm01")
+    sunil_cash = pick_audit_channel("financewithsunil", "finance_with_sunil")
+    darkhorse = pick_audit_channel("darkhorseofstockmarket")
+    milind = pick_audit_channel("milind4profits")
+    equity_channels = [
+        ("Shortterm01", shortterm),
+        ("FinanceWithSunil", sunil_cash),
+        ("Dark Horse", darkhorse),
+        ("Milind4Profits", milind),
+    ]
+    available_equity_channels = [(label, payload) for label, payload in equity_channels if payload]
+
+    equity_cards_items = [metric_card("Equity channels", len(available_equity_channels), "tracked")]
+    for label, payload in available_equity_channels[:4]:
+        summary = payload.get("summary") or {}
+        label_short = label if len(label) <= 14 else label[:14]
+        equity_cards_items.append(metric_card(f"{label_short} signals", payload.get("signals_evaluated", 0), f"extracted {payload.get('signals_extracted', 0)}"))
+        equity_cards_items.append(metric_card(f"{label_short} 20d avg %", audit_stat(summary, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(summary, 'ret_20d_pct', 'positive_rate'))}"))
+
+    equity_cards = html.Div(equity_cards_items, style={"display": "flex", "gap": "12px", "flexWrap": "wrap"})
 
     equity_audit_rows = []
-    for label, payload in [("Shortterm01 cash/equity", shortterm), ("FinanceWithSunil cash/equity", sunil_cash), ("Dark Horse cash/equity", darkhorse), ("Milind4Profits cash/equity", milind)]:
-        if not payload:
-            continue
+    for label, payload in available_equity_channels:
         summary = payload.get("summary") or {}
         best_examples = summary.get("best_examples") or []
         sample = best_examples[0] if best_examples else {}
         equity_audit_rows.append({
-            "channel": label,
+            "channel": f"{label} cash/equity",
             "signals_extracted": payload.get("signals_extracted", 0),
             "signals_evaluated": payload.get("signals_evaluated", 0),
             "20d_avg_%": audit_stat(summary, "ret_20d_pct", "avg"),
             "20d_positive_rate": audit_stat(summary, "ret_20d_pct", "positive_rate"),
             "max_20d_avg_%": audit_stat(summary, "max_20d_pct", "avg"),
+            "tgt1_hit_%": (audit_stat(summary, "target_1_hit_20d", "hit_rate") or 0) * 100 if audit_stat(summary, "target_1_hit_20d", "hit_rate") is not None else None,
             "best_symbol": sample.get("symbol"),
             "best_date": to_ist(sample.get("date")) if sample.get("date") else "-",
         })
     if equity_audit_rows:
-        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All channel equity signal audits side by side. If 20d stats are blank, the signal is too recent to score."))
+        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All available Telegram equity channel audits side by side. If 20d stats are blank, the signal is too recent to score."))
     else:
         children.append(section("Telegram equity", [equity_cards, empty_message("No Telegram equity audit rows yet.")]))
 
@@ -1095,7 +1104,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     open_pos = ledger.get("open_positions", [])
     closed_pos = ledger.get("closed_positions", [])
     updated_at = to_ist(ledger.get("updated_at"))
-    sunil_options = audit.get("finance_with_sunil_options") or {}
+    sunil_options = pick_audit_channel("financewithsunil_options", "finance_with_sunil_options")
     opt_summary = sunil_options.get("summary") or {}
 
     option_metrics = html.Div(
