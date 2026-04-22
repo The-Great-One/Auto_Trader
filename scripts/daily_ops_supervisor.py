@@ -686,6 +686,21 @@ def main():
     market_open, trade_date = is_market_open_today()
 
     strategy = run_strategy_lab(trade_date)
+
+    # Run portfolio report
+    portfolio = {"total_value": None, "total_cost": None, "total_pnl": None, "total_pnl_pct": None}
+    try:
+        import subprocess as sp
+        import json as _json
+        result = sp.run([str(ROOT / "venv" / "bin" / "python"), str(SCRIPTS / "daily_portfolio_report.py")],
+                       capture_output=True, text=True, timeout=60)
+        if result.returncode == 0:
+            p = REPORTS / f"portfolio_intel_{trade_date}.json"
+            if p.exists():
+                portfolio = _json.loads(p.read_text())
+    except Exception:
+        pass
+
     weekly_universe_cagr = run_weekly_universe_cagr_check(now, market_open)
     paper = check_and_fix_paper_execution(market_open, trade_date)
     autopromote = maybe_auto_promote(strategy, market_open)
@@ -702,6 +717,7 @@ def main():
         "weekly_universe_cagr": weekly_universe_cagr,
         "autopromote": autopromote,
         "iteration_plan": iteration_plan,
+        "portfolio": portfolio,
     }
 
     out_json = REPORTS / f"daily_ops_supervisor_{trade_date}.json"
