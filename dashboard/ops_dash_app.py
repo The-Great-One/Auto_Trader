@@ -965,6 +965,108 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
     return children
 
 
+def compute_market_prediction(data: dict[str, Any]) -> dict[str, Any]:
+    """Synthesize news sentiment + macro into a next-day market direction prediction."""
+    news_payload = data.get("news_payload") or {}
+    topics_payload = data.get("topics_payload") or {}
+    macro = load_global_macro()
+
+    # 1. Symbol sentiment
+    active = news_payload.get("active") or []
+    bull_count = sum(1 for a in active if (a.get("weighted_sentiment") or 0) > 0.1)
+    bear_count = sum(1 for a in active if (a.get("weighted_sentiment") or 0) < -0.1)
+    neutral_count = len(active) - bull_count - bear_count
+    avg_sent = 0.0
+    if active:
+        avg_sent = sum(a.get("weighted_sentiment", 0) or 0 for a in active) / len(active)
+
+    # 2. Topic sentiment
+    topics = topics_payload.get("topics") or []
+    topic_sent = 0.0
+    if topics:
+        topic_sent = sum(t.get("weighted_sentiment", 0) or 0 for t in topics) / len(topics)
+    risk_topics = sum(1 for t in topics if (t.get("weighted_sentiment") or 0) < -0.1)
+    bull_topics = sum(1 for t in topics if (t.get("weighted_sentiment") or 0) > 0.1)
+
+    # 3. Macro drivers & events
+    drivers = (macro.get("drivers") or []) if macro else []
+    events = (macro.get("events") or []) if macro else []
+    risk_drivers = sum(1 for d in drivers if d.get("impact") == "risk_off")
+    risk_events = sum(1 for e in events if (e.get("severity") or 0) >= 35 and (e.get("weighted_sentiment") or 0) < -0.1)
+    total_driver_strength = sum(d.get("strength", 0) or 0 for d in drivers)
+    risk_strength = sum(d.get("strength", 0) or 0 for d in drivers if d.get("impact") == "risk_off")
+
+    # 4. Region breadth
+    regions = (macro.get("region_summary") or []) if macro else []
+    asia_change = 0.0
+    for r in regions:
+        if r.get("region") == "Asia":
+            asia_change = r.get("avg_change_pct", 0) or 0
+
+    # 5. Score computation (scale: -100 to +100)
+    # Symbol sentiment component (weight: 25)
+    sym_score = avg_sent * 25 / 0.3  # normalize so 0.3 sentiment → full score
+    # Topic sentiment component (weight: 20)
+    top_score = topic_sent * 20 / 0.3
+    # Macro risk component (weight: 30) — more risk drivers = more negative
+    if total_driver_strength > 0:
+        risk_ratio = risk_strength / total_driver_strength
+    else:
+        risk_ratio = 0.5
+    macro_score = -(risk_ratio - 0.3) * 30 / 0.5  # 0.3 ratio is neutral
+    # Region breadth component (weight: 15)
+    region_score = asia_change * 15 / 2.0  # 2% move = full score
+    # Bull vs bear count component (weight: 10)
+    if bull_count + bear_count > 0:
+        breadth_score = (bull_count - bear_count) / (bull_count + bear_count) * 10
+    else:
+        breadth_score = 0.0
+
+    raw_score = sym_score + top_score + macro_score + region_score + breadth_score
+    score = max(-100, min(100, raw_score))
+
+    # Direction label
+    if score > 15:
+        direction = "BULLISH"
+        color = BLOOMBERG_GREEN
+    elif score < -15:
+        direction = "BEARISH"
+        color = BLOOMBERG_RED
+    else:
+        direction = "NEUTRAL"
+        color = BLOOMBERG_ORANGE
+
+    # Confidence (0-5): more agreement = higher confidence
+    signals = [sym_score > 0, top_score > 0, macro_score > 0, region_score > 0, breadth_score > 0]
+    agree = sum(1 for s in signals if s) if score > 0 else sum(1 for s in signals if not s)
+    confidence = min(5, max(1, agree))
+
+    # Key drivers text
+    key_drivers = []
+    for d in sorted(drivers, key=lambda x: x.get("strength", 0) or 0, reverse=True)[:3]:
+        key_drivers.append(f"{d.get('label', '?')} ({d.get('impact', '?')}, strength {d.get('strength', '?')})")
+    for e in sorted(events, key=lambda x: x.get("severity", 0) or 0, reverse=True)[:2]:
+        if e.get("headline"):
+            key_drivers.append(f"{e.get('label', '?')}: {e['headline'][:80]}")
+
+    return {
+        "direction": direction,
+        "score": round(score, 1),
+        "confidence": confidence,
+        "color": color,
+        "bull_count": bull_count,
+        "bear_count": bear_count,
+        "neutral_count": neutral_count,
+        "avg_symbol_sentiment": round(avg_sent, 3),
+        "avg_topic_sentiment": round(topic_sent, 3),
+        "risk_drivers": risk_drivers,
+        "risk_events": risk_events,
+        "total_drivers": len(drivers),
+        "asia_change_pct": round(asia_change, 2),
+        "key_drivers": key_drivers[:5],
+    }
+
+
 def build_news_tab(data: dict[str, Any]) -> list[Any]:
     paper = data["paper"]
     sentiment_df = data["sentiment_df"]
@@ -984,6 +1086,47 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("News and sentiment", [cards], "This covers both symbol-level sentiment and macro topic feeds used by the paper overlay."))
+
+    # ── MARKET PREDICTION ──
+    pred = compute_market_prediction(data)
+    pred_direction = pred["direction"]
+    pred_color = pred["color"]
+    pred_score = pred["score"]
+    pred_conf = pred["confidence"]
+    stars = "★" * pred_conf + "☆" * (5 - pred_conf)
+    pred_cards = html.Div(
+        [
+            html.Div(
+                [
+                    html.Div("TOMORROW'S MARKET", style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "1px"}),
+                    html.Div(pred_direction, style={"fontSize": "28px", "fontWeight": "800", "color": pred_color, "letterSpacing": "2px"}),
+                    html.Div(f"Score {pred_score:+.0f}/100  {stars}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                ],
+                style={**CARD_STYLE, "textAlign": "center", "minWidth": "200px", "padding": "16px"},
+            ),
+            html.Div(
+                [
+                    html.Div(f"Bullish symbols: {pred['bull_count']}", style={"fontSize": "12px", "color": BLOOMBERG_GREEN}),
+                    html.Div(f"Bearish symbols: {pred['bear_count']}", style={"fontSize": "12px", "color": BLOOMBERG_RED}),
+                    html.Div(f"Neutral symbols: {pred['neutral_count']}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                    html.Div(f"Avg symbol sentiment: {pred['avg_symbol_sentiment']:+.3f}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                    html.Div(f"Avg topic sentiment: {pred['avg_topic_sentiment']:+.3f}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                    html.Div(f"Risk drivers: {pred['risk_drivers']}/{pred['total_drivers']}", style={"fontSize": "12px", "color": BLOOMBERG_RED if pred['risk_drivers'] > pred['total_drivers'] // 2 else "#9ca3af"}),
+                    html.Div(f"Asia session: {pred['asia_change_pct']:+.2f}%", style={"fontSize": "12px", "color": BLOOMBERG_GREEN if pred['asia_change_pct'] > 0 else BLOOMBERG_RED if pred['asia_change_pct'] < 0 else "#9ca3af"}),
+                ],
+                style={**CARD_STYLE, "padding": "12px 16px", "minWidth": "180px"},
+            ),
+        ]
+        + [
+            html.Div(
+                [html.Div(kd, style={"fontSize": "11px", "color": "#9ca3af", "marginBottom": "4px"}) for kd in pred.get("key_drivers", [])],
+                style={**CARD_STYLE, "padding": "12px 16px", "flex": "1", "minWidth": "250px"},
+            )
+        ],
+        style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "alignItems": "stretch"},
+    )
+    children.append(section("Market prediction — next session", [pred_cards], "Based on symbol sentiment, topic sentiment, macro drivers, region breadth, and bull/bear counts. Score range: -100 (max bearish) to +100 (max bullish). NOT financial advice."))
+
     children.append(section("Active symbol sentiment", [table_from_df(sentiment_df, "sentiment-table", page_size=10)]))
     children.append(section("Market topics", [table_from_df(topics_df, "topics-table", page_size=10)]))
 
