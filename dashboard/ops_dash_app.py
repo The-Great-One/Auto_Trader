@@ -298,7 +298,7 @@ def load_telegram_channel_updates(limit: int = 120) -> pd.DataFrame:
             df[col] = pd.to_datetime(df[col], errors="coerce")
     if "text_excerpt" not in df.columns and "text" in df.columns:
         df["text_excerpt"] = df["text"].fillna("").astype(str).str.slice(0, 180)
-    wanted = [c for c in ["captured_at", "chat", "message_id", "date", "has_media", "media_kind", "media_path", "text_excerpt"] if c in df.columns]
+    wanted = [c for c in ["captured_at", "chat", "message_id", "date", "source", "has_media", "media_kind", "media_path", "text_excerpt"] if c in df.columns]
     if wanted:
         df = df[wanted]
     sort_col = "captured_at" if "captured_at" in df.columns else "date"
@@ -314,6 +314,16 @@ def load_telegram_receipts(limit: int = 120) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
     return df.sort_values("captured_at", ascending=False).head(limit) if "captured_at" in df.columns else df.head(limit)
+
+
+def load_telegram_latest_by_chat(limit: int = 20) -> pd.DataFrame:
+    updates = load_telegram_channel_updates(limit=500)
+    if updates.empty or "chat" not in updates.columns:
+        return pd.DataFrame()
+    sort_col = "date" if "date" in updates.columns else "captured_at"
+    latest = updates.sort_values(sort_col, ascending=False).drop_duplicates(subset=["chat"], keep="first")
+    cols = [c for c in ["chat", "date", "captured_at", "source", "has_media", "media_kind", "text_excerpt"] if c in latest.columns]
+    return latest[cols].sort_values(sort_col, ascending=False).head(limit) if cols else latest.head(limit)
 
 
 def load_sentiment_rows() -> pd.DataFrame:
@@ -476,6 +486,7 @@ def collect_data() -> dict[str, Any]:
     telegram_history = load_live_telegram_equity_history()
     telegram_backtests = load_telegram_options_table(limit=30)
     telegram_updates = load_telegram_channel_updates(limit=120)
+    telegram_latest_by_chat = load_telegram_latest_by_chat(limit=20)
     telegram_receipts = load_telegram_receipts(limit=120)
     server = fetch_server_snapshot()
     reports_df = recent_report_files(limit=120)
@@ -509,6 +520,7 @@ def collect_data() -> dict[str, Any]:
         "telegram_history": telegram_history,
         "telegram_backtests": telegram_backtests,
         "telegram_updates": telegram_updates,
+        "telegram_latest_by_chat": telegram_latest_by_chat,
         "telegram_receipts": telegram_receipts,
         "server": server,
         "sentiment_df": load_sentiment_rows(),
@@ -751,10 +763,12 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     backtests = data["telegram_backtests"]
     rulesets = data["telegram_rulesets"]
     updates = data.get("telegram_updates", pd.DataFrame())
+    latest_by_chat = data.get("telegram_latest_by_chat", pd.DataFrame())
     receipts = data.get("telegram_receipts", pd.DataFrame())
     children: list[Any] = []
 
     latest_update = updates.iloc[0].to_dict() if not updates.empty else {}
+    fallback_count = int((updates.get("source") == "public_fallback").sum()) if (not updates.empty and "source" in updates.columns) else 0
     cards = html.Div(
         [
             metric_card("Live equity", ledger.get("equity", "-"), "Telegram paper ledger"),
@@ -763,10 +777,14 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             metric_card("Open positions", len(ledger.get("open_positions") or []), "Telegram paper ledger"),
             metric_card("Watcher updates", len(updates), str(latest_update.get("chat") or "watch_channel_updates.jsonl")),
             metric_card("Latest watched post", latest_update.get("date", "-"), latest_update.get("text_excerpt", "")),
+            metric_card("Public fallback rows", fallback_count, "watch continuity when Telethon is unavailable"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("Telegram options paper", [cards]))
+
+    if not latest_by_chat.empty:
+        children.append(section("Latest post per watched channel", [table_from_df(latest_by_chat, "tg-latest-by-chat-table", page_size=8)], "Fast pulse view of the newest visible post from each tracked channel."))
 
     if not history.empty:
         fig = px.line(history, x="timestamp", y=[c for c in ["equity", "cash"] if c in history.columns], markers=True, title="Telegram live paper equity")
