@@ -23,7 +23,7 @@ LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity
 WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
 WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
 SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/Desktop/Sahil_Oracle_Keys/ssh-key-2024-10-12.key")))
-SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", ""))
+SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", "ubuntu@168.138.114.147"))
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
 COMBINED_LAB_STATUS_FILES = [
     "sizing_exit_sweep_latest.json",
