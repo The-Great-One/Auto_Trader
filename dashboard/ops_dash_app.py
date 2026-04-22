@@ -1762,6 +1762,7 @@ app.layout = html.Div(
             style={"borderBottom": f"1px solid #1e2a3a"},
         ),
         html.Div(id="tab-content", style={"marginTop": "12px"}),
+        dcc.Store(id="tab-click-ts", data=0),
     ],
 )
 
@@ -1796,6 +1797,20 @@ def refresh(_: int):
         traceback.print_exc()
         err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
         return err_msg, [], no_update
+
+
+app.clientside_callback(
+    """
+    function(tab) {
+        var el = document.getElementById('tab-content');
+        if (el) { el.innerHTML = '<div style=\'padding:40px;text-align:center;color:#5a6a7a;font-family:JetBrains Mono,monospace;font-size:13px;\'>Loading " + tab.toUpperCase() + "…</div>'; }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("tab-content", "children", allow_duplicate=True),
+    Input("main-tab", "value"),
+    prevent_initial_call=True,
+)
 
 
 @app.callback(
