@@ -464,16 +464,10 @@ def main() -> int:
         done_names = set(checkpoint.get("completed_names") or [])
         rows = list(checkpoint.get("rows") or [])
         data_context = checkpoint.get("data_context") or {}
-        data_map, fresh_data_context = load_5y_data(symbols)
-        if fresh_data_context:
-            data_context = fresh_data_context
     else:
         done_names = set()
         rows = []
-        data_map, data_context = load_5y_data(symbols)
-
-    if not data_map:
-        raise ValueError("No 5Y data loaded for 30% CAGR hunt")
+        data_context = {}
 
     best_row = max(rows, key=result_key, default=None)
     write_status(
@@ -494,6 +488,12 @@ def main() -> int:
             "best_drawdown_pct": (best_row or {}).get("drawdown_pct"),
         }
     )
+
+    data_map, fresh_data_context = load_5y_data(symbols)
+    if fresh_data_context:
+        data_context = fresh_data_context
+    if not data_map:
+        raise ValueError("No 5Y data loaded for 30% CAGR hunt")
 
     for idx, cfg in enumerate(variants, start=1):
         name = cfg["name"]
