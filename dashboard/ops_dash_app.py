@@ -1334,7 +1334,7 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
                     size=map_sizes, color=map_colors,
                     colorscale=[[0, BLOOMBERG_RED], [0.5, BLOOMBERG_ORANGE], [1, BLOOMBERG_GREEN]],
                     cmin=-3, cmax=3, line=dict(width=1, color="#1e2a3a"),
-                    colorbar=dict(title="% chg", thickness=10, tickfont=dict(size=9, color=BLOOMBERG_GRAY), title_font=dict(size=9, color=BLOOMBERG_GRAY)),
+                    colorbar=dict(title="% chg", thickness=10, x=1.12, xpad=24, tickfont=dict(size=9, color=BLOOMBERG_GRAY), title_font=dict(size=9, color=BLOOMBERG_GRAY)),
                 ),
                 mode="markers+text", textposition="top center",
                 textfont=dict(size=9, color="#c0c0c0"),
@@ -1365,7 +1365,7 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
             paper_bgcolor="#030712", plot_bgcolor="#111827",
             margin=dict(l=0, r=0, t=30, b=0),
             height=720,
-            legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY)),
+            legend=dict(font=dict(size=10, color=BLOOMBERG_GRAY), x=1.02, y=1, xanchor="left"),
         )
         fig.update_layout(title_font=dict(size=12, color=BLOOMBERG_ORANGE))
         children.append(section("WORLD MAP — markets & event hotspots", [dcc.Graph(figure=fig, style={"height": "78vh", "minHeight": "720px"})], "Green = up, Red = down ◆ = geopolitical event severity"))
