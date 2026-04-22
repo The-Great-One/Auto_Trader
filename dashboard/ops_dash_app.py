@@ -5,7 +5,7 @@ import math
 import os
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -33,33 +33,59 @@ COMBINED_LAB_STATUS_FILES = [
     "meta_label_lab_latest.json",
 ]
 SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+LAST_COMPACT_TS: float = 0.0
+COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def to_ist(dt_str: str | None) -> str:
+    """Convert UTC/ISO timestamp to IST display string."""
+    if not dt_str:
+        return "-"
+    try:
+        dt = pd.Timestamp(dt_str)
+        if pd.isna(dt):
+            return "-"
+        if dt.tzinfo is None:
+            dt = dt.tz_localize("UTC")
+        dt = dt.tz_convert(IST)
+        return dt.strftime("%b %d, %H:%M")
+    except Exception:
+        return str(dt_str)
 
 PAGE_STYLE = {
-    "background": "#030712",
-    "color": "#f9fafb",
+    "background": "#0a0e17",
+    "color": "#e0e0e0",
     "minHeight": "100vh",
-    "padding": "20px",
-    "fontFamily": "Inter, sans-serif",
+    "padding": "12px",
+    "fontFamily": "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
+    "fontSize": "13px",
 }
 CARD_STYLE = {
     "background": "#111827",
-    "border": "1px solid #1f2937",
-    "borderRadius": "14px",
-    "padding": "16px",
+    "border": "1px solid #1e2a3a",
+    "borderRadius": "4px",
+    "padding": "12px",
 }
+BLOOMBERG_ORANGE = "#f5a623"
+BLOOMBERG_GREEN = "#00ff88"
+BLOOMBERG_RED = "#ff4444"
+BLOOMBERG_BLUE = "#4fc3f7"
+BLOOMBERG_YELLOW = "#ffd600"
+BLOOMBERG_GRAY = "#8899aa"
 TABLE_STYLE = {"overflowX": "auto"}
 TABLE_CELL_STYLE = {
-    "backgroundColor": "#111827",
-    "color": "#f9fafb",
-    "border": "1px solid #1f2937",
+    "backgroundColor": "#0a0e17",
+    "color": "#e0e0e0",
+    "border": "1px solid #1e2a3a",
     "textAlign": "left",
-    "padding": "8px",
+    "padding": "6px 8px",
     "whiteSpace": "normal",
     "height": "auto",
-    "fontSize": "13px",
+    "fontSize": "12px",
+    "fontFamily": "'JetBrains Mono', monospace",
 }
-TABLE_HEADER_STYLE = {"backgroundColor": "#0f172a", "fontWeight": "bold", "color": "#f9fafb"}
+TABLE_HEADER_STYLE = {"backgroundColor": "#111827", "fontWeight": "bold", "color": BLOOMBERG_ORANGE, "border": "1px solid #1e2a3a", "padding": "6px 8px", "fontSize": "11px", "letterSpacing": "0.5px"}
 
 
 def load_json(path: Path) -> dict[str, Any] | list[Any] | None:
@@ -98,7 +124,11 @@ def recent_telegram_options_reports(limit: int = 20) -> list[tuple[Path, dict[st
     return rows
 
 
-def load_jsonl(path: Path) -> list[dict[str, Any]]:
+MAX_JSONL_LINES = 5000
+MAX_JSONL_BYTES = 5 * 1024 * 1024  # 5 MB – compact if larger
+
+
+def load_jsonl(path: Path, limit: int | None = None) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     rows: list[dict[str, Any]] = []
@@ -111,7 +141,56 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
             continue
         if isinstance(parsed, dict):
             rows.append(parsed)
+    if limit is not None and len(rows) > limit:
+        rows = rows[-limit:]
     return rows
+
+
+def compact_jsonl(path: Path, max_lines: int = MAX_JSONL_LINES, max_bytes: int = MAX_JSONL_BYTES) -> bool:
+    """Compact a JSONL file if it exceeds size or line limits.
+
+    Keeps only the most recent *max_lines* entries. Returns True if compaction
+    was performed, False if the file was already within limits.
+    """
+    if not path.exists():
+        return False
+    try:
+        size = path.stat().st_size
+        if size <= max_bytes and size <= 1_000_000:
+            # Quick check: small file, count lines cheaply
+            line_count = sum(1 for _ in open(path))
+            if line_count <= max_lines:
+                return False
+        lines = path.read_text().splitlines()
+        if len(lines) <= max_lines:
+            return False
+        kept = lines[-max_lines:]
+        path.write_text("\n".join(kept) + "\n")
+        print(f"[compact] {path.name}: {len(lines)} → {len(kept)} lines ({size} → {path.stat().st_size} bytes)")
+        return True
+    except Exception as exc:
+        print(f"[compact] {path.name}: error – {exc}")
+        return False
+
+
+COMPACT_JSONL_PATHS = [
+    WATCH_UPDATES_PATH,
+    WATCH_RECEIPTS_PATH,
+    LIVE_TELEGRAM_LEDGER_HISTORY,
+]
+
+
+def compact_all_jsonl() -> int:
+    """Run compaction on all known JSONL files. Returns count of compacted files."""
+    count = 0
+    for p in COMPACT_JSONL_PATHS:
+        if compact_jsonl(p):
+            count += 1
+    # Also check server-side JSONL archives via glob
+    for p in REPORTS_DIR.glob("*_history.jsonl"):
+        if compact_jsonl(p, max_lines=2000, max_bytes=MAX_JSONL_BYTES):
+            count += 1
+    return count
 
 
 def to_df(items: Any) -> pd.DataFrame:
@@ -138,6 +217,21 @@ def friendly(v: Any) -> str:
     return str(v)
 
 
+def fmt_pnl(val: float | None, prefix: str = "") -> str:
+    """Format PnL with sign and color hint."""
+    if val is None:
+        return "-"
+    sign = "+" if val > 0 else ""
+    return f"{prefix}{sign}{val:,.2f}"
+
+
+def fmt_pct(val: float | None) -> str:
+    """Format percentage with sign."""
+    if val is None:
+        return "-"
+    return f"{val:+.2f}%" if val != 0 else "0.00%"
+
+
 def safe_num(v: Any) -> float | None:
     try:
         if v is None:
@@ -149,21 +243,43 @@ def safe_num(v: Any) -> float | None:
 
 
 def metric_card(title: str, value: Any, subtitle: str | None = None) -> html.Div:
+    val_str = friendly(value)
+    # Color-code the value based on content
+    val_style = {"fontSize": "20px", "fontWeight": "700", "marginTop": "4px", "fontFamily": "'JetBrains Mono', monospace"}
+    if isinstance(value, (int, float)):
+        if value > 0:
+            val_style["color"] = BLOOMBERG_GREEN
+        elif value < 0:
+            val_style["color"] = BLOOMBERG_RED
+        else:
+            val_style["color"] = BLOOMBERG_ORANGE
+    else:
+        val_str_color = str(value).lower()
+        if val_str_color in ("active", "running", "ok", "true", "yes"):
+            val_style["color"] = BLOOMBERG_GREEN
+        elif val_str_color in ("stopped", "failed", "error", "false", "no"):
+            val_style["color"] = BLOOMBERG_RED
+        elif "sell" in val_str_color or "down" in val_str_color:
+            val_style["color"] = BLOOMBERG_RED
+        elif "buy" in val_str_color or "up" in val_str_color:
+            val_style["color"] = BLOOMBERG_GREEN
+        else:
+            val_style["color"] = BLOOMBERG_ORANGE
     return html.Div(
         [
-            html.Div(title, style={"fontSize": "14px", "color": "#9ca3af"}),
-            html.Div(friendly(value), style={"fontSize": "28px", "fontWeight": "700", "marginTop": "6px"}),
-            html.Div(subtitle or "", style={"fontSize": "12px", "color": "#94a3b8", "marginTop": "4px"}),
+            html.Div(title.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "1px", "fontWeight": "600"}),
+            html.Div(val_str, style=val_style),
+            html.Div(subtitle or "", style={"fontSize": "11px", "color": "#5a6a7a", "marginTop": "2px"}),
         ],
-        style={**CARD_STYLE, "flex": "1", "minWidth": "180px"},
+        style={**CARD_STYLE, "flex": "1", "minWidth": "150px"},
     )
 
 
 def section(title: str, children: list[Any], subtitle: str | None = None) -> html.Div:
-    header = [html.H3(title, style={"marginBottom": "6px"})]
+    header = [html.Div(title.upper(), style={"fontSize": "12px", "fontWeight": "700", "color": BLOOMBERG_ORANGE, "letterSpacing": "1px", "borderBottom": f"1px solid {BLOOMBERG_ORANGE}", "paddingBottom": "4px", "marginBottom": "8px"})]
     if subtitle:
-        header.append(html.Div(subtitle, style={"color": "#94a3b8", "marginBottom": "12px"}))
-    return html.Div(header + children, style={"marginTop": "18px"})
+        header.append(html.Div(subtitle, style={"color": "#5a6a7a", "marginBottom": "8px", "fontSize": "11px"}))
+    return html.Div(header + children, style={"marginTop": "14px"})
 
 
 def empty_message(text: str) -> html.Div:
@@ -186,7 +302,13 @@ def table_from_df(df: pd.DataFrame, table_id: str, page_size: int = 10) -> dash_
     show = df.copy()
     for col in show.columns:
         if pd.api.types.is_datetime64_any_dtype(show[col]):
-            show[col] = show[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                show[col] = show[col].dt.tz_convert(IST)
+            except Exception:
+                pass
+            show[col] = show[col].dt.strftime("%b %d, %H:%M")
+    # Sanitize NaN/Inf — these cause Dash "Invalid value" errors
+    show = show.fillna("-").replace([float("inf"), float("-inf")], "-")
     return dash_table.DataTable(
         id=table_id,
         data=show.to_dict("records"),
@@ -277,7 +399,7 @@ def load_live_telegram_ledger() -> dict[str, Any]:
 
 
 def load_live_telegram_equity_history() -> pd.DataFrame:
-    rows = load_jsonl(LIVE_TELEGRAM_LEDGER_HISTORY)
+    rows = load_jsonl(LIVE_TELEGRAM_LEDGER_HISTORY, limit=2000)
     if not rows:
         return pd.DataFrame(columns=["timestamp", "equity", "cash"])
     df = pd.DataFrame(rows)
@@ -289,7 +411,7 @@ def load_live_telegram_equity_history() -> pd.DataFrame:
 
 
 def load_telegram_channel_updates(limit: int = 120) -> pd.DataFrame:
-    rows = load_jsonl(WATCH_UPDATES_PATH)
+    rows = load_jsonl(WATCH_UPDATES_PATH, limit=MAX_JSONL_LINES)
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
@@ -306,7 +428,7 @@ def load_telegram_channel_updates(limit: int = 120) -> pd.DataFrame:
 
 
 def load_telegram_receipts(limit: int = 120) -> pd.DataFrame:
-    rows = load_jsonl(WATCH_RECEIPTS_PATH)
+    rows = load_jsonl(WATCH_RECEIPTS_PATH, limit=MAX_JSONL_LINES)
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
@@ -466,6 +588,16 @@ journalctl -u auto_trade.service -n 15 --no-pager || true
 
 
 def collect_data() -> dict[str, Any]:
+    # Periodic JSONL compaction
+    global LAST_COMPACT_TS
+    now = time.time()
+    if now - LAST_COMPACT_TS > COMPACT_INTERVAL_SECONDS:
+        try:
+            compact_all_jsonl()
+        except Exception:
+            pass
+        LAST_COMPACT_TS = now
+
     scorecard_path, scorecard = latest_report("daily_scorecard_*.json")
     ops_path, daily_ops = latest_report("daily_ops_supervisor_*.json")
     portfolio_path, portfolio = latest_report("portfolio_intel_*.json")
@@ -491,7 +623,7 @@ def collect_data() -> dict[str, Any]:
     server = fetch_server_snapshot()
     reports_df = recent_report_files(limit=120)
     return {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST"),
         "scorecard_path": scorecard_path.name if scorecard_path else None,
         "scorecard": scorecard or {},
         "daily_ops_path": ops_path.name if ops_path else None,
@@ -592,14 +724,29 @@ def build_overview_tab(data: dict[str, Any]) -> list[Any]:
         fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827")
         children.append(section("Paper capital curve", [dcc.Graph(figure=fig)]))
 
-    snapshots = html.Div(
-        [
-            html.Div([html.H4("Latest daily ops"), html.Pre(json.dumps(daily_ops, indent=2, default=str), style={"whiteSpace": "pre-wrap"})], style={**CARD_STYLE, "flex": "1", "minWidth": "320px"}),
-            html.Div([html.H4("Latest hourly lab snapshot"), html.Pre(json.dumps(hourly, indent=2, default=str), style={"whiteSpace": "pre-wrap"})], style={**CARD_STYLE, "flex": "1", "minWidth": "320px"}),
-        ],
-        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
-    )
-    children.append(section("Current snapshots", [snapshots]))
+    # Clean summary cards instead of raw JSON
+    ops_summary_items = []
+    for label, val in [
+        ('Trade date', daily_ops.get('trade_date')),
+        ('Market open', daily_ops.get('market_open')),
+        ('Strategy OK', (daily_ops.get('strategy_test') or {}).get('ok')),
+        ('Paper executed', (daily_ops.get('paper_trader') or {}).get('paper_executed')),
+        ('Paper decision', (daily_ops.get('paper_trader') or {}).get('decision')),
+    ]:
+        if val is not None:
+            ops_summary_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700"})], style={"display": "inline-block", "marginRight": "16px"}))
+    if ops_summary_items:
+        children.append(section("Daily ops summary", [html.Div(ops_summary_items, style=CARD_STYLE)]))
+
+    hourly_summary_items = []
+    hourly_data = hourly or {}
+    hourly_status = (hourly_data.get('status') or {}).get('status', '-')
+    hourly_msg = (hourly_data.get('status') or {}).get('message', '')
+    hourly_summary_items.append(html.Div([
+        html.Span(f"STATUS: {hourly_status}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_GREEN if hourly_status == 'running' else BLOOMBERG_ORANGE}),
+        html.Span(f"  {hourly_msg}", style={"fontSize": "11px", "color": "#5a6a7a"}),
+    ]))
+    children.append(section("Lab status", hourly_summary_items))
     return children
 
 
@@ -623,22 +770,17 @@ def build_runtime_tab(data: dict[str, Any]) -> list[Any]:
 
     children.append(section("Recent server reports", [table_from_df(to_df([{"report": x} for x in server.get("recent_reports", [])]), "server-reports", page_size=10)]))
     children.append(section("Latest scorecard", [table_from_df(to_df([scorecard]), "runtime-scorecard", page_size=5)]))
-    children.append(section("Latest daily ops", [table_from_df(to_df([{
-        "trade_date": daily_ops.get("trade_date"),
-        "market_open": daily_ops.get("market_open"),
-        "strategy_ok": (daily_ops.get("strategy_test") or {}).get("ok"),
-        "paper_executed": (daily_ops.get("paper_trader") or {}).get("paper_executed"),
-        "paper_decision": (daily_ops.get("paper_trader") or {}).get("decision"),
-        "autopromote_reason": (daily_ops.get("autopromote") or {}).get("reason"),
-    }]), "runtime-dailyops", page_size=5)]))
-    children.append(section("Latest options supervisor", [table_from_df(to_df([{
-        "trade_date": options_supervisor.get("trade_date"),
-        "fetch_ok": (options_supervisor.get("fetch") or {}).get("ok"),
-        "paper_ok": (options_supervisor.get("paper_shadow") or {}).get("ok"),
-        "lab_ok": (options_supervisor.get("options_lab") or {}).get("ok"),
-    }]), "runtime-options-supervisor", page_size=5)]))
+    # Daily ops and options supervisor as clean summary cards
+    ops_data = daily_ops or {}
+    ops_items = []
+    for label, val in [('Trade date', ops_data.get('trade_date')), ('Market open', ops_data.get('market_open')), ('Strategy OK', (ops_data.get('strategy_test') or {}).get('ok')), ('Paper decision', (ops_data.get('paper_trader') or {}).get('decision'))]:
+        if val is not None:
+            ops_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700"})], style={"display": "inline-block", "marginRight": "16px"}))
+    if ops_items:
+        children.append(section("Daily ops", [html.Div(ops_items, style=CARD_STYLE)]))
+
     if server.get("journal"):
-        children.append(section("Recent service logs", [html.Pre("\n".join(server["journal"]), style={**CARD_STYLE, "whiteSpace": "pre-wrap", "overflowX": "auto"})]))
+        children.append(section("Recent service logs", [html.Pre("\n".join(server["journal"][-8:]), style={**CARD_STYLE, "whiteSpace": "pre-wrap", "overflowX": "auto", "fontSize": "11px", "fontFamily": "'JetBrains Mono', monospace", "color": "#8899aa"})]))
     return children
 
 
@@ -708,14 +850,20 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
     closed_df = to_df(ledger.get("closed_positions") or [])
     near_miss_df = to_df((options_paper.get("near_miss_candidates") or [])[:20])
 
-    two_col = html.Div(
-        [
-            html.Div([html.H4("Equity paper snapshot"), html.Pre(json.dumps(paper, indent=2, default=str), style={"whiteSpace": "pre-wrap"})], style={**CARD_STYLE, "flex": "1", "minWidth": "340px"}),
-            html.Div([html.H4("Live paper snapshot"), html.Pre(json.dumps(live_paper, indent=2, default=str), style={"whiteSpace": "pre-wrap"})], style={**CARD_STYLE, "flex": "1", "minWidth": "340px"}),
-        ],
-        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
-    )
-    children.append(section("Snapshots", [two_col]))
+    # Paper snapshot as clean cards instead of raw JSON
+    paper_items = []
+    if paper:
+        for label, key, fmt in [('Decision', 'decision', str), ('Symbol', 'symbol', str), ('Score', 'selection_score', lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else str(x))]:
+            val = paper.get(key)
+            if val is not None:
+                paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {fmt(val)}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
+    if live_paper:
+        for label, key in [('Live mode', 'mode'), ('Time', 'time')]:
+            val = live_paper.get(key)
+            if val:
+                paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
+    if paper_items:
+        children.append(section("Paper trading state", [html.Div(paper_items, style={**CARD_STYLE, "display": "flex", "flexWrap": "wrap", "gap": "8px"})]))
 
     children.append(section("Open Telegram paper positions", [table_from_df(open_df, "paper-open-table", page_size=10)]))
     children.append(section("Closed Telegram paper positions", [table_from_df(closed_df, "paper-closed-table", page_size=10)]))
@@ -748,69 +896,165 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
     if symbol_news:
         children.append(section("Current paper symbol news", [html.Ul([html.Li(x) for x in (symbol_news.get("sample_headlines") or [])], style=CARD_STYLE)]))
 
-    active = (news_payload.get("active") or [])[:3] if isinstance(news_payload, dict) else []
-    for idx, item in enumerate(active, start=1):
-        children.append(json_block(item, f"Sentiment snapshot {idx}: {item.get('symbol', 'unknown')}"))
-    topics = (topics_payload.get("topics") or [])[:2] if isinstance(topics_payload, dict) else []
-    for idx, item in enumerate(topics, start=1):
-        children.append(json_block(item, f"Market topic {idx}: {item.get('label', item.get('topic', 'unknown'))}"))
+    # Summarize active sentiments as cards instead of raw JSON
+    active_items = (news_payload.get("active") or [])[:5] if isinstance(news_payload, dict) else []
+    if active_items:
+        sentiment_rows = []
+        for item in active_items:
+            sym = item.get("symbol", "?")
+            sent = item.get("weighted_sentiment", 0) or 0
+            sent_color = BLOOMBERG_GREEN if sent > 0.1 else BLOOMBERG_RED if sent < -0.1 else BLOOMBERG_ORANGE
+            block_buy = (item.get("trade_bias") or {}).get("block_buy", False)
+            force_sell = (item.get("trade_bias") or {}).get("force_sell", False)
+            bias_str = "BLOCK BUY" if block_buy else ("FORCE SELL" if force_sell else "neutral")
+            sentiment_rows.append(
+                html.Div([
+                    html.Span(sym, style={"fontWeight": "700", "fontSize": "13px"}),
+                    html.Span(f"  {sent:+.2f}", style={"fontSize": "13px", "color": sent_color, "fontWeight": "700"}),
+                    html.Span(f"  [{bias_str}]", style={"fontSize": "11px", "color": BLOOMBERG_GRAY}),
+                ], style={**CARD_STYLE, "marginBottom": "4px", "padding": "8px 12px"})
+            )
+        children.append(section("Active sentiment signals", sentiment_rows))
+
+    # Summarize topics as cards
+    topic_items = (topics_payload.get("topics") or [])[:5] if isinstance(topics_payload, dict) else []
+    if topic_items:
+        topic_rows = []
+        for item in topic_items:
+            topic = item.get("topic", "?")
+            label = item.get("label", "")
+            sent = item.get("weighted_sentiment", 0) or 0
+            sent_color = BLOOMBERG_GREEN if sent > 0.1 else BLOOMBERG_RED if sent < -0.1 else BLOOMBERG_ORANGE
+            topic_rows.append(
+                html.Div([
+                    html.Span(label or topic, style={"fontWeight": "700", "fontSize": "13px"}),
+                    html.Span(f"  {sent:+.2f}", style={"fontSize": "13px", "color": sent_color, "fontWeight": "700"}),
+                ], style={**CARD_STYLE, "marginBottom": "4px", "padding": "8px 12px"})
+            )
+        children.append(section("Market topics", topic_rows))
     return children
 
 
 def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     ledger = data["telegram_ledger"]
     history = data["telegram_history"]
-    backtests = data["telegram_backtests"]
-    rulesets = data["telegram_rulesets"]
     updates = data.get("telegram_updates", pd.DataFrame())
     latest_by_chat = data.get("telegram_latest_by_chat", pd.DataFrame())
-    receipts = data.get("telegram_receipts", pd.DataFrame())
     children: list[Any] = []
 
-    latest_update = updates.iloc[0].to_dict() if not updates.empty else {}
-    fallback_count = int((updates.get("source") == "public_fallback").sum()) if (not updates.empty and "source" in updates.columns) else 0
-    cards = html.Div(
+    # ── Portfolio metrics ──
+    equity = ledger.get("equity", 0)
+    cash = ledger.get("cash", 0)
+    starting = ledger.get("starting_capital", 100000)
+    realized = ledger.get("realized_pnl", 0)
+    unrealized = ledger.get("unrealized_pnl", 0)
+    net_pnl = (realized or 0) + (unrealized or 0)
+    net_pct = net_pnl / starting * 100 if starting else 0
+    open_pos = ledger.get("open_positions", [])
+    closed_pos = ledger.get("closed_positions", [])
+    updated_at = to_ist(ledger.get("updated_at"))
+
+    metrics = html.Div(
         [
-            metric_card("Live equity", ledger.get("equity", "-"), "Telegram paper ledger"),
-            metric_card("Cash", ledger.get("cash", "-"), "Telegram paper ledger"),
-            metric_card("Unrealized PnL", ledger.get("unrealized_pnl", "-"), "Telegram paper ledger"),
-            metric_card("Open positions", len(ledger.get("open_positions") or []), "Telegram paper ledger"),
-            metric_card("Watcher updates", len(updates), str(latest_update.get("chat") or "watch_channel_updates.jsonl")),
-            metric_card("Latest watched post", latest_update.get("date", "-"), latest_update.get("text_excerpt", "")),
-            metric_card("Public fallback rows", fallback_count, "watch continuity when Telethon is unavailable"),
+            metric_card("Portfolio", f"₹{equity:,.0f}" if isinstance(equity, (int, float)) else "-", f"Updated {updated_at}"),
+            metric_card("Net PnL", fmt_pnl(net_pnl, "₹"), fmt_pct(net_pct)),
+            metric_card("Realized", fmt_pnl(realized, "₹"), "Booked"),
+            metric_card("Unrealized", fmt_pnl(unrealized, "₹"), "Open MTM"),
+            metric_card("Open", len(open_pos), "positions"),
+            metric_card("Closed", len(closed_pos), "positions"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
-    children.append(section("Telegram options paper", [cards]))
+    children.append(section("Portfolio", [metrics]))
 
-    if not latest_by_chat.empty:
-        children.append(section("Latest post per watched channel", [table_from_df(latest_by_chat, "tg-latest-by-chat-table", page_size=8)], "Fast pulse view of the newest visible post from each tracked channel."))
+    # ── Open positions ──
+    if open_pos:
+        rows = []
+        for p in open_pos:
+            entry = p.get("entry_price", 0)
+            last = p.get("last_price", 0)
+            mtm = p.get("mtm_return_pct", 0) or 0
+            pnl = p.get("mtm_pnl", 0) or 0
+            tgt = p.get("targets_hit", [])
+            sl = p.get("stop_loss", "-")
+            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if mtm > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if mtm < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
+            rows.append(
+                html.Div(
+                    [
+                        html.Div([
+                            html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
+                            html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"}),
+                        ], style={"flex": "1"}),
+                        html.Div(f"Entry ₹{entry} → Last ₹{last}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                        html.Div(f"{mtm:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                        html.Div(f"SL: {sl} | Targets hit: {tgt if tgt else '-'}", style={"fontSize": "11px", "color": "#6b7280"}),
+                    ],
+                    style={**CARD_STYLE, "marginBottom": "8px"},
+                )
+            )
+        children.append(section(f"Open positions ({len(open_pos)})", rows))
+    else:
+        children.append(section("Open positions", [empty_message("No open positions")]))
 
+    # ── Closed positions ──
+    if closed_pos:
+        rows = []
+        for p in closed_pos:
+            pnl = p.get("pnl", 0) or 0
+            ret = p.get("return_pct", 0) or 0
+            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if pnl < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN}
+            rows.append(
+                html.Div(
+                    [
+                        html.Div([
+                            html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
+                            html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"}),
+                        ], style={"flex": "1"}),
+                        html.Div(f"{ret:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                        html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+                    ],
+                    style={**CARD_STYLE, "marginBottom": "8px"},
+                )
+            )
+        children.append(section(f"Closed positions ({len(closed_pos)})", rows))
+
+    # ── Equity curve ──
     if not history.empty:
-        fig = px.line(history, x="timestamp", y=[c for c in ["equity", "cash"] if c in history.columns], markers=True, title="Telegram live paper equity")
-        fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827")
+        fig = px.line(history, x="timestamp", y=[c for c in ["equity", "cash"] if c in history.columns], markers=False)
+        fig.update_layout(
+            template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827",
+            margin=dict(l=40, r=20, t=30, b=30),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+            xaxis_title="", yaxis_title="₹",
+            title=dict(text="Equity curve", font=dict(size=14)),
+        )
+        # Convert x-axis timestamps to IST
+        if not history.empty and "timestamp" in history.columns:
+            fig.update_xaxes(tickformat="%b %d %H:%M")
         children.append(section("Equity curve", [dcc.Graph(figure=fig)]))
 
-    children.append(section("Open positions", [table_from_df(to_df(ledger.get("open_positions") or []), "tg-open-table", page_size=10)]))
-    children.append(section("Closed positions", [table_from_df(to_df(ledger.get("closed_positions") or []), "tg-closed-table", page_size=10)]))
-    children.append(section("Watched channel updates", [table_from_df(updates, "tg-channel-updates-table", page_size=12)]))
-    if not receipts.empty:
-        children.append(section("Watcher receipts", [table_from_df(receipts, "tg-receipts-table", page_size=10)]))
-    children.append(section("Backtest archive", [table_from_df(backtests.sort_values("generated_at", ascending=False) if not backtests.empty else backtests, "tg-backtests-table", page_size=12)]))
+    # ── Latest channel posts ──
+    if not latest_by_chat.empty:
+        display = latest_by_chat.copy()
+        for col in ["date", "captured_at"]:
+            if col in display.columns:
+                display[col] = display[col].apply(lambda x: to_ist(str(x)) if pd.notna(x) else "-")
+        if "text_excerpt" in display.columns:
+            display["text_excerpt"] = display["text_excerpt"].fillna("").astype(str).str.slice(0, 120)
+        cols = [c for c in ["chat", "date", "text_excerpt"] if c in display.columns]
+        children.append(section("Latest channel posts", [table_from_df(display[cols], "tg-latest-by-chat-table", page_size=8)], "Newest post from each tracked channel."))
 
-    if isinstance(rulesets, dict) and rulesets.get("rulesets"):
-        rules_rows = []
-        for name, payload in (rulesets.get("rulesets") or {}).items():
-            rules_rows.append(
-                {
-                    "ruleset": name,
-                    "use_case": payload.get("use_case"),
-                    "confidence": payload.get("confidence"),
-                    "signals": (payload.get("evidence") or {}).get("signals"),
-                }
-            )
-        children.append(section("Channel scoring rules", [table_from_df(pd.DataFrame(rules_rows), "tg-rulesets-table", page_size=10)]))
-        children.append(json_block(rulesets, f"Telegram rulesets raw, {data.get('rulesets_path') or 'latest'}"))
+    # ── Recent channel updates ──
+    if not updates.empty:
+        display = updates.head(30).copy()
+        for col in ["date", "captured_at"]:
+            if col in display.columns:
+                display[col] = display[col].apply(lambda x: to_ist(str(x)) if pd.notna(x) else "-")
+        if "text_excerpt" in display.columns:
+            display["text_excerpt"] = display["text_excerpt"].fillna("").astype(str).str.slice(0, 100)
+        cols = [c for c in ["chat", "date", "message_id", "text_excerpt"] if c in display.columns]
+        children.append(section("Recent updates", [table_from_df(display[cols], "tg-channel-updates-table", page_size=15)], "Last 30 channel messages."))
+
     return children
 
 
@@ -858,26 +1102,48 @@ def build_research_tab(data: dict[str, Any]) -> list[Any]:
     if not iteration_items.empty:
         children.append(section("Options iteration plan", [table_from_df(iteration_items, "research-iteration-table", page_size=8)]))
 
-    children.append(json_block(hourly, f"Hourly lab status raw, {REPORTS_DIR / 'hourly_lab_status_latest.json'}"))
-    children.append(json_block(options_supervisor, f"Options supervisor raw, {data.get('options_supervisor_path') or 'latest'}"))
-    children.append(json_block(improvement, f"Improvement audit raw, {data.get('improvement_path') or 'latest'}"))
+    # Hourly lab status as clean card
+    if hourly:
+        lab_status = (hourly.get("status") or {}).get("status", "?")
+        lab_msg = (hourly.get("status") or {}).get("message", "")
+        children.append(section("Lab status", [
+            html.Div([
+                html.Div(lab_status.upper(), style={"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN if lab_status == "running" else BLOOMBERG_ORANGE}),
+                html.Div(lab_msg, style={"fontSize": "11px", "color": "#5a6a7a", "marginTop": "2px"}),
+            ], style=CARD_STYLE),
+        ]))
+
+    # Options supervisor as clean card
+    if options_supervisor:
+        opt_fetch = (options_supervisor.get("fetch") or {}).get("ok", "?")
+        opt_paper = (options_supervisor.get("paper_shadow") or {}).get("ok", "?")
+        opt_lab = (options_supervisor.get("options_lab") or {}).get("ok", "?")
+        children.append(section("Options supervisor", [
+            html.Div([
+                html.Span(f"Fetch: {opt_fetch}  ", style={"fontSize": "12px", "color": BLOOMBERG_GREEN if opt_fetch else BLOOMBERG_RED}),
+                html.Span(f"Paper: {opt_paper}  ", style={"fontSize": "12px", "color": BLOOMBERG_GREEN if opt_paper else BLOOMBERG_RED}),
+                html.Span(f"Lab: {opt_lab}", style={"fontSize": "12px", "color": BLOOMBERG_GREEN if opt_lab else BLOOMBERG_RED}),
+            ], style=CARD_STYLE),
+        ]))
     return children
 
 
 def build_reports_tab(data: dict[str, Any]) -> list[Any]:
     reports_df = data["reports_df"]
-    children: list[Any] = [section("Recent report files", [table_from_df(reports_df, "reports-table", page_size=20)], "Everything currently being generated locally ends up here." )]
-    latest_jsons = [
-        ("Daily scorecard", data["scorecard"]),
-        ("Daily ops supervisor", data["daily_ops"]),
-        ("Portfolio intel", data["portfolio"]),
+    children: list[Any] = [section("Recent report files", [table_from_df(reports_df, "reports-table", page_size=20)], "All generated reports on disk.")]
+    # Clean summary cards for key reports
+    for title, payload in [
+        ("Scorecard", data["scorecard"]),
+        ("Portfolio", data["portfolio"]),
         ("Paper shadow", data["paper"]),
-        ("Live paper shadow", data["live_paper"]),
-        ("Options paper shadow", data["options_paper"]),
-    ]
-    for title, payload in latest_jsons:
-        if payload:
-            children.append(json_block(payload, title))
+    ]:
+        if payload and isinstance(payload, dict):
+            items = []
+            for k, v in list(payload.items())[:6]:
+                if isinstance(v, (str, int, float, bool, type(None))):
+                    items.append(html.Div([html.Span(k.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY}), html.Span(f" {v}", style={"fontSize": "13px", "fontWeight": "700"})], style={"display": "inline-block", "marginRight": "16px"}))
+            if items:
+                children.append(section(f"{title} summary", [html.Div(items, style=CARD_STYLE)]))
     return children
 
 
@@ -942,48 +1208,121 @@ def table_payload(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str
     show = df.copy()
     for col in show.columns:
         if pd.api.types.is_datetime64_any_dtype(show[col]):
-            show[col] = show[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                show[col] = show[col].dt.tz_convert(IST)
+            except Exception:
+                pass
+            show[col] = show[col].dt.strftime("%b %d, %H:%M")
     return show.to_dict("records"), [{"name": c, "id": c} for c in show.columns]
 
 
 app = Dash(__name__)
 app.title = "Auto Trader Ops"
 app.config.suppress_callback_exceptions = True
+app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%css%}
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+            /* Bloomberg-style tab overrides */
+            .tab-container .tab {
+                padding: 8px 14px !important;
+                font-family: 'JetBrains Mono', monospace !important;
+                font-size: 11px !important;
+                letter-spacing: 1px !important;
+                font-weight: 600 !important;
+                color: #8899aa !important;
+                border: 1px solid #1e2a3a !important;
+                border-bottom: none !important;
+                background: #0a0e17 !important;
+                cursor: pointer !important;
+                transition: all 0.15s ease !important;
+            }
+            .tab-container .tab--selected {
+                color: #f5a623 !important;
+                background: #111827 !important;
+                border-color: #f5a623 !important;
+                border-bottom: 2px solid #f5a623 !important;
+            }
+            .tab-container .tab:hover {
+                color: #f5a623 !important;
+                background: #111827 !important;
+            }
+            .tab-container {
+                border-bottom: 1px solid #1e2a3a !important;
+                margin-bottom: 4px !important;
+            }
+            /* Fix Dash table styling */
+            .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+                font-family: 'JetBrains Mono', monospace !important;
+                font-size: 11px !important;
+                color: #f5a623 !important;
+            }
+            .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td {
+                font-family: 'JetBrains Mono', monospace !important;
+                font-size: 12px !important;
+            }
+            /* Remove Dash default margins */
+            ._dash-app-content { padding: 0 !important; }
+            body { margin: 0 !important; }
+            /* Scrollbar styling */
+            ::-webkit-scrollbar { width: 6px; height: 6px; }
+            ::-webkit-scrollbar-track { background: #0a0e17; }
+            ::-webkit-scrollbar-thumb { background: #2a3a4a; border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: #3a4a5a; }
+        </style>
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
 app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
         dcc.Interval(id="refresh", interval=30_000, n_intervals=0),
-        html.H1("Auto Trader Ops"),
-        html.Div("All-inclusive dashboard for service health, portfolios, paper trading, news, labs, Telegram, and reports.", style={"color": "#94a3b8", "marginBottom": "8px"}),
-        html.Div(id="last-updated", style={"color": "#94a3b8", "marginBottom": "14px"}),
+        html.H1("AUTO TRADER OPS", style={"fontSize": "18px", "fontWeight": "700", "letterSpacing": "2px", "color": BLOOMBERG_ORANGE, "marginBottom": "2px"}),
+        html.Div("Live dashboard — service health, portfolios, paper trading, research, Telegram.", style={"color": BLOOMBERG_GRAY, "marginBottom": "8px", "fontSize": "11px"}),
+        html.Div(id="last-updated", style={"color": "#5a6a7a", "marginBottom": "8px", "fontSize": "11px"}),
         html.Div(id="hero-row", style={"display": "flex", "gap": "12px", "flexWrap": "wrap"}),
         dcc.Tabs(
             id="main-tab",
-            value="overview",
+            value="telegram",
             children=[
-                dcc.Tab(label="Overview", value="overview"),
-                dcc.Tab(label="Runtime", value="runtime"),
-                dcc.Tab(label="Portfolio", value="portfolio"),
-                dcc.Tab(label="Paper", value="paper"),
-                dcc.Tab(label="News", value="news"),
-                dcc.Tab(label="Telegram", value="telegram"),
-                dcc.Tab(label="Research", value="research"),
-                dcc.Tab(label="Reports", value="reports"),
+                dcc.Tab(label="OVERVIEW", value="overview"),
+                dcc.Tab(label="RUNTIME", value="runtime"),
+                dcc.Tab(label="PORTFOLIO", value="portfolio"),
+                dcc.Tab(label="PAPER", value="paper"),
+                dcc.Tab(label="NEWS", value="news"),
+                dcc.Tab(label="TELEGRAM", value="telegram"),
+                dcc.Tab(label="RESEARCH", value="research"),
+                dcc.Tab(label="REPORTS", value="reports"),
             ],
-            colors={"border": "#1f2937", "primary": "#60a5fa", "background": "#0f172a"},
+            colors={"border": "#1e2a3a", "primary": BLOOMBERG_ORANGE, "background": "#111827"},
+            style={"borderBottom": f"1px solid #1e2a3a"},
         ),
         html.Div(id="tab-content", style={"marginTop": "12px"}),
-        html.Div(
-            style={"display": "none"},
-            children=[
-                dcc.Graph(id="lab-line", figure=empty_figure("Completed lab returns")),
-                dcc.Graph(id="telegram-line", figure=empty_figure("Telegram live paper equity")),
-                dash_table.DataTable(id="lab-table", data=[], columns=[]),
-                dash_table.DataTable(id="telegram-open-table", data=[], columns=[]),
-            ],
-        ),
     ],
 )
+
+
+def _safe_render(tab: str, data: dict[str, Any]) -> list[Any]:
+    """Render a tab with error fallback so one broken tab doesn't kill the page."""
+    try:
+        return render_tab(tab, data)
+    except Exception as exc:
+        return [html.Div(
+            [html.Div("ERROR LOADING TAB", style={"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED}),
+             html.Pre(str(exc), style={"fontSize": "11px", "color": "#9ca3af", "whiteSpace": "pre-wrap"})],
+            style=CARD_STYLE,
+        )]
 
 
 @app.callback(
@@ -994,37 +1333,18 @@ app.layout = html.Div(
     Input("main-tab", "value"),
 )
 def refresh(_: int, tab: str):
-    data = collect_data()
-    updated = f"Last refresh: {data['generated_at']} | server cache TTL {SSH_TTL_SECONDS}s | default dashboard now points here on port 8504"
-    return updated, build_hero(data), render_tab(tab, data)
+    try:
+        data = collect_data()
+        updated = f"⟳ {data['generated_at']} IST | refresh 30s | port 8504"
+        return updated, build_hero(data), _safe_render(tab, data)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
+        return err_msg, [], [html.Div(err_msg, style={**CARD_STYLE, "color": BLOOMBERG_RED})]
 
 
-@app.callback(
-    Output("hero-row", "children", allow_duplicate=True),
-    Output("lab-line", "figure"),
-    Output("telegram-line", "figure"),
-    Output("lab-table", "data"),
-    Output("lab-table", "columns"),
-    Output("telegram-open-table", "data"),
-    Output("telegram-open-table", "columns"),
-    Input("refresh", "n_intervals"),
-    Input("main-tab", "value"),
-    prevent_initial_call=True,
-)
-def refresh_legacy(_: int, __: str):
-    data = collect_data()
-    lab_data, lab_columns = table_payload(data["combined_labs"].sort_values("generated_at", ascending=False) if not data["combined_labs"].empty else data["combined_labs"])
-    open_df = to_df((data.get("telegram_ledger") or {}).get("open_positions") or [])
-    open_data, open_columns = table_payload(open_df)
-    return (
-        build_hero(data),
-        legacy_lab_figure(data),
-        legacy_telegram_figure(data),
-        lab_data,
-        lab_columns,
-        open_data,
-        open_columns,
-    )
+# Legacy hidden-table callback removed — single refresh callback handles all rendering
 
 
 if __name__ == "__main__":
