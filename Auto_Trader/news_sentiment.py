@@ -371,7 +371,7 @@ def _split_env_list(name: str) -> List[str]:
     values: List[str] = []
     if not raw:
         return values
-    for part in re.split(r"[\n,]+", raw):
+    for part in re.split(r"[\s\n,]+", raw):
         item = str(part or "").strip()
         if item and item not in values:
             values.append(item)
