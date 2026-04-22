@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dcc, html, dash_table
+from dash import Dash, Input, Output, dcc, html, dash_table, no_update
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "reports"
@@ -39,6 +39,7 @@ COMBINED_LAB_STATUS_FILES = [
 SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 ECO_CALENDAR_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+DASH_DATA_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
@@ -1737,6 +1738,7 @@ app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
         dcc.Interval(id="refresh", interval=30_000, n_intervals=0),
+        dcc.Store(id="data-version", data={"ts": 0.0}),
         html.H1("AUTO TRADER OPS", style={"fontSize": "18px", "fontWeight": "700", "letterSpacing": "2px", "color": BLOOMBERG_ORANGE, "marginBottom": "2px"}),
         html.Div("Live dashboard — service health, portfolios, paper trading, research, Telegram.", style={"color": BLOOMBERG_GRAY, "marginBottom": "8px", "fontSize": "11px"}),
         html.Div(id="last-updated", style={"color": "#5a6a7a", "marginBottom": "8px", "fontSize": "11px"}),
@@ -1779,23 +1781,44 @@ def _safe_render(tab: str, data: dict[str, Any]) -> list[Any]:
 @app.callback(
     Output("last-updated", "children"),
     Output("hero-row", "children"),
-    Output("tab-content", "children"),
+    Output("data-version", "data"),
     Input("refresh", "n_intervals"),
-    Input("main-tab", "value"),
 )
-def refresh(_: int, tab: str):
+def refresh(_: int):
     try:
         data = collect_data()
+        DASH_DATA_CACHE["ts"] = time.time()
+        DASH_DATA_CACHE["data"] = data
         updated = f"⟳ {data['generated_at']} IST | refresh 30s | port 8504"
-        return updated, build_hero(data), _safe_render(tab, data)
+        return updated, build_hero(data), {"ts": DASH_DATA_CACHE["ts"]}
     except Exception as exc:
         import traceback
         traceback.print_exc()
         err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
-        return err_msg, [], [html.Div(err_msg, style={**CARD_STYLE, "color": BLOOMBERG_RED})]
+        return err_msg, [], no_update
 
 
-# Legacy hidden-table callback removed — single refresh callback handles all rendering
+@app.callback(
+    Output("tab-content", "children"),
+    Input("main-tab", "value"),
+    Input("data-version", "data"),
+)
+def render_active_tab(tab: str, _data_version: dict[str, Any] | None):
+    try:
+        data = DASH_DATA_CACHE.get("data")
+        if not data:
+            data = collect_data()
+            DASH_DATA_CACHE["ts"] = time.time()
+            DASH_DATA_CACHE["data"] = data
+        return _safe_render(tab, data)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
+        return [html.Div(err_msg, style={**CARD_STYLE, "color": BLOOMBERG_RED})]
+
+
+# Legacy hidden-table callback removed — refresh and tab rendering are now decoupled
 
 
 if __name__ == "__main__":
