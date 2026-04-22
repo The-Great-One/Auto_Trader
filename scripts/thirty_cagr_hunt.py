@@ -84,6 +84,35 @@ EXPOSURE_PROFILES = {
         "target_equity": 1.00,
         "max_single_symbol_weight": 1.00,
     },
+    # ── Pass 2: aggressive profiles to push toward 30% CAGR ──
+    "aggressive7": {
+        "risk_per_trade_pct": 0.07,
+        "atr_stop_mult": 2.0,
+        "max_position_notional_pct": 1.20,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 1.00,
+    },
+    "aggressive8": {
+        "risk_per_trade_pct": 0.08,
+        "atr_stop_mult": 2.0,
+        "max_position_notional_pct": 1.30,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 1.00,
+    },
+    "compound6": {
+        "risk_per_trade_pct": 0.06,
+        "atr_stop_mult": 2.0,
+        "max_position_notional_pct": 1.00,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 0.80,
+    },
+    "concentrated5": {
+        "risk_per_trade_pct": 0.05,
+        "atr_stop_mult": 1.8,
+        "max_position_notional_pct": 1.50,
+        "target_equity": 1.00,
+        "max_single_symbol_weight": 1.00,
+    },
 }
 
 ENTRY_PATCHES = {
@@ -110,6 +139,38 @@ ENTRY_PATCHES = {
         "regime_ema_fast": 20,
         "regime_ema_slow": 100,
     },
+    # ── Pass 2: entry patches for 30% push ──
+    "ultra_loose_a6_v06": {
+        "adx_min": 6,
+        "volume_confirm_mult": 0.60,
+        "ich_cloud_bull": 0,
+    },
+    "regime30_150_ultra_loose": {
+        "adx_min": 6,
+        "volume_confirm_mult": 0.60,
+        "ich_cloud_bull": 0,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
+    "regime30_150_loose_long": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.75,
+        "ich_cloud_bull": 0,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
+    "momentum_rsi": {
+        "adx_min": 8,
+        "volume_confirm_mult": 0.75,
+        "ich_cloud_bull": 0,
+        "rsi_floor": 40,
+        "stoch_momo_max": 85,
+        "regime_filter_enabled": 1,
+        "regime_ema_fast": 30,
+        "regime_ema_slow": 150,
+    },
 }
 
 VARIANT_BLUEPRINTS = [
@@ -133,6 +194,21 @@ VARIANT_BLUEPRINTS = [
     ("scale5", "regime20_100_loose"),
     ("tight6", "regime20_100_loose"),
     ("scale6", "regime20_100_loose_e28"),
+    # ── Pass 2 variants: aggressive sizing + compound + ultra-loose entry + longer holds ──
+    ("aggressive7", "regime30_150_loose"),
+    ("aggressive7", "ultra_loose_a6_v06"),
+    ("aggressive7", "regime30_150_ultra_loose"),
+    ("aggressive7", "momentum_rsi"),
+    ("aggressive8", "regime30_150_loose"),
+    ("aggressive8", "regime30_150_ultra_loose"),
+    ("compound6", "regime30_150_loose"),
+    ("compound6", "regime30_150_ultra_loose"),
+    ("concentrated5", "regime30_150_loose_long"),
+    ("concentrated5", "ultra_loose_a6_v06"),
+    ("tight5", "regime30_150_ultra_loose"),
+    ("tight5", "ultra_loose_a6_v06"),
+    ("tight6", "regime30_150_ultra_loose"),
+    ("tight6", "momentum_rsi"),
 ]
 
 
@@ -176,6 +252,22 @@ def profile_env(profile: dict) -> dict[str, str]:
     }
 
 
+SELL_PATCHES = {
+    "long_hold": {
+        "breakeven_trigger_pct": 4.0,
+        "equity_time_stop_bars": 10,
+        "equity_time_stop_min_profit_pct": 1.5,
+        "momentum_exit_rsi": 38.0,
+    },
+    "very_long_hold": {
+        "breakeven_trigger_pct": 5.0,
+        "equity_time_stop_bars": 14,
+        "equity_time_stop_min_profit_pct": 2.0,
+        "momentum_exit_rsi": 35.0,
+    },
+}
+
+
 def build_variants(base_buy: dict, base_sell: dict, base_env: dict[str, str]) -> list[dict]:
     variants = []
     for profile_name, entry_name in VARIANT_BLUEPRINTS:
@@ -184,6 +276,11 @@ def build_variants(base_buy: dict, base_sell: dict, base_env: dict[str, str]) ->
         merged_buy = dict(base_buy)
         merged_buy.update(entry_patch)
         merged_sell = dict(base_sell)
+        # Apply longer hold sell patches for variants that need it
+        if entry_name.endswith("_long") or entry_name == "momentum_rsi":
+            merged_sell.update(SELL_PATCHES["long_hold"])
+        if entry_name == "ultra_loose_a6_v06":
+            merged_sell.update(SELL_PATCHES["very_long_hold"])
         env_patch = dict(base_env)
         env_patch.update(profile_env(exposure))
         variants.append(

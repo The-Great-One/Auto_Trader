@@ -762,6 +762,16 @@ def build_hero(data: dict[str, Any]) -> list[Any]:
     exposure_best = ((data.get("exposure_sweep") or {}).get("best") or {})
     validated_cagr = exposure_best.get("cagr_pct") or (data["five_year"].get("vol_sizing") or {}).get("cagr_pct", "-")
     validated_name = exposure_best.get("name") or data.get("exposure_sweep_path") or data.get("five_year_path") or "5y validation"
+    # Hunt status for hero
+    hunt_path = ROOT / "reports" / "thirty_cagr_hunt_latest.json"
+    hunt_data = None
+    if hunt_path.exists():
+        try:
+            hunt_data = json.loads(hunt_path.read_text())
+        except Exception:
+            pass
+    hunt_cagr = (hunt_data or {}).get("best_cagr_pct")
+    hunt_status_short = ((hunt_data or {}).get("status") or "idle").upper()[:6]
     return [
         metric_card("auto_trade.service", server.get("service", "unknown"), server.get("substate", "")),
         metric_card("Paper decision", data["paper"].get("decision", data["live_paper"].get("mode", "-")), data["paper"].get("symbol", "paper shadow")),
@@ -769,6 +779,7 @@ def build_hero(data: dict[str, Any]) -> list[Any]:
         metric_card("Live portfolio value", data["portfolio"].get("total_value", "-"), data.get("portfolio_path") or "portfolio_intel"),
         metric_card("Latest lab return %", latest_lab.get("best_return_pct", "-"), latest_lab.get("best_name", "-")),
         metric_card("Best validated 5y CAGR %", validated_cagr, validated_name),
+        metric_card("30% hunt CAGR %", hunt_cagr if hunt_cagr is not None else "-", hunt_status_short),
     ]
 
 
@@ -1432,6 +1443,91 @@ def build_research_tab(data: dict[str, Any]) -> list[Any]:
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("Research scoreboard", [cards]))
+
+    # ── 30% CAGR HUNT STATUS ──
+    hunt_path = ROOT / "reports" / "thirty_cagr_hunt_latest.json"
+    hunt_data = None
+    if hunt_path.exists():
+        try:
+            hunt_data = json.loads(hunt_path.read_text())
+        except Exception:
+            pass
+    if hunt_data:
+        hunt_status = hunt_data.get("status", "?")
+        hunt_phase = hunt_data.get("phase", "?")
+        hunt_total = hunt_data.get("variants_total", 0)
+        hunt_done = hunt_data.get("variants_done", 0)
+        hunt_best = hunt_data.get("best_variant", "-")
+        hunt_best_cagr = hunt_data.get("best_cagr_pct")
+        hunt_best_ret = hunt_data.get("best_return_pct")
+        hunt_best_dd = hunt_data.get("best_drawdown_pct")
+        hunt_progress = hunt_data.get("progress_pct") or (hunt_done / max(hunt_total, 1) * 100 if hunt_total else 0)
+        hunt_current = hunt_data.get("current_variant", "-")
+        hunt_output = hunt_data.get("output_json")
+
+        # Color based on CAGR relative to target
+        if hunt_best_cagr is not None and hunt_best_cagr >= 30:
+            cagr_color = BLOOMBERG_GREEN
+        elif hunt_best_cagr is not None and hunt_best_cagr >= 25:
+            cagr_color = BLOOMBERG_ORANGE
+        else:
+            cagr_color = "#9ca3af"
+
+        hunt_cards = html.Div(
+            [
+                metric_card("Hunt status", hunt_status.upper(), hunt_phase),
+                metric_card("Progress", f"{hunt_done}/{hunt_total}", f"{hunt_progress:.0f}%"),
+                metric_card("Best CAGR %", hunt_best_cagr, hunt_best),
+                metric_card("Best return %", hunt_best_ret, f"DD {friendly(hunt_best_dd)}%"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+
+        # Build progress bar
+        bar_bg = html.Div(style={"height": "6px", "backgroundColor": "#1e2a3a", "borderRadius": "3px", "width": "100%"})
+        bar_fill_pct = min(100, hunt_progress) if hunt_progress else 0
+        bar_fill = html.Div(style={"height": "6px", "backgroundColor": cagr_color, "borderRadius": "3px", "width": f"{bar_fill_pct}%"})
+        progress_bar = html.Div([bar_bg, bar_fill], style={"position": "relative", "height": "6px", "marginBottom": "8px"})
+
+        # Build CAGR target bar (visual gauge toward 30%)
+        if hunt_best_cagr is not None and hunt_best_cagr > 0:
+            cagr_fill = min(100, hunt_best_cagr / 30 * 100)
+            cagr_bar_bg = html.Div(style={"height": "8px", "backgroundColor": "#1e2a3a", "borderRadius": "4px", "width": "100%"})
+            cagr_bar_fill = html.Div(style={"height": "8px", "backgroundColor": cagr_color, "borderRadius": "4px", "width": f"{cagr_fill:.0f}%"})
+            cagr_gauge = html.Div([
+                html.Div(f"CAGR progress toward 30% target: {hunt_best_cagr:.1f}% / 30%", style={"fontSize": "10px", "color": "#6b7280", "marginBottom": "3px"}),
+                html.Div([cagr_bar_bg, cagr_bar_fill], style={"position": "relative", "height": "8px"}),
+            ], style={"marginBottom": "8px"})
+        else:
+            cagr_gauge = html.Div()
+
+        # Load full ranked results if hunt completed
+        hunt_rows = []
+        if hunt_output and Path(hunt_output).exists():
+            try:
+                full_hunt = json.loads(Path(hunt_output).read_text())
+                ranked = full_hunt.get("ranked", [])
+                for r in ranked[:10]:
+                    cagr = r.get("cagr_pct", 0) or 0
+                    hunt_rows.append({
+                        "variant": r.get("name", "?"),
+                        "CAGR %": round(cagr, 2),
+                        "Return %": round(r.get("return_pct", 0) or 0, 1),
+                        "DD %": round(r.get("drawdown_pct", 0) or 0, 1),
+                        "Trades": r.get("trades", 0),
+                        "Win %": round(r.get("win_rate_pct", 0) or 0, 0),
+                        "Sharpe": round(r.get("sharpe", 0) or 0, 2),
+                    })
+            except Exception:
+                pass
+
+        hunt_children = [hunt_cards, progress_bar, cagr_gauge]
+        if hunt_rows:
+            hunt_children.append(table_from_df(pd.DataFrame(hunt_rows), "hunt-results-table", page_size=10))
+        if hunt_current and hunt_status == "running":
+            hunt_children.append(html.Div(f"Evaluating: {hunt_current}", style={"fontSize": "11px", "color": "#6b7280"}))
+
+        children.append(section("30% CAGR hunt", hunt_children, "5Y live-parity validation. Target: >=30% CAGR. Progress bar shows completion; CAGR gauge shows best result vs 30% target."))
 
     exposure_rows_raw = exposure_sweep.get("ranked") or exposure_sweep.get("results") or []
     if exposure_rows_raw:
