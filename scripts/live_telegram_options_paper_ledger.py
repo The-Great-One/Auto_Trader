@@ -77,11 +77,51 @@ def match_contract(call: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]
     return None
 
 
+CHANNEL_LEARNING_PATH = Path(ROOT) / "reports" / "channel_learning_scores.json"
+
+
+def load_channel_sizing_mult(chat: str, default: float = 1.0) -> float:
+    """Load the sizing multiplier for a channel from learning scores.
+    Returns the default if no scores exist yet."""
+    if not CHANNEL_LEARNING_PATH.exists():
+        return default
+    try:
+        data = json.loads(CHANNEL_LEARNING_PATH.read_text())
+    except Exception:
+        return default
+    channels = data.get("channels") or {}
+    ch_data = channels.get(chat) or {}
+    action = ch_data.get("action", "")
+    # Skip channels with too-low confidence
+    if action == "skip_or_observe":
+        return 0.0
+    mult = ch_data.get("sizing_mult", default)
+    return float(mult) if mult else default
+
+
 def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per_trade_pct: float) -> None:
     positions = state.setdefault('positions', {})
     pos_key = key_for(call)
     if pos_key in positions:
         return
+
+    # Apply channel learning sizing multiplier
+    chat = call.get('source_chat', '')
+    channel_mult = load_channel_sizing_mult(chat, default=1.0)
+    if channel_mult <= 0.0:
+        positions[pos_key] = {
+            'status': 'skipped',
+            'reason': 'channel_low_confidence',
+            'call': call,
+            'created_at': now_utc().isoformat(),
+            'channel_confidence_note': f'Channel {chat} below min confidence, skipped',
+        }
+        return
+
+    adjusted_pct = capital_per_trade_pct * channel_mult
+    # Cap at global max
+    max_pct = 0.40
+    adjusted_pct = min(adjusted_pct, max_pct)
 
     snap = fetch_option_chain_snapshot(call['symbol'], call['option_side']) or {}
     contract = match_contract(call, snap)
@@ -97,7 +137,7 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
     cash = float(state.get('cash', 0.0))
     entry_price = float(call.get('entry_ref') or contract.get('last_price') or 0.0)
     lot_size = int(contract.get('lot_size') or 0)
-    alloc = float(state.get('starting_capital', 0.0)) * capital_per_trade_pct
+    alloc = float(state.get('starting_capital', 0.0)) * adjusted_pct
     if entry_price <= 0 or lot_size <= 0 or cash <= 0:
         positions[pos_key] = {
             'status': 'skipped',
@@ -135,7 +175,7 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
             'entry_ref': call.get('entry_ref'),
             'underlying_entry': call.get('underlying_entry'),
             'nearest_expiry': call.get('nearest_expiry'),
-            'text': ((call.get('initial_snapshot') or {}).get('text') or '')[:300],
+            'text': ((call.get('initial_snapshot') or {}).get('text') or call.get('text') or '')[:500],
         },
         'contract': {
             'tradingsymbol': contract.get('tradingsymbol'),
@@ -150,8 +190,8 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'remaining_qty': int(qty),
         'invested': round(invested, 2),
         'realized_cash': 0.0,
-        'stop_loss': float(_extract_stop(call) or 0.0) or None,
-        'targets': _extract_targets(call),
+        'stop_loss': float(call.get('stop_loss') or _extract_stop(call) or 0.0) or None,
+        'targets': call.get('targets') or _extract_targets(call),
         'target_hits': [],
         'last_price': round(float(contract.get('last_price') or 0.0), 2),
         'last_underlying_price': round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None,
@@ -214,6 +254,10 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
                 realized_cash += sell_qty * float(tgt)
                 remaining_qty -= sell_qty
                 hits.append(idx)
+                # Record the timestamp when each target is hit
+                hit_times = list(pos.get('target_hit_times') or [])
+                hit_times.append({'target': float(tgt), 'target_idx': idx, 'hit_at': now_utc().isoformat(), 'hit_price': round(price, 2)})
+                pos['target_hit_times'] = hit_times
                 if idx == 0 and stop_loss is not None:
                     stop_loss = max(float(stop_loss), entry_price)
 
@@ -291,6 +335,7 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
             'qty': pos.get('qty'),
             'remaining_qty': pos.get('remaining_qty'),
             'targets_hit': [int(x) + 1 for x in pos.get('target_hits') or []],
+            'target_hit_times': pos.get('target_hit_times') or [],
             'stop_loss': pos.get('stop_loss'),
             'mtm_pnl': round(pnl, 2),
             'mtm_return_pct': round((current_value / invested - 1.0) * 100.0, 2) if invested > 0 else None,

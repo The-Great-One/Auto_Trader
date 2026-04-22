@@ -1055,6 +1055,28 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         cols = [c for c in ["chat", "date", "message_id", "text_excerpt"] if c in display.columns]
         children.append(section("Recent updates", [table_from_df(display[cols], "tg-channel-updates-table", page_size=15)], "Last 30 channel messages."))
 
+    # ── Channel learning scores ──
+    channel_scores = load_json(Path(ROOT) / "reports" / "channel_learning_scores.json") if hasattr(ROOT, 'exists') else None
+    if channel_scores and isinstance(channel_scores, dict):
+        channels = channel_scores.get("channels") or {}
+        if channels:
+            score_rows = []
+            for chat, s in channels.items():
+                score_rows.append({
+                    "channel": chat,
+                    "confidence": s.get("confidence", "-"),
+                    "action": s.get("action", "-"),
+                    "sizing_mult": s.get("sizing_mult", "-"),
+                    "win_rate%": s.get("win_rate", "-"),
+                    "avg_ret%": s.get("avg_return_pct", "-"),
+                    "n_trades": s.get("n_trades", 0),
+                    "ladder": s.get("ladder_style", "-"),
+                })
+            score_df = pd.DataFrame(score_rows)
+            recs = channel_scores.get("recommendations") or []
+            rec_text = " | ".join(recs) if recs else "No recommendations yet"
+            children.append(section("Channel learning", [table_from_df(score_df, "tg-channel-learning-table", page_size=10)], rec_text))
+
     return children
 
 
