@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tempfile
 from collections import Counter
 from datetime import datetime, timedelta
@@ -32,6 +33,7 @@ OUT = ROOT / "reports"
 OUT.mkdir(exist_ok=True)
 HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
 OPTIONS_OUT = OUT / "paper_shadow_options_latest.json"
+SHADOW_STATE_OUT = OUT / "paper_shadow_portfolio_state.json"
 logger = logging.getLogger("Auto_Trade_Logger")
 
 KITE_FALLBACK_TOKENS = {
@@ -180,6 +182,109 @@ def load_qty(symbol="NIFTYETF") -> int:
     return int(float(df.iloc[0].get("quantity", 0) + df.iloc[0].get("t1_quantity", 0)))
 
 
+def _load_shadow_state(symbol: str, starting_capital: float) -> dict:
+    base = {
+        "symbol": symbol,
+        "starting_capital": float(starting_capital),
+        "cash": float(starting_capital),
+        "quantity": 0,
+        "entry_price": None,
+        "realized_pnl": 0.0,
+        "bars_in_trade": 0,
+        "trade_count": 0,
+        "last_action": "INIT",
+        "last_action_at": None,
+    }
+    if not SHADOW_STATE_OUT.exists():
+        return base
+    try:
+        state = json.loads(SHADOW_STATE_OUT.read_text())
+        if str(state.get("symbol") or "").upper() != symbol.upper():
+            return base
+        merged = {**base, **state}
+        if float(merged.get("starting_capital") or starting_capital) != float(starting_capital) and int(merged.get("quantity") or 0) == 0:
+            merged.update({
+                "starting_capital": float(starting_capital),
+                "cash": float(starting_capital),
+                "entry_price": None,
+                "realized_pnl": 0.0,
+                "bars_in_trade": 0,
+                "trade_count": 0,
+                "last_action": "RESET_STARTING_CAPITAL",
+                "last_action_at": datetime.now().isoformat(),
+            })
+        return merged
+    except Exception:
+        return base
+
+
+def _save_shadow_state(state: dict) -> None:
+    SHADOW_STATE_OUT.write_text(json.dumps(state, indent=2))
+
+
+def _apply_shadow_trade(state: dict, decision: str, price: float) -> dict:
+    action = "HOLD"
+    cash = float(state.get("cash") or 0.0)
+    qty = int(state.get("quantity") or 0)
+    entry_price = state.get("entry_price")
+    realized_pnl = float(state.get("realized_pnl") or 0.0)
+    bars_in_trade = int(state.get("bars_in_trade") or 0)
+    trade_count = int(state.get("trade_count") or 0)
+
+    if decision == "BUY" and qty <= 0:
+        buy_qty = int(cash // price) if price > 0 else 0
+        if buy_qty > 0:
+            cost = round(buy_qty * price, 2)
+            cash = round(cash - cost, 2)
+            qty = buy_qty
+            entry_price = float(price)
+            bars_in_trade = 1
+            trade_count += 1
+            action = "BUY"
+        else:
+            action = "BUY_SKIPPED_NO_CASH"
+    elif decision == "SELL" and qty > 0:
+        proceeds = round(qty * price, 2)
+        pnl = round((float(price) - float(entry_price or 0.0)) * qty, 2)
+        cash = round(cash + proceeds, 2)
+        realized_pnl = round(realized_pnl + pnl, 2)
+        qty = 0
+        entry_price = None
+        bars_in_trade = 0
+        trade_count += 1
+        action = "SELL"
+    elif qty > 0:
+        bars_in_trade = max(1, bars_in_trade + 1)
+        action = "HOLD_POSITION"
+
+    market_value = round(qty * price, 2)
+    unrealized_pnl = round(((float(price) - float(entry_price or 0.0)) * qty), 2) if qty > 0 and entry_price is not None else 0.0
+    equity = round(cash + market_value, 2)
+    total_pnl = round(realized_pnl + unrealized_pnl, 2)
+    starting_capital = float(state.get("starting_capital") or 0.0)
+    total_return_pct = round(((equity / starting_capital) - 1.0) * 100.0, 2) if starting_capital > 0 else 0.0
+
+    updated = {
+        **state,
+        "cash": cash,
+        "quantity": qty,
+        "entry_price": entry_price,
+        "realized_pnl": realized_pnl,
+        "bars_in_trade": bars_in_trade,
+        "trade_count": trade_count,
+        "last_action": action,
+        "last_action_at": datetime.now().isoformat(),
+        "last_price": float(price),
+        "market_value": market_value,
+        "unrealized_pnl": unrealized_pnl,
+        "equity": equity,
+        "total_pnl": total_pnl,
+        "total_return_pct": total_return_pct,
+    }
+    _save_shadow_state(updated)
+    return updated
+
+
 def run_equity_shadow() -> dict:
     at_utils.get_mmi_now = lambda: None
     symbol = "NIFTYETF"
@@ -205,17 +310,19 @@ def run_equity_shadow() -> dict:
     entry_holdings = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
     entry_decision, entry_details = RULE_SET_7.evaluate_signal(df, row, entry_holdings)
 
-    qty = load_qty(symbol)
+    actual_qty = load_qty(symbol)
+    starting_capital = float(os.getenv("AT_PAPER_SHADOW_STARTING_CAPITAL", "100000") or 100000)
+    shadow_state = _load_shadow_state(symbol, starting_capital)
+    qty = int(shadow_state.get("quantity") or 0)
     if qty > 0:
-        avg = float(df["Close"].iloc[-20:-1].mean())
         holdings = pd.DataFrame([
             {
                 "instrument_token": 1626369,
                 "tradingsymbol": symbol,
-                "average_price": avg,
+                "average_price": float(shadow_state.get("entry_price") or df["Close"].iloc[-1]),
                 "quantity": qty,
                 "t1_quantity": 0,
-                "bars_in_trade": 20,
+                "bars_in_trade": int(shadow_state.get("bars_in_trade") or 1),
             }
         ])
         with tempfile.TemporaryDirectory(prefix="paper_shadow_state_") as td:
@@ -231,13 +338,15 @@ def run_equity_shadow() -> dict:
 
     final_decision, news_overlay = apply_news_overlay(base_decision, symbol, holdings=holdings)
     symbol_news = load_analysis(symbol, max_age_minutes=24 * 60) or {}
+    shadow_state = _apply_shadow_trade(shadow_state, str(final_decision).upper(), float(df.iloc[-1]["Close"]))
 
     payload = {
         "generated_at": datetime.now().isoformat(),
         "paper_mode": True,
         "symbol": symbol,
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
-        "position_qty": qty,
+        "position_qty": int(shadow_state.get("quantity") or 0),
+        "broker_position_qty": actual_qty,
         "mode": mode,
         "base_decision": str(base_decision).upper(),
         "decision": str(final_decision).upper(),
@@ -266,6 +375,22 @@ def run_equity_shadow() -> dict:
             "sample_headlines": symbol_news.get("sample_headlines", [])[:3],
         },
         "market_news_topics": topic_summary.get("topics", []),
+        "shadow_portfolio": {
+            "starting_capital": float(shadow_state.get("starting_capital") or starting_capital),
+            "cash": float(shadow_state.get("cash") or 0.0),
+            "market_value": float(shadow_state.get("market_value") or 0.0),
+            "equity": float(shadow_state.get("equity") or 0.0),
+            "quantity": int(shadow_state.get("quantity") or 0),
+            "entry_price": shadow_state.get("entry_price"),
+            "bars_in_trade": int(shadow_state.get("bars_in_trade") or 0),
+            "realized_pnl": float(shadow_state.get("realized_pnl") or 0.0),
+            "unrealized_pnl": float(shadow_state.get("unrealized_pnl") or 0.0),
+            "total_pnl": float(shadow_state.get("total_pnl") or 0.0),
+            "total_return_pct": float(shadow_state.get("total_return_pct") or 0.0),
+            "trade_count": int(shadow_state.get("trade_count") or 0),
+            "last_action": shadow_state.get("last_action"),
+            "last_action_at": shadow_state.get("last_action_at"),
+        },
     }
     (OUT / "paper_shadow_latest.json").write_text(json.dumps(payload, indent=2))
     return payload

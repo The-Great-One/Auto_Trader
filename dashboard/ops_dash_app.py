@@ -964,11 +964,14 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
     promoted_validation = data.get("promoted_validation") or {}
     children: list[Any] = []
 
-    active_paper = oracle_paper or paper
+    active_paper = {**(paper or {}), **(oracle_paper or {})}
+    shadow_portfolio = active_paper.get("shadow_portfolio") or {}
     cards = html.Div(
         [
             metric_card("Oracle paper decision", active_paper.get("decision", "-"), active_paper.get("symbol", "paper shadow")),
             metric_card("Oracle paper updated", to_ist(active_paper.get("generated_at")), "latest shadow snapshot"),
+            metric_card("Shadow equity", friendly(shadow_portfolio.get("equity")), f"return {friendly(shadow_portfolio.get('total_return_pct'))}%"),
+            metric_card("Shadow qty", shadow_portfolio.get("quantity", "-"), f"cash {friendly(shadow_portfolio.get('cash'))}"),
             metric_card("Live paper mode", live_paper.get("mode", "-"), live_paper.get("time", "")),
             metric_card("Options candidates", len(options_paper.get("buy_candidates") or []), "paper shadow options"),
             metric_card("Options near misses", len(options_paper.get("near_miss_candidates") or []), "paper shadow options"),
@@ -988,6 +991,7 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
             ('Symbol', 'symbol', str),
             ('Mode', 'mode', str),
             ('Position qty', 'position_qty', lambda x: str(int(x)) if isinstance(x, (int, float)) else str(x)),
+            ('Broker qty', 'broker_position_qty', lambda x: str(int(x)) if isinstance(x, (int, float)) else str(x)),
         ]:
             val = active_paper.get(key)
             if val is not None:
@@ -1000,6 +1004,20 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
                 paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
     if paper_items:
         children.append(section("Paper snapshot", [html.Div(paper_items, style={**CARD_STYLE, "display": "flex", "flexWrap": "wrap", "gap": "8px"})], "Oracle paper shadow is separate from the Telegram paper ledger. Service restarts update rules immediately, but the shadow snapshot only changes when paper_shadow.py runs."))
+
+    if shadow_portfolio:
+        shadow_cards = html.Div(
+            [
+                metric_card("Starting capital", friendly(shadow_portfolio.get("starting_capital")), "shadow book"),
+                metric_card("Current equity", friendly(shadow_portfolio.get("equity")), f"MTM {friendly(shadow_portfolio.get('market_value'))}"),
+                metric_card("Total PnL", friendly(shadow_portfolio.get("total_pnl")), f"{friendly(shadow_portfolio.get('total_return_pct'))}%"),
+                metric_card("Realized", friendly(shadow_portfolio.get("realized_pnl")), "booked"),
+                metric_card("Unrealized", friendly(shadow_portfolio.get("unrealized_pnl")), "open MTM"),
+                metric_card("Last action", shadow_portfolio.get("last_action", "-"), to_ist(shadow_portfolio.get("last_action_at"))),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        children.append(section("Oracle shadow portfolio, ₹1L book", [shadow_cards], "This is the simulated live paper-shadow book, independent of broker holdings, so you can see what the promoted rules would have done with ₹1,00,000."))
 
     validation = promoted_validation.get("validation") or {}
     variant = promoted_validation.get("variant") or {}
