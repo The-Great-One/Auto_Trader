@@ -924,6 +924,7 @@ def collect_data() -> dict[str, Any]:
     scorecard_path, scorecard = latest_report("daily_scorecard_*.json")
     ops_path, daily_ops = latest_report("daily_ops_supervisor_*.json")
     portfolio_path, portfolio = latest_report("portfolio_intel_*.json")
+    mf_rebalance_plan_path, mf_rebalance_plan = latest_report("mf_rebalance_plan_*.json")
     options_supervisor_path, options_supervisor = latest_report("options_research_supervisor_*.json")
     improvement_path, improvement = latest_report("daily_improvement_audit_*.json")
     five_year_path, five_year = latest_report("five_year_validation_*.json")
@@ -957,6 +958,8 @@ def collect_data() -> dict[str, Any]:
         "daily_ops": daily_ops or {},
         "portfolio_path": portfolio_path.name if portfolio_path else None,
         "portfolio": portfolio or {},
+        "mf_rebalance_plan_path": mf_rebalance_plan_path.name if mf_rebalance_plan_path else None,
+        "mf_rebalance_plan": mf_rebalance_plan or {},
         "options_supervisor_path": options_supervisor_path.name if options_supervisor_path else None,
         "options_supervisor": options_supervisor or {},
         "improvement_path": improvement_path.name if improvement_path else None,
@@ -1214,6 +1217,42 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
                 "rationale": (m.get("rationale") or "")[:80],
             })
         children.append(section("MF holdings + recommendations", [table_from_df(pd.DataFrame(mf_rows), "mf-recommendations-table", page_size=15)], "Buy/sell/hold based on P\u0026L, risk, category outlook, and portfolio concentration."))
+
+    mf_plan = data.get("mf_rebalance_plan") or {}
+    if mf_plan:
+        plan_cards = html.Div(
+            [
+                metric_card("MF plan profile", mf_plan.get("profile", "-"), data.get("mf_rebalance_plan_path") or "mf_rebalance_plan"),
+                metric_card("MF delta target", friendly(mf_plan.get("report_mf_delta")), "negative means trim MF allocation"),
+                metric_card("Planned MF orders", len(mf_plan.get("orders") or []), mf_plan.get("tag", "mf_rebalance")),
+                metric_card("Buy / redeem funds", len(mf_plan.get("buy_symbols") or []), f"redeem {len(mf_plan.get('redeem_symbols') or [])}"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        children.append(section("MF rebalance engine", [plan_cards], "Latest guarded mutual-fund rebalance plan from the MF execution layer."))
+
+        profile_resolution = mf_plan.get("profile_resolution") or {}
+        ranked_candidates = profile_resolution.get("ranked_candidates") or []
+        if ranked_candidates:
+            ranked_df = pd.DataFrame(ranked_candidates)
+            children.append(section("MF profile candidates", [table_from_df(ranked_df, "mf-profile-candidates-table", page_size=10)], profile_resolution.get("description") or "How the latest MF profile ranked candidates."))
+
+        orders = mf_plan.get("orders") or []
+        if orders:
+            order_rows = []
+            for order in orders:
+                order_rows.append({
+                    "symbol": order.get("tradingsymbol", "?"),
+                    "side": order.get("transaction_type", "?"),
+                    "amount": order.get("amount", "-"),
+                    "quantity": order.get("quantity", "-"),
+                    "tag": order.get("tag", "-"),
+                })
+            children.append(section("MF rebalance orders", [table_from_df(pd.DataFrame(order_rows), "mf-rebalance-orders-table", page_size=10)], "Guarded order plan only. The dashboard is showing the latest generated MF action set, not placing orders."))
+
+        notes = mf_plan.get("notes") or []
+        if notes:
+            children.append(section("MF rebalance notes", [html.Ul([html.Li(str(x)) for x in notes], style=CARD_STYLE)]))
 
     # Equity recommendations table
     if eq_holdings:
