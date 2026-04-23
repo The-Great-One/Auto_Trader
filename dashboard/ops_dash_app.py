@@ -715,8 +715,10 @@ def collect_data() -> dict[str, Any]:
     improvement_path, improvement = latest_report("daily_improvement_audit_*.json")
     five_year_path, five_year = latest_report("five_year_validation_*.json")
     exposure_sweep_path, exposure_sweep = latest_report("five_year_exposure_sweep_*.json")
+    promoted_validation_path, promoted_validation = latest_report("five_year_validate_*.json")
     rulesets_path, telegram_rulesets = latest_report("telegram_channel_rulesets_*.json")
     paper = load_json(REPORTS_DIR / "paper_shadow_latest.json") or {}
+    oracle_paper = load_json(REPORTS_DIR / "oracle_paper_shadow_latest.json") or {}
     live_paper = load_json(REPORTS_DIR / "paper_shadow_live_latest.json") or {}
     options_paper = load_json(REPORTS_DIR / "paper_shadow_options_latest.json") or {}
     news_payload = load_json(REPORTS_DIR / "news_sentiment_latest.json") or {}
@@ -749,8 +751,11 @@ def collect_data() -> dict[str, Any]:
         "exposure_sweep_path": exposure_sweep_path.name if exposure_sweep_path else None,
         "exposure_sweep": exposure_sweep or {},
         "rulesets_path": rulesets_path.name if rulesets_path else None,
+        "promoted_validation_path": promoted_validation_path.name if promoted_validation_path else None,
+        "promoted_validation": promoted_validation or {},
         "telegram_rulesets": telegram_rulesets or {},
         "paper": paper,
+        "oracle_paper": oracle_paper,
         "live_paper": live_paper,
         "options_paper": options_paper,
         "news_payload": news_payload,
@@ -791,7 +796,7 @@ def build_hero(data: dict[str, Any]) -> list[Any]:
     hunt_status_short = ((hunt_data or {}).get("status") or "idle").upper()[:6]
     return [
         metric_card("auto_trade.service", server.get("service", "unknown"), server.get("substate", "")),
-        metric_card("Paper decision", data["paper"].get("decision", data["live_paper"].get("mode", "-")), data["paper"].get("symbol", "paper shadow")),
+        metric_card("Paper decision", data.get("oracle_paper", {}).get("decision", data["paper"].get("decision", data["live_paper"].get("mode", "-"))), data.get("oracle_paper", {}).get("symbol", data["paper"].get("symbol", "paper shadow"))),
         metric_card("Telegram paper equity", data["telegram_ledger"].get("equity", "-"), f"cash {friendly(data['telegram_ledger'].get('cash'))}"),
         metric_card("Live portfolio value", data["portfolio"].get("total_value", "-"), data.get("portfolio_path") or "portfolio_intel"),
         metric_card("Latest lab return %", latest_lab.get("best_return_pct", "-"), latest_lab.get("best_name", "-")),
@@ -952,14 +957,18 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
 
 def build_paper_tab(data: dict[str, Any]) -> list[Any]:
     paper = data["paper"]
+    oracle_paper = data.get("oracle_paper") or {}
     live_paper = data["live_paper"]
     options_paper = data["options_paper"]
     ledger = data["telegram_ledger"]
+    promoted_validation = data.get("promoted_validation") or {}
     children: list[Any] = []
 
+    active_paper = oracle_paper or paper
     cards = html.Div(
         [
-            metric_card("Equity paper decision", paper.get("decision", "-"), paper.get("symbol", "paper shadow")),
+            metric_card("Oracle paper decision", active_paper.get("decision", "-"), active_paper.get("symbol", "paper shadow")),
+            metric_card("Oracle paper updated", to_ist(active_paper.get("generated_at")), "latest shadow snapshot"),
             metric_card("Live paper mode", live_paper.get("mode", "-"), live_paper.get("time", "")),
             metric_card("Options candidates", len(options_paper.get("buy_candidates") or []), "paper shadow options"),
             metric_card("Options near misses", len(options_paper.get("near_miss_candidates") or []), "paper shadow options"),
@@ -972,20 +981,48 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
     closed_df = to_df(ledger.get("closed_positions") or [])
     near_miss_df = to_df((options_paper.get("near_miss_candidates") or [])[:20])
 
-    # Paper snapshot as clean cards instead of raw JSON
     paper_items = []
-    if paper:
-        for label, key, fmt in [('Decision', 'decision', str), ('Symbol', 'symbol', str), ('Score', 'selection_score', lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else str(x))]:
-            val = paper.get(key)
+    if active_paper:
+        for label, key, fmt in [
+            ('Decision', 'decision', str),
+            ('Symbol', 'symbol', str),
+            ('Mode', 'mode', str),
+            ('Position qty', 'position_qty', lambda x: str(int(x)) if isinstance(x, (int, float)) else str(x)),
+        ]:
+            val = active_paper.get(key)
             if val is not None:
                 paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {fmt(val)}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
+        paper_items.append(html.Div([html.Span("UPDATED".upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {to_ist_verbose(active_paper.get('generated_at'))}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
     if live_paper:
         for label, key in [('Live mode', 'mode'), ('Time', 'time')]:
             val = live_paper.get(key)
             if val:
                 paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
     if paper_items:
-        children.append(section("Paper trading state", [html.Div(paper_items, style={**CARD_STYLE, "display": "flex", "flexWrap": "wrap", "gap": "8px"})]))
+        children.append(section("Paper snapshot", [html.Div(paper_items, style={**CARD_STYLE, "display": "flex", "flexWrap": "wrap", "gap": "8px"})], "Oracle paper shadow is separate from the Telegram paper ledger. Service restarts update rules immediately, but the shadow snapshot only changes when paper_shadow.py runs."))
+
+    validation = promoted_validation.get("validation") or {}
+    variant = promoted_validation.get("variant") or {}
+    if validation:
+        validation_cards = html.Div(
+            [
+                metric_card("Promoted config", variant.get("name", "-"), data.get("promoted_validation_path") or "5y validate"),
+                metric_card("1L starting capital", friendly(validation.get("starting_capital")), "5Y live-parity validation"),
+                metric_card("1L final equity", friendly(validation.get("final_equity")), f"return {friendly(validation.get('return_pct'))}%"),
+                metric_card("CAGR %", validation.get("cagr_pct", "-"), f"DD {friendly(validation.get('drawdown_pct'))}%"),
+                metric_card("Trades", validation.get("trades", "-"), f"win {friendly(validation.get('win_rate_pct'))}%"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        config_items = []
+        for block_name, block in [("buy", variant.get("buy") or {}), ("sell", variant.get("sell") or {}), ("env", variant.get("env") or {})]:
+            if not block:
+                continue
+            config_items.append(html.Div([
+                html.Div(block_name.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "1px", "marginBottom": "6px"}),
+                html.Pre(json.dumps(block, indent=2), style={"margin": 0, "whiteSpace": "pre-wrap", "fontSize": "11px", "color": "#d1d5db", "fontFamily": "'JetBrains Mono', monospace"}),
+            ], style={**CARD_STYLE, "flex": "1", "minWidth": "220px"}))
+        children.append(section("Promoted rule validation, ₹1L capital", [validation_cards] + config_items, "This is a fresh 5Y live-parity validation of the currently promoted Oracle paper config with starting capital fixed at ₹1,00,000."))
 
     children.append(section("Open Telegram paper positions", [table_from_df(open_df, "paper-open-table", page_size=10)]))
     children.append(section("Closed Telegram paper positions", [table_from_df(closed_df, "paper-closed-table", page_size=10)]))

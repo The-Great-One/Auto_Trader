@@ -92,14 +92,19 @@ def _summarize_symbols(details: dict[str, dict], limit: int = 20) -> dict:
     }
 
 
-def _apply_sim_env(simulation: dict) -> dict:
+def _apply_sim_env(simulation: dict, *, starting_capital: float | None = None) -> dict:
     applied = {}
-    env_map = (((simulation or {}).get("simulation") or {}).get("sizing_exit_sweep_env")) or {}
+    env_map = (((simulation or {}).get("simulation") or {}).get("sizing_exit_sweep_env")) or simulation.get("env") or {}
     for key, value in env_map.items():
         os.environ[str(key)] = str(value)
         applied[str(key)] = str(value)
+    if starting_capital is not None:
+        os.environ["AT_BACKTEST_STARTING_CAPITAL"] = str(starting_capital)
+        applied["AT_BACKTEST_STARTING_CAPITAL"] = str(starting_capital)
     os.environ["AT_LAB_MATCH_LIVE"] = "1"
     os.environ["AT_LAB_RNN_ENABLED"] = "0"
+    applied["AT_LAB_MATCH_LIVE"] = "1"
+    applied["AT_LAB_RNN_ENABLED"] = "0"
     return applied
 
 
@@ -107,6 +112,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", default=str(OUT_DIR / "sizing_exit_sweep_latest.json"))
     parser.add_argument("--variant")
+    parser.add_argument("--starting-capital", type=float, default=100000.0)
     args = parser.parse_args()
 
     report_path = Path(args.report)
@@ -114,15 +120,16 @@ def main() -> int:
     variant = _pick_variant(report_obj, args.variant)
 
     rec = report_obj.get("recommendation", {})
-    data_context = rec.get("data_context", {})
+    data_context = rec.get("data_context", {}) or report_obj.get("data_context", {}) or {}
     symbols = list(data_context.get("loaded_symbols") or variant.get("symbols_tested") or [])
     if not symbols:
         raise ValueError("no symbols found in report")
 
-    buy = dict((variant.get("params") or {}).get("buy") or {})
-    sell = dict((variant.get("params") or {}).get("sell") or {})
-    rnn = dict((variant.get("params") or {}).get("rnn") or {"enabled": False})
-    applied_env = _apply_sim_env(variant.get("params") or {})
+    variant_params = dict((variant.get("params") or {}))
+    buy = dict(variant_params.get("buy") or variant.get("buy") or {})
+    sell = dict(variant_params.get("sell") or variant.get("sell") or {})
+    rnn = dict(variant_params.get("rnn") or {"enabled": False})
+    applied_env = _apply_sim_env(variant_params or variant, starting_capital=args.starting_capital)
 
     print(f"Variant: {variant.get('name')}")
     print(f"Symbols: {len(symbols)}")
@@ -144,7 +151,9 @@ def main() -> int:
         lab.RULE_SET_7.CONFIG.clear()
         lab.RULE_SET_7.CONFIG.update(old_r7)
 
-    curve = _compute_curve_metrics(sim_meta.get("portfolio_equity"))
+    portfolio_equity = sim_meta.get("portfolio_equity")
+    curve = _compute_curve_metrics(portfolio_equity)
+    final_equity = float(portfolio_equity.iloc[-1]) if portfolio_equity is not None and len(portfolio_equity) else float(args.starting_capital)
     symbol_summary = _summarize_symbols(details)
     sizing = ((sim_meta.get("curve_meta") or {}).get("position_sizing") or {})
     regime = ((sim_meta.get("curve_meta") or {}).get("regime_filter") or {})
@@ -154,9 +163,12 @@ def main() -> int:
         "source_report": str(report_path),
         "variant": {
             "name": variant.get("name"),
-            "params": variant.get("params"),
-            "source_backtest_total_return_pct": variant.get("total_return_pct"),
-            "source_backtest_drawdown_pct": variant.get("max_drawdown_pct"),
+            "params": variant_params or None,
+            "buy": buy,
+            "sell": sell,
+            "env": variant.get("env") or (((variant_params.get("simulation") or {}).get("sizing_exit_sweep_env")) or {}),
+            "source_backtest_total_return_pct": variant.get("total_return_pct", variant.get("return_pct")),
+            "source_backtest_drawdown_pct": variant.get("max_drawdown_pct", variant.get("drawdown_pct")),
             "source_backtest_trades": variant.get("trades"),
             "source_backtest_win_rate_pct": variant.get("win_rate_pct"),
         },
@@ -164,6 +176,8 @@ def main() -> int:
         "data_context": data_ctx,
         "simulation_env": applied_env,
         "validation": {
+            "starting_capital": float(args.starting_capital),
+            "final_equity": round(final_equity, 2),
             "return_pct": result.total_return_pct,
             "drawdown_pct": result.max_drawdown_pct,
             "trades": result.trades,
