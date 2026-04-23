@@ -1730,6 +1730,9 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
                 "tradingsymbol": r.get("channel") or "",
                 "entry_price": round(entry, 2),
                 "last_price": round(last, 2),
+                "qty": int(qty),
+                "invested": invested,
+                "market_value": round(qty * last, 2) if qty > 0 else None,
                 "mtm_return_pct": safe_num(r.get("profit_pct_live")),
                 "mtm_pnl": mtm_pnl,
                 "targets_hit": [],
@@ -1753,10 +1756,16 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
                 continue
             qty = int(closed_alloc // entry) if entry > 0 and closed_alloc > 0 else 0
             qty = max(qty, 1) if entry > 0 else 0
+            invested = round(qty * entry, 2) if qty > 0 else None
+            exit_price = round(entry * (1.0 + ret / 100.0), 2) if qty > 0 else None
             pnl = round((ret / 100.0) * entry * qty, 2) if qty > 0 else None
             closed_equity_positions.append({
                 "symbol": r.get("symbol"),
                 "tradingsymbol": r.get("channel") or "",
+                "entry_price": round(entry, 2),
+                "exit_price": exit_price,
+                "qty": int(qty),
+                "invested": invested,
                 "return_pct": ret,
                 "pnl": pnl,
                 "exit_reason": exit_reason,
@@ -1769,14 +1778,18 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     eq_net_pct = (eq_net_pnl / eq_starting * 100.0) if eq_starting else 0.0
     eq_portfolio = eq_starting + eq_net_pnl
     eq_open_avg = avg_present([p.get("mtm_return_pct") for p in open_equity_positions])
+    eq_open_invested = sum(float(p.get("invested") or 0.0) for p in open_equity_positions)
+    eq_open_market_value = sum(float(p.get("market_value") or 0.0) for p in open_equity_positions)
+    eq_cash = eq_portfolio - eq_open_market_value
 
     equity_metrics = html.Div(
         [
-            metric_card("Equity portfolio", f"₹{eq_portfolio:,.0f}", f"Signals {total_equity_signals} | extracted {total_equity_extracted}"),
+            metric_card("Equity portfolio", f"₹{eq_portfolio:,.0f}", f"₹1L book | signals {total_equity_signals}"),
             metric_card("Equity net PnL", fmt_pnl(eq_net_pnl, "₹"), fmt_pct(eq_net_pct)),
+            metric_card("Cash", f"₹{eq_cash:,.0f}", "free book cash"),
+            metric_card("Open invested", f"₹{eq_open_invested:,.0f}", f"value ₹{eq_open_market_value:,.0f}"),
             metric_card("Realized", fmt_pnl(eq_realized, "₹"), "Booked"),
             metric_card("Unrealized", fmt_pnl(eq_unrealized, "₹"), "Open MTM"),
-            metric_card("Equity signals", total_equity_signals, f"channels {len(available_equity_channels)}"),
             metric_card("Equity open avg %", eq_open_avg, "live mark to market"),
             metric_card("Open", len(open_equity_positions), "positions"),
             metric_card("Closed", len(closed_equity_positions), "positions"),
@@ -1796,8 +1809,9 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if mtm > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if mtm < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
             rows.append(html.Div([
                 html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
-                html.Div(f"Entry ₹{p.get('entry_price')} → Last ₹{p.get('last_price')}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                html.Div(f"Entry ₹{p.get('entry_price')} × Qty {p.get('qty')} → Last ₹{p.get('last_price')}", style={"fontSize": "12px", "color": "#9ca3af"}),
                 html.Div(f"{mtm:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                html.Div(f"Invested ₹{friendly(p.get('invested'))} | Value ₹{friendly(p.get('market_value'))}", style={"fontSize": "11px", "color": "#6b7280"}),
                 html.Div(f"SL: {sl} | Targets: {targets_text}", style={"fontSize": "11px", "color": "#6b7280"}),
             ], style={**CARD_STYLE, "marginBottom": "8px"}))
         children.append(section(f"Telegram equity open positions ({len(open_equity_positions)})", rows))
@@ -1812,8 +1826,9 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if pnl < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN}
             rows.append(html.Div([
                 html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"Entry ₹{p.get('entry_price')} × Qty {p.get('qty')} → Exit ₹{p.get('exit_price')}", style={"fontSize": "12px", "color": "#9ca3af"}),
                 html.Div(f"{ret:+.2f}% (₹{pnl:+,.0f})", style=color_style),
-                html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+                html.Div(f"Invested ₹{friendly(p.get('invested'))} | Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
             ], style={**CARD_STYLE, "marginBottom": "8px"}))
         children.append(section(f"Telegram equity closed positions ({len(closed_equity_positions)})", rows))
     else:
