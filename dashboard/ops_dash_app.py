@@ -2398,16 +2398,20 @@ def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
     earnings_scoreboard = earnings_pipeline.get("symbol_scoreboard") or []
     if earnings_context:
         upcoming_df = pd.DataFrame(earnings_context[:12]).copy()
+        if "latest_signal" in upcoming_df.columns:
+            upcoming_df["latest_signal"] = upcoming_df["latest_signal"].fillna("-").replace("", "-").str.upper()
         if "latest_earnings_headline" in upcoming_df.columns:
             upcoming_df["latest_matched_headline"] = upcoming_df["latest_earnings_headline"].fillna("-").replace("", "-")
             upcoming_df = upcoming_df.drop(columns=["latest_earnings_headline"])
-        children.append(section("EARNINGS PIPELINE", [table_from_df(upcoming_df, "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings enriched with how each symbol behaved after prior matched earnings/results headlines."))
+        children.append(section("EARNINGS PIPELINE", [table_from_df(upcoming_df, "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings with prior matched earnings headline, signal, and follow-through move."))
     if earnings_scoreboard:
         scoreboard_df = pd.DataFrame(earnings_scoreboard[:12]).copy()
+        if "latest_signal" in scoreboard_df.columns:
+            scoreboard_df["latest_signal"] = scoreboard_df["latest_signal"].fillna("-").replace("", "-").str.upper()
         if "latest_title" in scoreboard_df.columns:
             scoreboard_df["latest_matched_headline"] = scoreboard_df["latest_title"].fillna("-").replace("", "-")
             scoreboard_df = scoreboard_df.drop(columns=["latest_title"])
-        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(scoreboard_df, "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after matched earnings/results headlines in the recent archive."))
+        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(scoreboard_df, "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after matched earnings headlines, including latest signal and move."))
 
     # ── 3. SECTOR HEATMAP ──────────────────────────────────
     sectors = eco.get("sectors") or []

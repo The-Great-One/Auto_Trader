@@ -241,6 +241,14 @@ def infer_direction(row: dict[str, Any]) -> int:
     return 0
 
 
+def direction_label(direction: int) -> str:
+    if direction > 0:
+        return 'positive'
+    if direction < 0:
+        return 'negative'
+    return 'neutral'
+
+
 def compute_forward_behavior(symbol: str, event_dt: datetime, cache: dict[str, pd.DataFrame]) -> dict[str, Any] | None:
     df = get_price_frame(symbol, cache, event_dt - timedelta(days=20), event_dt + timedelta(days=20))
     if df is None or df.empty:
@@ -397,14 +405,16 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
             if not behavior:
                 continue
             ret_3d = behavior.get('ret_3d_pct')
+            event_sentiment = float(((row.get('classification') or {}).get('sentiment')) or 0.0)
             events.append({
                 'symbol': symbol,
                 'title': headline,
                 'kind': row.get('kind'),
                 'source': row.get('source'),
                 'published_at': int(row.get('published_at') or row.get('fetched_at') or 0),
-                'sentiment': float(((row.get('classification') or {}).get('sentiment')) or 0.0),
+                'sentiment': event_sentiment,
                 'direction': direction,
+                'direction_label': direction_label(direction),
                 'alignment_3d_pct': round(float(ret_3d) * direction, 2) if direction and isinstance(ret_3d, (int, float)) else None,
                 **behavior,
             })
@@ -428,6 +438,10 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
             'positive_rate_3d': positive_rate([b.get('ret_3d_pct') for b in bucket]),
             'latest_title': latest_event.get('title'),
             'latest_published_at': latest_event.get('published_at'),
+            'latest_signal': latest_event.get('direction_label'),
+            'latest_signal_score': latest_event.get('sentiment'),
+            'latest_ret_1d_pct': latest_event.get('ret_1d_pct'),
+            'latest_ret_3d_pct': latest_event.get('ret_3d_pct'),
         })
     scoreboard.sort(key=lambda x: (x.get('events', 0), x.get('avg_alignment_3d_pct') or -999), reverse=True)
 
@@ -444,6 +458,10 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
             'avg_post_earnings_5d_pct': hist.get('avg_ret_5d_pct'),
             'avg_alignment_3d_pct': hist.get('avg_alignment_3d_pct'),
             'latest_earnings_headline': latest_event.get('title'),
+            'latest_signal': latest_event.get('direction_label'),
+            'latest_signal_score': latest_event.get('sentiment'),
+            'latest_ret_1d_pct': latest_event.get('ret_1d_pct'),
+            'latest_ret_3d_pct': latest_event.get('ret_3d_pct'),
         })
     upcoming.sort(key=lambda x: (str(x.get('earnings_date') or '9999-99-99'), str(x.get('symbol') or '')))
 
