@@ -25,6 +25,8 @@ LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity
 TELEGRAM_TRADE_AUDIT_PATH = REPORTS_DIR / "telegram_trade_audit_latest.json"
 ECO_CALENDAR_PATH = REPORTS_DIR / "economic_calendar_sector_latest.json"
 GLOBAL_MACRO_PATH = REPORTS_DIR / "global_macro_latest.json"
+NEWS_BEHAVIOR_PATH = REPORTS_DIR / "news_topic_symbol_behavior_latest.json"
+EARNINGS_PIPELINE_PATH = REPORTS_DIR / "earnings_call_pipeline_latest.json"
 WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
 WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
 SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key")))
@@ -41,12 +43,14 @@ SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 ECO_CALENDAR_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 TELEGRAM_AUDIT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+EVENT_PIPELINES_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 DASH_DATA_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
 GLOBAL_MACRO_TTL_SECONDS = 600
 ECO_CALENDAR_TTL_SECONDS = 600
+EVENT_PIPELINES_TTL_SECONDS = 900
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def to_ist(dt_str: str | None) -> str:
@@ -624,6 +628,46 @@ def load_eco_calendar() -> dict[str, Any]:
     return out
 
 
+def load_event_pipelines() -> dict[str, Any]:
+    now = time.time()
+    cached = EVENT_PIPELINES_CACHE.get("data")
+    if cached is not None and now - float(EVENT_PIPELINES_CACHE.get("ts", 0.0)) < 30:
+        return cached if isinstance(cached, dict) else {}
+
+    news_payload = load_json(NEWS_BEHAVIOR_PATH) or {}
+    earnings_payload = load_json(EARNINGS_PIPELINE_PATH) or {}
+
+    output_mtime = max(
+        NEWS_BEHAVIOR_PATH.stat().st_mtime if NEWS_BEHAVIOR_PATH.exists() else 0.0,
+        EARNINGS_PIPELINE_PATH.stat().st_mtime if EARNINGS_PIPELINE_PATH.exists() else 0.0,
+    )
+    input_mtime = max(
+        (REPORTS_DIR / "market_topics_latest.json").stat().st_mtime if (REPORTS_DIR / "market_topics_latest.json").exists() else 0.0,
+        ECO_CALENDAR_PATH.stat().st_mtime if ECO_CALENDAR_PATH.exists() else 0.0,
+        (REPORTS_DIR / "news_sentiment_latest.json").stat().st_mtime if (REPORTS_DIR / "news_sentiment_latest.json").exists() else 0.0,
+    )
+    if not news_payload or not earnings_payload or output_mtime + EVENT_PIPELINES_TTL_SECONDS < now or input_mtime > output_mtime + 2:
+        try:
+            subprocess.run(
+                [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "generate_market_event_pipelines.py")],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            news_payload = load_json(NEWS_BEHAVIOR_PATH) or news_payload or {}
+            earnings_payload = load_json(EARNINGS_PIPELINE_PATH) or earnings_payload or {}
+        except Exception:
+            pass
+
+    out = {
+        "news_behavior": news_payload if isinstance(news_payload, dict) else {},
+        "earnings_pipeline": earnings_payload if isinstance(earnings_payload, dict) else {},
+    }
+    EVENT_PIPELINES_CACHE.update({"ts": now, "data": out})
+    return out
+
+
 def recent_report_files(limit: int = 80) -> pd.DataFrame:
     rows = []
     for path in REPORTS_DIR.iterdir():
@@ -746,6 +790,7 @@ def collect_data() -> dict[str, Any]:
     options_paper = load_json(REPORTS_DIR / "paper_shadow_options_latest.json") or {}
     news_payload = load_json(REPORTS_DIR / "news_sentiment_latest.json") or {}
     topics_payload = load_json(REPORTS_DIR / "market_topics_latest.json") or {}
+    event_pipelines = load_event_pipelines()
     hourly_lab = load_json(REPORTS_DIR / "hourly_lab_status_latest.json") or {}
     lab_status = load_json(LAB_STATUS_PATH) or {}
     combined_labs = load_combined_lab_table(limit=30)
@@ -783,6 +828,8 @@ def collect_data() -> dict[str, Any]:
         "options_paper": options_paper,
         "news_payload": news_payload,
         "topics_payload": topics_payload,
+        "news_behavior": event_pipelines.get("news_behavior") or {},
+        "earnings_pipeline": event_pipelines.get("earnings_pipeline") or {},
         "hourly_lab": hourly_lab,
         "lab_status": lab_status,
         "combined_labs": combined_labs,
@@ -1211,6 +1258,7 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
     topics_df = data["topics_df"]
     news_payload = data["news_payload"]
     topics_payload = data["topics_payload"]
+    news_behavior = data.get("news_behavior") or {}
     children: list[Any] = []
 
     symbol_news = paper.get("symbol_news_sentiment") or {}
@@ -1231,6 +1279,24 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
         style={**CARD_STYLE, "padding": "10px 12px"},
     )
     children.append(section("News and sentiment", [cards, news_timestamp], "This covers both symbol-level sentiment and macro topic feeds used by the paper overlay."))
+
+    behavior_pairs = news_behavior.get("top_topic_symbol_pairs") or []
+    if behavior_pairs:
+        behavior_cards = html.Div(
+            [
+                metric_card("Topic rows matched", news_behavior.get("matched_events", 0), f"lookback {news_behavior.get('lookback_days', '-') }d"),
+                metric_card("Tracked topic-symbol pairs", len(behavior_pairs), "news first, symbols second"),
+                metric_card("Best avg alignment 3d %", behavior_pairs[0].get("avg_alignment_3d_pct", "-"), behavior_pairs[0].get("symbol", "")),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        behavior_df = pd.DataFrame(behavior_pairs[:12])
+        children.append(section("Topic news → symbol behavior", [behavior_cards, table_from_df(behavior_df, "topic-symbol-behavior-table", page_size=12)], "This flips the lens: start from topic/news events, map mentioned symbols, then score how those symbols behaved after the news."))
+
+    recent_behavior = news_behavior.get("recent_events") or []
+    if recent_behavior:
+        recent_df = pd.DataFrame(recent_behavior[:12])
+        children.append(section("Recent topic-driven symbol reactions", [table_from_df(recent_df, "recent-topic-reactions-table", page_size=12)]))
 
     # ── MARKET PREDICTION ──
     pred = compute_market_prediction(data)
@@ -1520,6 +1586,8 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         if channels:
             score_rows = []
             for chat, s in channels.items():
+                option_audit = s.get("options_audit") or {}
+                paper_stats = s.get("paper_stats") or {}
                 score_rows.append({
                     "channel": chat,
                     "confidence": s.get("confidence", "-"),
@@ -1527,8 +1595,12 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
                     "sizing_mult": s.get("sizing_mult", "-"),
                     "win_rate%": s.get("win_rate", "-"),
                     "avg_ret%": s.get("avg_return_pct", "-"),
+                    "option_10d_avg%": option_audit.get("dir_ret_10d_avg", "-"),
+                    "option_20d_pos%": option_audit.get("dir_ret_20d_positive_rate", "-"),
+                    "resolve_rate%": paper_stats.get("contract_resolution_rate", "-"),
                     "n_trades": s.get("n_trades", 0),
                     "ladder": s.get("ladder_style", "-"),
+                    "sl": s.get("sl_style", "-"),
                 })
             score_df = pd.DataFrame(score_rows)
             recs = channel_scores.get("recommendations") or []
@@ -1888,6 +1960,7 @@ def build_global_macro_tab(data: dict[str, Any]) -> list[Any]:
 
 def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
     eco = load_eco_calendar()
+    earnings_pipeline = data.get("earnings_pipeline") or {}
     if not eco:
         return [empty_message("Calendar + sector data not yet available. Refreshing in ~30s.")]
 
@@ -1945,6 +2018,13 @@ def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
         children.append(section("EARNINGS CALENDAR", [table_from_df(earn_df, "earnings-table", page_size=10)], "Upcoming earnings for tracked universe symbols"))
     else:
         children.append(section("EARNINGS CALENDAR", [empty_message("No upcoming earnings found for tracked symbols.")]))
+
+    earnings_context = earnings_pipeline.get("upcoming_with_context") or []
+    earnings_scoreboard = earnings_pipeline.get("symbol_scoreboard") or []
+    if earnings_context:
+        children.append(section("EARNINGS PIPELINE", [table_from_df(pd.DataFrame(earnings_context[:12]), "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings enriched with how each symbol behaved after prior earnings-related news/results events."))
+    if earnings_scoreboard:
+        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(pd.DataFrame(earnings_scoreboard[:12]), "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after earnings/results news in the recent archive."))
 
     # ── 3. SECTOR HEATMAP ──────────────────────────────────
     sectors = eco.get("sectors") or []

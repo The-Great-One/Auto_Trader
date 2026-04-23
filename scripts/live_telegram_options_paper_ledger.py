@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,9 @@ STATE_PATH = REPORTS / 'live_telegram_options_paper_state.json'
 HISTORY_PATH = REPORTS / 'live_telegram_options_paper_equity_history.jsonl'
 LATEST_JSON = REPORTS / 'live_telegram_options_paper_latest.json'
 LATEST_MD = REPORTS / 'live_telegram_options_paper_latest.md'
+WATCH_UPDATES = Path.home() / '.openclaw' / 'telegram-user' / 'watch_channel_updates.jsonl'
+TELEGRAM_AUDIT_PATH = REPORTS / 'telegram_trade_audit_latest.json'
+CHANNEL_LEARNING_SCRIPT = ROOT / 'scripts' / 'generate_channel_learning.py'
 
 TARGET_FRACTIONS = [0.5, 0.3, 0.2]
 
@@ -104,23 +108,60 @@ def match_contract(call: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]
 CHANNEL_LEARNING_PATH = Path(ROOT) / "reports" / "channel_learning_scores.json"
 
 
-def load_channel_sizing_mult(chat: str, default: float = 1.0) -> float:
-    """Load the sizing multiplier for a channel from learning scores.
-    Returns the default if no scores exist yet."""
+def refresh_channel_learning_if_stale() -> None:
+    if not CHANNEL_LEARNING_SCRIPT.exists():
+        return
+    output_mtime = CHANNEL_LEARNING_PATH.stat().st_mtime if CHANNEL_LEARNING_PATH.exists() else 0.0
+    input_paths = [TRACKED_CALLS, STATE_PATH, WATCH_UPDATES, TELEGRAM_AUDIT_PATH]
+    newest_input = max((p.stat().st_mtime for p in input_paths if p.exists()), default=0.0)
+    if CHANNEL_LEARNING_PATH.exists() and output_mtime >= newest_input - 1:
+        return
+    try:
+        subprocess.run(
+            [str(ROOT / 'venv' / 'bin' / 'python'), str(CHANNEL_LEARNING_SCRIPT)],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+    except Exception:
+        pass
+
+
+def load_channel_learning_row(chat: str) -> dict[str, Any]:
     if not CHANNEL_LEARNING_PATH.exists():
-        return default
+        return {}
     try:
         data = json.loads(CHANNEL_LEARNING_PATH.read_text())
     except Exception:
-        return default
+        return {}
     channels = data.get("channels") or {}
-    ch_data = channels.get(chat) or {}
+    return channels.get(chat) or channels.get(str(chat or '').lower()) or {}
+
+
+def load_channel_sizing_mult(chat: str, default: float = 1.0) -> float:
+    """Load the sizing multiplier for a channel from learning scores.
+    Returns the default if no scores exist yet."""
+    ch_data = load_channel_learning_row(chat)
     action = ch_data.get("action", "")
-    # Skip channels with too-low confidence
     if action == "skip_or_observe":
         return 0.0
     mult = ch_data.get("sizing_mult", default)
     return float(mult) if mult else default
+
+
+def target_fractions_for(chat: str) -> list[float]:
+    profile = (load_channel_learning_row(chat).get('execution_profile') or {})
+    fractions = profile.get('target_fractions') or []
+    cleaned = [float(x) for x in fractions if isinstance(x, (int, float)) and float(x) > 0]
+    return cleaned or list(TARGET_FRACTIONS)
+
+
+def stop_profile_for(chat: str) -> tuple[int, int]:
+    profile = (load_channel_learning_row(chat).get('execution_profile') or {})
+    to_entry = int(profile.get('move_stop_to_entry_after_hits') or 0)
+    to_last_target = int(profile.get('move_stop_to_last_target_after_hits') or 0)
+    return to_entry, to_last_target
 
 
 def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per_trade_pct: float) -> None:
@@ -247,18 +288,22 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'last_underlying_price': round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None,
         'last_snapshot_at': now_utc().isoformat(),
         'sizing_note': 'one_lot_floor_applied' if lot_floor_applied else None,
+        'channel_learning': {
+            'chat': chat,
+            'snapshot': load_channel_learning_row(chat),
+        },
     }
 
 
 def _extract_stop(call: dict[str, Any]) -> float | None:
-    text = ((call.get('initial_snapshot') or {}).get('text') or '')
+    text = ((call.get('initial_snapshot') or {}).get('text') or call.get('text') or '')
     import re
     m = re.search(r'SL-\s*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
     return float(m.group(1)) if m else None
 
 
 def _extract_targets(call: dict[str, Any]) -> list[float]:
-    text = ((call.get('initial_snapshot') or {}).get('text') or '')
+    text = ((call.get('initial_snapshot') or {}).get('text') or call.get('text') or '')
     import re
     m = re.search(r'Target-\s*([0-9+/\-. ]+)', text, re.IGNORECASE)
     return [float(x) for x in re.findall(r'\d+(?:\.\d+)?', m.group(1))[:4]] if m else []
@@ -285,6 +330,9 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
     pos['contract']['tradingsymbol'] = contract.get('tradingsymbol')
     pos['contract']['expiry'] = contract.get('expiry') or pos['contract'].get('expiry') or snap.get('nearest_expiry')
 
+    chat = str(call.get('source_chat') or '')
+    target_fractions = target_fractions_for(chat)
+    move_stop_to_entry_after_hits, move_stop_to_last_target_after_hits = stop_profile_for(chat)
     targets = pos.get('targets') or []
     hits = list(pos.get('target_hits') or [])
     remaining_qty = int(pos.get('remaining_qty') or 0)
@@ -294,11 +342,11 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
     qty = int(pos.get('qty') or 0)
 
     if target_style == 'ladder' and targets and remaining_qty > 0:
-        for idx, tgt in enumerate(targets[: len(TARGET_FRACTIONS)]):
+        for idx, tgt in enumerate(targets[: len(target_fractions)]):
             if idx in hits:
                 continue
             if price >= float(tgt):
-                sell_qty = min(remaining_qty, int(qty * TARGET_FRACTIONS[idx]))
+                sell_qty = min(remaining_qty, int(qty * target_fractions[idx]))
                 if sell_qty <= 0:
                     hits.append(idx)
                     continue
@@ -309,8 +357,11 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
                 hit_times = list(pos.get('target_hit_times') or [])
                 hit_times.append({'target': float(tgt), 'target_idx': idx, 'hit_at': now_utc().isoformat(), 'hit_price': round(price, 2)})
                 pos['target_hit_times'] = hit_times
-                if idx == 0 and stop_loss is not None:
+                hit_count = len(hits)
+                if stop_loss is not None and move_stop_to_entry_after_hits and hit_count >= move_stop_to_entry_after_hits:
                     stop_loss = max(float(stop_loss), entry_price)
+                if stop_loss is not None and move_stop_to_last_target_after_hits and hit_count >= move_stop_to_last_target_after_hits and idx >= 1:
+                    stop_loss = max(float(stop_loss), float(targets[idx - 1]))
 
     pos['target_hits'] = hits
     pos['remaining_qty'] = remaining_qty
@@ -500,6 +551,7 @@ def main() -> int:
     state['starting_capital'] = float(state.get('starting_capital') or args.starting_capital)
     state['cash'] = float(state.get('cash', state['starting_capital']))
     repair_position_placeholders(state)
+    refresh_channel_learning_if_stale()
 
     for call in tracked_calls():
         maybe_open_position(state, call, float(args.capital_per_trade_pct))
