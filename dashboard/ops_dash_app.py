@@ -436,17 +436,32 @@ def json_block(obj: Any, title: str) -> html.Details:
     )
 
 
+def _maybe_format_timeish_series(name: str, series: pd.Series, verbose: bool = False) -> pd.Series:
+    lower = str(name).lower()
+    is_timeish = any(token in lower for token in ["date", "time", "timestamp", "published", "generated", "updated", "_at"])
+    if pd.api.types.is_datetime64_any_dtype(series):
+        try:
+            localized = series.dt.tz_convert(IST)
+        except Exception:
+            try:
+                localized = series.dt.tz_localize("UTC").dt.tz_convert(IST)
+            except Exception:
+                localized = series
+        return localized.dt.strftime("%b %d, %H:%M:%S IST" if verbose else "%b %d, %H:%M")
+    if not is_timeish:
+        return series
+    parsed = series.apply(parse_timestamp_any)
+    if parsed.notna().sum() == 0:
+        return series
+    return parsed.apply(lambda x: x.tz_convert(IST).strftime("%b %d, %H:%M:%S IST" if verbose else "%b %d, %H:%M") if x is not None and pd.notna(x) else "-")
+
+
 def table_from_df(df: pd.DataFrame, table_id: str, page_size: int = 10) -> dash_table.DataTable | html.Div:
     if df.empty:
         return empty_message("No data yet.")
     show = df.copy()
     for col in show.columns:
-        if pd.api.types.is_datetime64_any_dtype(show[col]):
-            try:
-                show[col] = show[col].dt.tz_convert(IST)
-            except Exception:
-                pass
-            show[col] = show[col].dt.strftime("%b %d, %H:%M")
+        show[col] = _maybe_format_timeish_series(col, show[col], verbose=False)
     # Sanitize NaN/Inf — these cause Dash "Invalid value" errors
     show = show.fillna("-").replace([float("inf"), float("-inf")], "-")
     return dash_table.DataTable(
@@ -1436,8 +1451,8 @@ def build_news_tab(data: dict[str, Any]) -> list[Any]:
     symbol_news = paper.get("symbol_news_sentiment") or {}
     cards = html.Div(
         [
-            metric_card("Tracked sentiment symbols", len(sentiment_df), data.get("news_payload", {}).get("generated_at", "news feed")),
-            metric_card("Market topics", len(topics_df), data.get("topics_payload", {}).get("generated_at", "topic feeds")),
+            metric_card("Tracked sentiment symbols", len(sentiment_df), to_ist_verbose(data.get("news_payload", {}).get("generated_at")) if isinstance(data.get("news_payload"), dict) else "news feed"),
+            metric_card("Market topics", len(topics_df), to_ist_verbose(data.get("topics_payload", {}).get("generated_at")) if isinstance(data.get("topics_payload"), dict) else "topic feeds"),
             metric_card("Current paper symbol sentiment", symbol_news.get("weighted_sentiment", "-"), paper.get("symbol", "NIFTYETF")),
             metric_card("Paper symbol headlines", symbol_news.get("item_count", "-"), ", ".join(symbol_news.get("dominant_types") or [])),
         ],
@@ -2472,12 +2487,7 @@ def table_payload(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str
         return [], []
     show = df.copy()
     for col in show.columns:
-        if pd.api.types.is_datetime64_any_dtype(show[col]):
-            try:
-                show[col] = show[col].dt.tz_convert(IST)
-            except Exception:
-                pass
-            show[col] = show[col].dt.strftime("%b %d, %H:%M")
+        show[col] = _maybe_format_timeish_series(col, show[col], verbose=False)
     return show.to_dict("records"), [{"name": c, "id": c} for c in show.columns]
 
 
