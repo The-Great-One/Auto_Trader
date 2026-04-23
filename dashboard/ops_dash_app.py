@@ -40,6 +40,7 @@ COMBINED_LAB_STATUS_FILES = [
 SERVER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 ECO_CALENDAR_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+TELEGRAM_AUDIT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 DASH_DATA_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
@@ -535,8 +536,30 @@ def load_market_topics_rows() -> pd.DataFrame:
 
 
 def load_telegram_trade_audit() -> dict[str, Any]:
+    now = time.time()
+    cached = TELEGRAM_AUDIT_CACHE.get("data")
+    if cached is not None and now - float(TELEGRAM_AUDIT_CACHE.get("ts", 0.0)) < 20:
+        return cached if isinstance(cached, dict) else {}
+
+    audit_mtime = TELEGRAM_TRADE_AUDIT_PATH.stat().st_mtime if TELEGRAM_TRADE_AUDIT_PATH.exists() else 0.0
+    watch_mtime = WATCH_UPDATES_PATH.stat().st_mtime if WATCH_UPDATES_PATH.exists() else 0.0
+    if watch_mtime > audit_mtime + 2:
+        try:
+            subprocess.run(
+                [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "generate_telegram_trade_audit.py")],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=240,
+            )
+        except Exception:
+            pass
+
     payload = load_json(TELEGRAM_TRADE_AUDIT_PATH)
-    return payload if isinstance(payload, dict) else {}
+    payload = payload if isinstance(payload, dict) else {}
+    TELEGRAM_AUDIT_CACHE["ts"] = now
+    TELEGRAM_AUDIT_CACHE["data"] = payload
+    return payload
 
 
 def load_global_macro() -> dict[str, Any]:
