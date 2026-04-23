@@ -77,6 +77,9 @@ def repair_position_placeholders(state: dict[str, Any]) -> None:
                 continue
         if status == 'skipped' and pos.get('reason') == 'insufficient_cash_for_one_lot' and call.get('option_side') and call.get('option_strike'):
             to_delete.append(pos_key)
+            continue
+        if status == 'skipped' and pos.get('reason') == 'not_option_signal':
+            to_delete.append(pos_key)
     for pos_key in to_delete:
         positions.pop(pos_key, None)
 
