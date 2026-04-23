@@ -72,13 +72,41 @@ def _uniq(items):
 def evaluate_signal(df, row, holdings):
     from .utils import get_mmi_now
 
+    core_gate_names = [
+        "trend_ok",
+        "trend_slope_ok",
+        "adx_ok",
+        "volume_confirm",
+        "cmf_ok",
+        "obv_ok",
+        "macd_signal_ok",
+        "macd_hist_rising",
+        "rsi_floor_ok",
+        "atr_band_ok",
+        "extension_ok",
+        "supertrend_price_ok",
+        "supertrend_direction_ok",
+        "weekly_trend_ok",
+        "mmi_ok",
+        "vwap_ok",
+        "ich_cloud_ok",
+        "sar_ok",
+        "cci_ok",
+        "di_cross_ok",
+        "di_plus_ok",
+    ]
+
     if len(df) < 3:
         return "HOLD", {
             "entry_gate_failures": ["short_history"],
             "hard_blocks": ["short_history"],
+            "hard_block_count": 1,
             "nearest_mode": None,
             "nearest_mode_missing": ["short_history"],
             "nearest_mode_missing_count": 1,
+            "readiness_score_pct": 0.0,
+            "score_gap_to_buy": None,
+            "blocker_pressure": {"hard_blocks": 1, "nearest_mode_missing": 1},
             "gate_status": {"enough_history": False},
             "metric_snapshot": {},
             "threshold_snapshot": {
@@ -320,6 +348,28 @@ def evaluate_signal(df, row, holdings):
         "breakout_mode": bool(breakout_mode),
     }
 
+    passed_core_gates = sum(1 for name in core_gate_names if gate_status.get(name))
+    readiness_score_pct = round(100.0 * passed_core_gates / len(core_gate_names), 1)
+    score_gap_to_buy = round((1.25 * len(hard_blocks)) + (0.75 * len(nearest_mode_missing)), 3)
+    blocker_pressure = {
+        "hard_blocks": len(hard_blocks),
+        "nearest_mode_missing": len(nearest_mode_missing),
+        "alternate_mode_missing": len(breakout_missing if nearest_mode == "pullback" else pullback_missing),
+    }
+    blocker_margins = {
+        "adx_gap": _safe_metric(max(0.0, CONFIG["adx_min"] - float(adx))),
+        "adx_strong_gap": _safe_metric(max(0.0, CONFIG["adx_strong_min"] - float(adx))),
+        "volume_gap_ratio": _safe_metric(max(0.0, CONFIG["volume_confirm_mult"] - (float(vol) / max(float(vol_sma), 1e-9)))),
+        "cmf_gap": _safe_metric(max(0.0, float(cmf_gate) - float(cmf))),
+        "rsi_floor_gap": _safe_metric(max(0.0, CONFIG["rsi_floor"] - float(rsi))),
+        "extension_gap_atr": _safe_metric(max(0.0, float(extension_atr) - CONFIG["max_extension_atr"])) if np.isfinite(extension_atr) else None,
+        "atr_below_min_gap": _safe_metric(max(0.0, CONFIG["min_atr_pct"] - float(atr_pct))) if np.isfinite(atr_pct) else None,
+        "atr_above_max_gap": _safe_metric(max(0.0, float(atr_pct) - CONFIG["max_atr_pct"])) if np.isfinite(atr_pct) else None,
+        "vwap_gap_pct": _safe_metric(max(0.0, (float(vwap) - close) / max(close, 1e-9))) if np.isfinite(vwap) else None,
+        "cci_gap": _safe_metric(max(0.0, CONFIG["cci_buy_min"] - float(cci))) if np.isfinite(cci) else None,
+        "di_plus_gap": _safe_metric(max(0.0, CONFIG["di_plus_min"] - float(plus_di))) if np.isfinite(plus_di) else None,
+    }
+
     metric_snapshot = {
         "close": _safe_metric(close),
         "ema20": _safe_metric(ema20),
@@ -394,10 +444,15 @@ def evaluate_signal(df, row, holdings):
     return decision, {
         "entry_gate_failures": entry_gate_failures,
         "hard_blocks": hard_blocks,
+        "hard_block_count": len(hard_blocks),
         "nearest_mode": nearest_mode,
         "nearest_mode_missing": nearest_mode_missing,
         "nearest_mode_missing_count": len(nearest_mode_missing),
         "alternate_mode_missing": breakout_missing if nearest_mode == "pullback" else pullback_missing,
+        "readiness_score_pct": readiness_score_pct,
+        "score_gap_to_buy": score_gap_to_buy,
+        "blocker_pressure": blocker_pressure,
+        "blocker_margins": blocker_margins,
         "gate_status": gate_status,
         "metric_snapshot": metric_snapshot,
         "threshold_snapshot": threshold_snapshot,

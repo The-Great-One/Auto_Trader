@@ -35,6 +35,25 @@ def is_market_open_today() -> tuple[bool, str]:
     return open_today, str(today)
 
 
+DEFAULT_DAILY_OPTIONS_LAB_MAX_VARIANTS = max(
+    1,
+    int(os.getenv("AT_DAILY_OPTIONS_LAB_MAX_VARIANTS", os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", "180"))),
+)
+DEFAULT_WEEKEND_OPTIONS_LAB_MAX_VARIANTS = max(
+    DEFAULT_DAILY_OPTIONS_LAB_MAX_VARIANTS,
+    int(os.getenv("AT_WEEKEND_OPTIONS_LAB_MAX_VARIANTS", "320")),
+)
+
+
+def resolve_options_lab_max_variants(now: datetime | None = None) -> int:
+    now = now or ist_now()
+    return (
+        DEFAULT_WEEKEND_OPTIONS_LAB_MAX_VARIANTS
+        if now.weekday() >= 5
+        else DEFAULT_DAILY_OPTIONS_LAB_MAX_VARIANTS
+    )
+
+
 def _extract_json_payload(text: str):
     text = (text or "").strip()
     if not text:
@@ -62,9 +81,9 @@ def _extract_json_payload(text: str):
 
 
 
-def _run_json_script(script_name: str) -> dict:
+def _run_json_script(script_name: str, env: dict | None = None) -> dict:
     cmd = [PYTHON_BIN, str(SCRIPTS / script_name)]
-    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env)
     payload = _extract_json_payload(proc.stdout)
     return {
         "ok": proc.returncode == 0,
@@ -273,7 +292,9 @@ def main():
             paper["reason"] = None if paper.get("ok") else f"failed_rc_{paper.get('returncode')}"
             summary["paper_shadow"] = _mark_stale(paper, trade_date, ["options_shadow"])
 
-            lab = _run_json_script("options_strategy_lab.py")
+            lab_env = os.environ.copy()
+            lab_env["AT_OPTIONS_LAB_MAX_VARIANTS"] = str(resolve_options_lab_max_variants(now))
+            lab = _run_json_script("options_strategy_lab.py", env=lab_env)
             lab["reason"] = None if lab.get("ok") else f"failed_rc_{lab.get('returncode')}"
             summary["options_lab"] = _mark_stale(lab, trade_date)
         else:

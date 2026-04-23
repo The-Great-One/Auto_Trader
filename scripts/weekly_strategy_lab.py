@@ -705,22 +705,22 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
     sell_cfg = RULE_SET_2.CONFIG
 
     buy_grid = {
-        "adx_min": prioritized_values([10, 12, 14, 16, 18, 20, 22], buy_cfg["adx_min"]),
+        "adx_min": prioritized_values([6, 8, 10, 12, 14, 16, 18], buy_cfg["adx_min"]),
         "adx_strong_min": prioritized_values([18, 20, 22, 25, 28, 30], buy_cfg["adx_strong_min"]),
         "max_obv_zscore": prioritized_values([2.0, 2.5, 3.0, 3.5, 4.0, 5.0], buy_cfg["max_obv_zscore"]),
         "obv_min_zscore": prioritized_values([0.0, 0.25, 0.5, 0.75, 1.0], buy_cfg["obv_min_zscore"]),
         "max_extension_atr": prioritized_values([1.5, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5], buy_cfg["max_extension_atr"]),
         "mmi_risk_off": prioritized_values([60, 62, 65, 68, 70, 75], buy_cfg["mmi_risk_off"]),
-        "volume_confirm_mult": prioritized_values([0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3], buy_cfg["volume_confirm_mult"]),
+        "volume_confirm_mult": prioritized_values([0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05], buy_cfg["volume_confirm_mult"]),
         "cmf_base_min": prioritized_values([0.0, 0.02, 0.03, 0.05, 0.08], buy_cfg["cmf_base_min"]),
-        "rsi_floor": prioritized_values([38, 40, 42, 45, 48, 50], buy_cfg["rsi_floor"]),
-        "stoch_pull_max": prioritized_values([60, 65, 70, 75, 80, 85, 90], buy_cfg["stoch_pull_max"]),
-        "stoch_momo_max": prioritized_values([75, 80, 85, 90, 95], buy_cfg["stoch_momo_max"]),
-        "min_atr_pct": prioritized_values([0.002, 0.003, 0.005, 0.006, 0.008], buy_cfg["min_atr_pct"]),
+        "rsi_floor": prioritized_values([34, 36, 38, 40, 42, 45, 48], buy_cfg["rsi_floor"]),
+        "stoch_pull_max": prioritized_values([65, 70, 75, 80, 85, 90, 95], buy_cfg["stoch_pull_max"]),
+        "stoch_momo_max": prioritized_values([80, 85, 90, 95], buy_cfg["stoch_momo_max"]),
+        "min_atr_pct": prioritized_values([0.001, 0.002, 0.003, 0.005, 0.006, 0.008], buy_cfg["min_atr_pct"]),
         "max_atr_pct": prioritized_values([0.07, 0.08, 0.09, 0.10, 0.12], buy_cfg["max_atr_pct"]),
         "ich_cloud_bull": prioritized_values([0, 1], buy_cfg["ich_cloud_bull"]),
         "vwap_buy_above": prioritized_values([0, 1], buy_cfg["vwap_buy_above"]),
-        "cci_buy_min": prioritized_values([-150, -125, -100, -75, -50], buy_cfg["cci_buy_min"]),
+        "cci_buy_min": prioritized_values([-175, -150, -125, -100, -75, -50], buy_cfg["cci_buy_min"]),
     }
     sell_grid = {
         "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0, 48.0], sell_cfg["momentum_exit_rsi"]),
@@ -734,11 +734,13 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
     }
 
     if scorecard_context.get("no_trade_day"):
-        buy_grid["adx_min"] = prioritized_values([8, 10, 12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
+        buy_grid["adx_min"] = prioritized_values([6, 8, 10, 12, *buy_grid["adx_min"]], buy_cfg["adx_min"])
         buy_grid["max_obv_zscore"] = prioritized_values([*buy_grid["max_obv_zscore"], 4.0, 5.0], buy_cfg["max_obv_zscore"])
         buy_grid["max_extension_atr"] = prioritized_values([*buy_grid["max_extension_atr"], 3.5], buy_cfg["max_extension_atr"])
         buy_grid["mmi_risk_off"] = prioritized_values([*buy_grid["mmi_risk_off"], 70, 75], buy_cfg["mmi_risk_off"])
-        buy_grid["volume_confirm_mult"] = prioritized_values([0.8, 0.9, 0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
+        buy_grid["volume_confirm_mult"] = prioritized_values([0.7, 0.75, 0.8, 0.9, 0.95, *buy_grid["volume_confirm_mult"]], buy_cfg["volume_confirm_mult"])
+        buy_grid["rsi_floor"] = prioritized_values([34, 36, 38, 40, *buy_grid["rsi_floor"]], buy_cfg["rsi_floor"])
+        buy_grid["stoch_pull_max"] = prioritized_values([85, 90, 95, *buy_grid["stoch_pull_max"]], buy_cfg["stoch_pull_max"])
         buy_grid["ich_cloud_bull"] = prioritized_values([0, 1], buy_cfg["ich_cloud_bull"])
         buy_grid["vwap_buy_above"] = prioritized_values([0, 1], buy_cfg["vwap_buy_above"])
 
@@ -846,6 +848,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         "cmf_base_min",
         "rsi_floor",
         "min_atr_pct",
+        "max_extension_atr",
         "ich_cloud_bull",
         "vwap_buy_above",
         "stoch_pull_max",
@@ -879,6 +882,9 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         {"adx_min": 12, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
         {"adx_min": 12, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0, "vwap_buy_above": 0},
         {"cci_buy_min": -125, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+        {"adx_min": 8, "volume_confirm_mult": 0.75, "rsi_floor": 38, "stoch_pull_max": 90, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        {"adx_min": 8, "volume_confirm_mult": 0.75, "max_extension_atr": 3.2, "obv_min_zscore": 0.0, "ich_cloud_bull": 0},
+        {"adx_min": 6, "volume_confirm_mult": 0.7, "rsi_floor": 36, "stoch_pull_max": 95, "cci_buy_min": -150, "vwap_buy_above": 0},
     ]
     curated_sell = [
         {},
@@ -894,7 +900,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
             curated_idx += 1
             add(f"curated_combo_{curated_idx:03d}", buy_patch, sell_patch, {"enabled": False})
 
-    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "500"))
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "700"))
     return out[:max_variants]
 
 
@@ -1217,6 +1223,12 @@ def main():
         )
     best = rank[0]
 
+    min_promote_return_gain = float(os.getenv("AT_LAB_MIN_PROMOTE_RETURN_GAIN", "1.0") or 1.0)
+    min_promote_score_gain = float(os.getenv("AT_LAB_MIN_PROMOTE_SCORE_GAIN", "0.5") or 0.5)
+    min_promote_total_return = float(os.getenv("AT_LAB_MIN_PROMOTE_TOTAL_RETURN", "8.0") or 8.0)
+    min_promote_trades = int(os.getenv("AT_LAB_MIN_PROMOTE_TRADES", "5") or 5)
+    max_promote_drawdown_slack = float(os.getenv("AT_LAB_MAX_PROMOTE_DRAWDOWN_SLACK", "1.0") or 1.0)
+
     recommendation = {
         "generated_at": datetime.now().isoformat(),
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
@@ -1245,11 +1257,20 @@ def main():
         "tested_variants": len(rank),
         "improvement_return_pct": round(best.total_return_pct - baseline.total_return_pct, 2),
         "improvement_score": round(best.selection_score - baseline.selection_score, 3),
+        "promotion_guardrails": {
+            "min_return_gain": min_promote_return_gain,
+            "min_score_gain": min_promote_score_gain,
+            "min_total_return_pct": min_promote_total_return,
+            "min_trades": min_promote_trades,
+            "max_drawdown_slack_pct": max_promote_drawdown_slack,
+        },
         "should_promote": bool(
             best.name != baseline.name
-            and best.total_return_pct > baseline.total_return_pct + 0.25
-            and best.selection_score > baseline.selection_score + 0.2
-            and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + 2.0
+            and best.total_return_pct >= min_promote_total_return
+            and best.total_return_pct > baseline.total_return_pct + min_promote_return_gain
+            and best.selection_score > baseline.selection_score + min_promote_score_gain
+            and best.trades >= min_promote_trades
+            and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + max_promote_drawdown_slack
         ),
     }
 

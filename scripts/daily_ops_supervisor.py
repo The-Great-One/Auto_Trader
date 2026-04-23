@@ -95,11 +95,11 @@ def is_market_open_today() -> tuple[bool, str]:
 
 DEFAULT_DAILY_LAB_MAX_VARIANTS = max(
     1,
-    int(os.getenv("AT_DAILY_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "50"))),
+    int(os.getenv("AT_DAILY_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "120"))),
 )
 DEFAULT_WEEKEND_LAB_MAX_VARIANTS = max(
     DEFAULT_DAILY_LAB_MAX_VARIANTS,
-    int(os.getenv("AT_WEEKEND_LAB_MAX_VARIANTS", "200")),
+    int(os.getenv("AT_WEEKEND_LAB_MAX_VARIANTS", "320")),
 )
 
 
@@ -282,7 +282,9 @@ def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
         "requested_variants": requested_variants,
         "tested_variants": 0,
         "baseline_return_pct": None,
+        "baseline_trades": None,
         "best_return_pct": None,
+        "best_trades": None,
         "improvement_return_pct": None,
         "improvement_score": None,
         "should_promote": False,
@@ -302,7 +304,9 @@ def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
         if not out["stale_report"]:
             out["tested_variants"] = int(rec.get("tested_variants", 0) or 0)
             out["baseline_return_pct"] = rec.get("baseline", {}).get("total_return_pct")
+            out["baseline_trades"] = rec.get("baseline", {}).get("trades")
             out["best_return_pct"] = rec.get("best", {}).get("total_return_pct")
+            out["best_trades"] = rec.get("best", {}).get("trades")
             out["improvement_return_pct"] = rec.get("improvement_return_pct")
             out["improvement_score"] = rec.get("improvement_score")
             out["should_promote"] = bool(rec.get("should_promote", False)) and proc.returncode == 0
@@ -614,10 +618,18 @@ def maybe_auto_promote(strategy: dict, market_open: bool) -> dict:
 
     min_return_gain = _safe_float(os.getenv("AT_LAB_AUTOPROMOTE_MIN_RETURN_GAIN", "1.0"), 1.0)
     min_score_gain = _safe_float(os.getenv("AT_LAB_AUTOPROMOTE_MIN_SCORE_GAIN", "1.0"), 1.0)
+    min_total_return = _safe_float(os.getenv("AT_LAB_AUTOPROMOTE_MIN_TOTAL_RETURN", "8.0"), 8.0)
+    min_trades = max(1, int(os.getenv("AT_LAB_AUTOPROMOTE_MIN_TRADES", "5")))
     lookback = max(1, int(os.getenv("AT_LAB_AUTOPROMOTE_LOOKBACK", "3")))
     min_repeat = max(1, int(os.getenv("AT_LAB_AUTOPROMOTE_MIN_REPEAT", "2")))
     cooldown_hours = max(0, int(os.getenv("AT_LAB_AUTOPROMOTE_COOLDOWN_HOURS", "24")))
 
+    if (_safe_float(strategy.get("best_return_pct"), -999) or -999) < min_total_return:
+        result["reason"] = "insufficient_absolute_return"
+        return result
+    if int(strategy.get("best_trades") or 0) < min_trades:
+        result["reason"] = "insufficient_trade_count"
+        return result
     if (_safe_float(strategy.get("improvement_return_pct"), -999) or -999) < min_return_gain:
         result["reason"] = "insufficient_return_gain"
         return result

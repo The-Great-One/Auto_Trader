@@ -129,20 +129,20 @@ def base_params() -> dict:
 def build_grids(scorecard_context: dict, tradebook_context: dict) -> dict:
     cfg = RULE_SET_OPTIONS_1.CONFIG
     grid = {
-        "underlying_rsi_bull_min": prioritized_values([52, 55, 58, 60], cfg["underlying_rsi_bull_min"]),
+        "underlying_rsi_bull_min": prioritized_values([50, 52, 55, 58, 60], cfg["underlying_rsi_bull_min"]),
         "underlying_rsi_bear_max": prioritized_values([40, 42, 45, 48], cfg["underlying_rsi_bear_max"]),
-        "underlying_adx_min": prioritized_values([14, 18, 22, 26], cfg["underlying_adx_min"]),
-        "option_rsi_min": prioritized_values([50, 54, 56, 60], cfg["option_rsi_min"]),
-        "volume_confirm_mult": prioritized_values([0.95, 1.0, 1.1, 1.25], cfg["volume_confirm_mult"]),
+        "underlying_adx_min": prioritized_values([10, 12, 14, 16, 18, 22], cfg["underlying_adx_min"]),
+        "option_rsi_min": prioritized_values([48, 50, 52, 54, 56, 60], cfg["option_rsi_min"]),
+        "volume_confirm_mult": prioritized_values([0.9, 0.95, 1.0, 1.1, 1.25], cfg["volume_confirm_mult"]),
         "oi_sma_mult": prioritized_values([1.0, 1.02, 1.05, 1.1], cfg["oi_sma_mult"]),
-        "oi_change_min_pct": prioritized_values([0.0, 1.0, 2.0, 3.0], cfg["oi_change_min_pct"]),
+        "oi_change_min_pct": prioritized_values([-1.0, 0.0, 1.0, 2.0, 3.0], cfg["oi_change_min_pct"]),
         "atr_pct_min": prioritized_values([0.0, 0.02, 0.03, 0.05], cfg["atr_pct_min"]),
         "atr_pct_max": prioritized_values([0.8, 1.0, 1.5, 2.0], cfg["atr_pct_max"]),
-        "buy_score_min": prioritized_values([5.0, 5.5, 6.0, 6.5], cfg["buy_score_min"]),
-        "take_profit_pct": prioritized_values([15.0, 18.0, 25.0, 35.0], cfg["take_profit_pct"]),
+        "buy_score_min": prioritized_values([4.5, 5.0, 5.5, 6.0, 6.5], cfg["buy_score_min"]),
+        "take_profit_pct": prioritized_values([12.0, 15.0, 18.0, 25.0, 35.0], cfg["take_profit_pct"]),
         "stop_loss_pct": prioritized_values([8.0, 10.0, 12.0, 15.0], cfg["stop_loss_pct"]),
-        "max_hold_bars": prioritized_values([2, 3, 4, 6], cfg["max_hold_bars"]),
-        "exit_rsi": prioritized_values([38.0, 42.0, 45.0, 50.0], cfg["exit_rsi"]),
+        "max_hold_bars": prioritized_values([1, 2, 3, 4, 6], cfg["max_hold_bars"]),
+        "exit_rsi": prioritized_values([38.0, 40.0, 42.0, 45.0, 50.0], cfg["exit_rsi"]),
     }
 
     if scorecard_context.get("no_trade_day"):
@@ -225,7 +225,39 @@ def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tu
     for idx, patch in enumerate(prebuilt, start=1):
         add(f"prebuilt_combo_{idx:02d}", patch)
 
-    max_variants = int(os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "120")))
+    adx14_cluster_idx = 0
+    for bull_min in [50, 52, 54]:
+        for buy_score in [4.5, 5.0, 5.5]:
+            for option_rsi in [48, 50, 52]:
+                adx14_cluster_idx += 1
+                add(
+                    f"adx14_cluster_{adx14_cluster_idx:03d}",
+                    {
+                        "underlying_adx_min": 14,
+                        "underlying_rsi_bull_min": bull_min,
+                        "buy_score_min": buy_score,
+                        "option_rsi_min": option_rsi,
+                        "volume_confirm_mult": 0.95,
+                        "oi_change_min_pct": 0.0,
+                    },
+                )
+
+    adx14_exit_idx = 0
+    for take_profit in [12.0, 15.0, 18.0, 25.0]:
+        for stop_loss in [8.0, 10.0, 12.0]:
+            adx14_exit_idx += 1
+            add(
+                f"adx14_exit_{adx14_exit_idx:03d}",
+                {
+                    "underlying_adx_min": 14,
+                    "take_profit_pct": take_profit,
+                    "stop_loss_pct": stop_loss,
+                    "max_hold_bars": 2,
+                    "buy_score_min": 5.0,
+                },
+            )
+
+    max_variants = int(os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "200")))
     return out[:max_variants]
 
 
