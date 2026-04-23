@@ -449,10 +449,16 @@ def main() -> int:
 
     report_obj = _load_report(report_path)
     variant = _pick_variant(report_obj, variant_name)
-    base_buy = dict((variant.get("params") or {}).get("buy") or {})
-    base_sell = dict((variant.get("params") or {}).get("sell") or {})
-    base_env = dict((((variant.get("params") or {}).get("simulation") or {}).get("sizing_exit_sweep_env")) or {})
-    symbols = list(((report_obj.get("recommendation") or {}).get("data_context") or {}).get("loaded_symbols") or variant.get("symbols_tested") or [])
+    variant_params = dict((variant.get("params") or {}))
+    base_buy = dict(variant_params.get("buy") or variant.get("buy") or {})
+    base_sell = dict(variant_params.get("sell") or variant.get("sell") or {})
+    base_env = dict((((variant_params.get("simulation") or {}).get("sizing_exit_sweep_env")) or variant.get("env") or {}))
+    symbols = list(
+        ((report_obj.get("recommendation") or {}).get("data_context") or {}).get("loaded_symbols")
+        or (report_obj.get("data_context") or {}).get("loaded_symbols")
+        or variant.get("symbols_tested")
+        or []
+    )
     if not symbols:
         raise ValueError("No symbols found for 30% CAGR hunt")
 
