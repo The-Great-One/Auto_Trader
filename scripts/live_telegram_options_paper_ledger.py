@@ -60,6 +60,27 @@ def tracked_calls() -> list[dict[str, Any]]:
     return out
 
 
+def repair_position_placeholders(state: dict[str, Any]) -> None:
+    positions = state.get('positions') or {}
+    to_delete = []
+    for pos_key, pos in list(positions.items()):
+        status = pos.get('status')
+        call = pos.get('call') or {}
+        if status == 'unresolved':
+            if not call.get('option_side') or not call.get('option_strike'):
+                pos['status'] = 'skipped'
+                pos['reason'] = 'not_option_signal'
+                pos['status_note'] = 'converted_from_unresolved_non_option'
+                continue
+            if pos.get('reason') == 'contract_not_found':
+                to_delete.append(pos_key)
+                continue
+        if status == 'skipped' and pos.get('reason') == 'insufficient_cash_for_one_lot' and call.get('option_side') and call.get('option_strike'):
+            to_delete.append(pos_key)
+    for pos_key in to_delete:
+        positions.pop(pos_key, None)
+
+
 def key_for(call: dict[str, Any]) -> str:
     return f"{call.get('source_chat')}::{call.get('source_message_id')}"
 
@@ -105,6 +126,15 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
     if pos_key in positions:
         return
 
+    if not call.get('option_side') or not call.get('option_strike'):
+        positions[pos_key] = {
+            'status': 'skipped',
+            'reason': 'not_option_signal',
+            'call': call,
+            'created_at': now_utc().isoformat(),
+        }
+        return
+
     # Apply channel learning sizing multiplier
     chat = call.get('source_chat', '')
     channel_mult = load_channel_sizing_mult(chat, default=1.0)
@@ -147,7 +177,24 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         }
         return
     cost_per_lot = entry_price * lot_size
+    max_affordable_lots = int(cash // cost_per_lot) if cost_per_lot > 0 else 0
     lots = int(alloc // cost_per_lot) if alloc >= cost_per_lot else 0
+    lot_floor_applied = False
+    if lots <= 0 and max_affordable_lots >= 1 and adjusted_pct > 0:
+        lots = 1
+        lot_floor_applied = True
+    if lots <= 0:
+        positions[pos_key] = {
+            'status': 'skipped',
+            'reason': 'insufficient_cash_for_one_lot',
+            'call': call,
+            'created_at': now_utc().isoformat(),
+            'entry_price': entry_price,
+            'lot_size': lot_size,
+            'required_for_one_lot': round(cost_per_lot, 2),
+        }
+        return
+    lots = min(lots, max_affordable_lots)
     if lots <= 0:
         positions[pos_key] = {
             'status': 'skipped',
@@ -196,6 +243,7 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'last_price': round(float(contract.get('last_price') or 0.0), 2),
         'last_underlying_price': round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None,
         'last_snapshot_at': now_utc().isoformat(),
+        'sizing_note': 'one_lot_floor_applied' if lot_floor_applied else None,
     }
 
 
@@ -448,6 +496,7 @@ def main() -> int:
     state = load_json(STATE_PATH, {'starting_capital': float(args.starting_capital), 'cash': float(args.starting_capital), 'positions': {}})
     state['starting_capital'] = float(state.get('starting_capital') or args.starting_capital)
     state['cash'] = float(state.get('cash', state['starting_capital']))
+    repair_position_placeholders(state)
 
     for call in tracked_calls():
         maybe_open_position(state, call, float(args.capital_per_trade_pct))
