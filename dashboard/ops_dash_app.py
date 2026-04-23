@@ -57,34 +57,58 @@ EVENT_PIPELINES_TTL_SECONDS = 900
 EQUITY_SPOT_TTL_SECONDS = 900
 IST = timezone(timedelta(hours=5, minutes=30))
 
-def to_ist(dt_str: str | None) -> str:
-    """Convert UTC/ISO timestamp to IST display string."""
-    if not dt_str:
-        return "-"
+def parse_timestamp_any(value: Any) -> pd.Timestamp | None:
+    if value in (None, "", "-"):
+        return None
     try:
-        dt = pd.Timestamp(dt_str)
+        if isinstance(value, pd.Timestamp):
+            dt = value
+        elif isinstance(value, (int, float)):
+            num = float(value)
+            abs_num = abs(num)
+            if abs_num >= 1e18:
+                dt = pd.to_datetime(num, unit="ns", utc=True)
+            elif abs_num >= 1e15:
+                dt = pd.to_datetime(num, unit="us", utc=True)
+            elif abs_num >= 1e12:
+                dt = pd.to_datetime(num, unit="ms", utc=True)
+            else:
+                dt = pd.to_datetime(num, unit="s", utc=True)
+        elif isinstance(value, str) and value.strip().isdigit():
+            return parse_timestamp_any(int(value.strip()))
+        else:
+            dt = pd.Timestamp(value)
+            if pd.isna(dt):
+                return None
+            if dt.tzinfo is None:
+                dt = dt.tz_localize("UTC")
         if pd.isna(dt):
-            return "-"
+            return None
         if dt.tzinfo is None:
             dt = dt.tz_localize("UTC")
-        dt = dt.tz_convert(IST)
-        return dt.strftime("%b %d, %H:%M")
+        return dt
+    except Exception:
+        return None
+
+
+def to_ist(dt_str: Any) -> str:
+    """Convert UTC/ISO/epoch timestamp to IST display string."""
+    dt = parse_timestamp_any(dt_str)
+    if dt is None:
+        return "-" if dt_str in (None, "", "-") else str(dt_str)
+    try:
+        return dt.tz_convert(IST).strftime("%b %d, %H:%M")
     except Exception:
         return str(dt_str)
 
 
-def to_ist_verbose(dt_str: str | None) -> str:
-    """Convert UTC/ISO timestamp to an IST string with timezone label."""
-    if not dt_str:
-        return "-"
+def to_ist_verbose(dt_str: Any) -> str:
+    """Convert UTC/ISO/epoch timestamp to an IST string with timezone label."""
+    dt = parse_timestamp_any(dt_str)
+    if dt is None:
+        return "-" if dt_str in (None, "", "-") else str(dt_str)
     try:
-        dt = pd.Timestamp(dt_str)
-        if pd.isna(dt):
-            return "-"
-        if dt.tzinfo is None:
-            dt = dt.tz_localize("UTC")
-        dt = dt.tz_convert(IST)
-        return dt.strftime("%b %d, %H:%M:%S IST")
+        return dt.tz_convert(IST).strftime("%b %d, %H:%M:%S IST")
     except Exception:
         return str(dt_str)
 
