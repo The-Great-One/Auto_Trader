@@ -2,13 +2,18 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from scripts import weekly_strategy_lab as w
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "reports"
+OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
 
 CANDIDATES = [
