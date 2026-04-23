@@ -47,12 +47,14 @@ TELEGRAM_AUDIT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 EVENT_PIPELINES_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 PORTFOLIO_TRACKER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 DASH_DATA_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+EQUITY_SPOT_CACHE: dict[str, Any] = {}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
 SSH_TTL_SECONDS = 45
 GLOBAL_MACRO_TTL_SECONDS = 600
 ECO_CALENDAR_TTL_SECONDS = 600
 EVENT_PIPELINES_TTL_SECONDS = 900
+EQUITY_SPOT_TTL_SECONDS = 900
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def to_ist(dt_str: str | None) -> str:
@@ -273,6 +275,70 @@ def safe_num(v: Any) -> float | None:
         return None if math.isnan(out) else out
     except Exception:
         return None
+
+
+def normalize_price_history(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    if df is None or df.empty:
+        return None
+    out = df.copy()
+    if isinstance(out.columns, pd.MultiIndex):
+        out.columns = [c[0] if isinstance(c, tuple) else c for c in out.columns]
+    if "Date" not in out.columns:
+        out = out.reset_index()
+    if "Date" not in out.columns or "Close" not in out.columns:
+        return None
+    out["Date"] = pd.to_datetime(out["Date"], errors="coerce")
+    out["Close"] = pd.to_numeric(out["Close"], errors="coerce")
+    out = out.dropna(subset=["Date", "Close"]).sort_values("Date").reset_index(drop=True)
+    return out if not out.empty else None
+
+
+def get_equity_spot_snapshot(symbol: str | None) -> dict[str, Any]:
+    symbol = str(symbol or "").strip().upper()
+    if not symbol:
+        return {}
+    now_ts = time.time()
+    cached = EQUITY_SPOT_CACHE.get(symbol)
+    if cached and now_ts - float(cached.get("ts") or 0.0) <= EQUITY_SPOT_TTL_SECONDS:
+        return cached.get("data") or {}
+
+    data: dict[str, Any] = {}
+    hist_path = INTERMEDIARY_DIR / "Hist_Data" / f"{symbol}.feather"
+    try:
+        if hist_path.exists():
+            hist = normalize_price_history(pd.read_feather(hist_path))
+            if hist is not None and not hist.empty:
+                last = hist.iloc[-1]
+                data = {
+                    "price": round(float(last["Close"]), 2),
+                    "date": pd.Timestamp(last["Date"]).isoformat(),
+                    "source": "local_hist",
+                }
+    except Exception:
+        data = {}
+
+    if not data:
+        try:
+            import yfinance as yf
+
+            candidates = [symbol] if "." in symbol else [f"{symbol}.NS", f"{symbol}.BO"]
+            for cand in candidates:
+                df = yf.download(cand, period="10d", interval="1d", auto_adjust=False, progress=False)
+                hist = normalize_price_history(df)
+                if hist is None or hist.empty:
+                    continue
+                last = hist.iloc[-1]
+                data = {
+                    "price": round(float(last["Close"]), 2),
+                    "date": pd.Timestamp(last["Date"]).isoformat(),
+                    "source": cand,
+                }
+                break
+        except Exception:
+            data = {}
+
+    EQUITY_SPOT_CACHE[symbol] = {"ts": now_ts, "data": data}
+    return data
 
 
 def metric_card(title: str, value: Any, subtitle: str | None = None) -> html.Div:
@@ -1625,36 +1691,59 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             recent_df = pd.DataFrame(equity_recent_rows)
             recent_df["sort_date"] = pd.to_datetime(recent_df["date"], errors="coerce")
             recent_df = recent_df.sort_values("sort_date", ascending=False, na_position="last")
+            recent_df = recent_df.drop_duplicates(subset=["symbol"], keep="first")
             for _, row in recent_df.head(8).iterrows():
-                edge = safe_num(row.get("ret_20d_pct"))
-                if edge is None:
-                    edge = safe_num(row.get("max_20d_pct"))
-                color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
+                spot = get_equity_spot_snapshot(row.get("symbol"))
+                entry_ref = safe_num(row.get("entry_ref"))
+                current_price = safe_num(spot.get("price"))
+                profit_pct = ((current_price / entry_ref) - 1.0) * 100.0 if current_price is not None and entry_ref not in (None, 0) else None
+                profit_abs = (current_price - entry_ref) if current_price is not None and entry_ref is not None else None
+                age_days = None
+                sort_dt = pd.to_datetime(row.get("date"), errors="coerce")
+                if pd.notna(sort_dt):
+                    try:
+                        if getattr(sort_dt, "tzinfo", None) is not None:
+                            sort_dt = sort_dt.tz_convert(None)
+                        age_days = max((pd.Timestamp.utcnow().tz_localize(None) - sort_dt).days, 0)
+                    except Exception:
+                        age_days = None
+                malformed_extract = profit_pct is not None and abs(profit_pct) > 200 and (age_days is None or age_days <= 45)
+                if malformed_extract:
+                    continue
+
+                display_edge = profit_pct
+                if display_edge is None:
+                    display_edge = safe_num(row.get("ret_20d_pct"))
+                if display_edge is None:
+                    display_edge = safe_num(row.get("max_20d_pct"))
+                color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (display_edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (display_edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
                 recent_cards.append(html.Div([
                     html.Div([
                         html.Span(f"{row.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
                         html.Span(row.get("channel", ""), style={"fontSize": "12px", "color": "#9ca3af"}),
                     ], style={"flex": "1"}),
-                    html.Div(f"{row.get('signal_type', 'equity')} | Entry ₹{friendly(row.get('entry_ref'))}", style={"fontSize": "12px", "color": "#9ca3af"}),
-                    html.Div(f"5d {fmt_pct(safe_num(row.get('ret_5d_pct')))} | 10d {fmt_pct(safe_num(row.get('ret_10d_pct')))} | 20d {fmt_pct(safe_num(row.get('ret_20d_pct')))}", style=color_style),
-                    html.Div(f"Max 20d {fmt_pct(safe_num(row.get('max_20d_pct')))} | T1 {row.get('target_1_hit_20d')} | T2 {row.get('target_2_hit_20d')}", style={"fontSize": "11px", "color": "#6b7280"}),
-                    html.Div(to_ist(row.get("date")), style={"fontSize": "11px", "color": "#9ca3af"}),
+                    html.Div(
+                        f"Entry ₹{friendly(entry_ref)} → Current ₹{friendly(current_price)}",
+                        style={"fontSize": "12px", "color": "#9ca3af"},
+                    ),
+                    html.Div(
+                        f"{fmt_pct(profit_pct)} ({fmt_pnl(profit_abs, '₹')}/share)" if profit_pct is not None and profit_abs is not None else f"5d {fmt_pct(safe_num(row.get('ret_5d_pct')))} | 10d {fmt_pct(safe_num(row.get('ret_10d_pct')))} | 20d {fmt_pct(safe_num(row.get('ret_20d_pct')))}",
+                        style=color_style,
+                    ),
+                    html.Div(
+                        f"Signal: {row.get('signal_type', 'equity')} | Max 20d {fmt_pct(safe_num(row.get('max_20d_pct')))}",
+                        style={"fontSize": "11px", "color": "#6b7280"},
+                    ),
+                    html.Div(
+                        f"As of {to_ist(spot.get('date')) if spot.get('date') else '-'} | Posted {to_ist(row.get('date'))}",
+                        style={"fontSize": "11px", "color": "#9ca3af"},
+                    ),
                     html.Div(str(row.get("text") or "")[:180], style={"fontSize": "11px", "color": "#9ca3af"}),
                 ], style={**CARD_STYLE, "marginBottom": "8px"}))
         if recent_cards:
-            children.append(section(f"Telegram equity recent setups ({len(recent_cards)})", recent_cards, "Latest scored equity ideas laid out as cards, matching the options section style."))
+            children.append(section(f"Telegram equity recent setups ({len(recent_cards)})", recent_cards, "Latest scored equity ideas shown in the same entry to current to profit card style as options."))
         else:
             children.append(section("Telegram equity recent setups", [empty_message("No recent Telegram equity setups yet.")]))
-
-        viz_df = pd.DataFrame(equity_audit_rows)
-        viz_df = viz_df.rename(columns={"20d_avg_%": "20d avg %", "max_20d_avg_%": "max 20d avg %"})
-        viz_df = viz_df[[c for c in ["channel", "20d avg %", "max 20d avg %"] if c in viz_df.columns]]
-        if not viz_df.empty:
-            plot_df = viz_df.melt(id_vars="channel", var_name="metric", value_name="value").dropna(subset=["value"])
-            if not plot_df.empty:
-                fig = px.bar(plot_df, x="channel", y="value", color="metric", barmode="group", title="Telegram equity channel quality")
-                fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827", margin=dict(l=40, r=20, t=30, b=30), xaxis_title="", yaxis_title="%")
-                children.append(section("Telegram equity quality view", [dcc.Graph(figure=fig)]))
 
         children.append(section("Telegram equity audit table", [table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All available Telegram equity channel audits side by side. If 20d stats are blank, the signal is too recent to score."))
     else:
