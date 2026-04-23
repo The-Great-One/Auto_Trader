@@ -380,15 +380,16 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
     for row in rows:
         if not is_earnings_row(row):
             continue
-        text = f"{row.get('title') or ''} {row.get('summary') or ''}"
+        title = str(row.get('title') or '').strip()
+        summary = str(row.get('summary') or '').strip()
+        headline = title or summary or None
+        text = f"{title} {summary}".strip()
         symbols = match_symbols(text, registry)
-        if not symbols and row.get('kind') == 'symbol' and str(row.get('key') or '').upper() in registry:
-            symbols = [str(row.get('key')).upper()]
         if not symbols:
             continue
         direction = infer_direction(row)
         for symbol in symbols:
-            dedupe_key = (str(row.get('link') or row.get('event_id') or row.get('title')), symbol)
+            dedupe_key = (str(row.get('link') or row.get('event_id') or headline), symbol)
             if dedupe_key in seen:
                 continue
             seen.add(dedupe_key)
@@ -398,7 +399,7 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
             ret_3d = behavior.get('ret_3d_pct')
             events.append({
                 'symbol': symbol,
-                'title': row.get('title'),
+                'title': headline,
                 'kind': row.get('kind'),
                 'source': row.get('source'),
                 'published_at': int(row.get('published_at') or row.get('fetched_at') or 0),

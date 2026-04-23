@@ -444,6 +444,7 @@ def json_block(obj: Any, title: str) -> html.Details:
 
 def _maybe_format_timeish_series(name: str, series: pd.Series, verbose: bool = False) -> pd.Series:
     lower = str(name).lower().strip()
+    is_dateish = lower == "date" or lower.endswith("_date") or lower.startswith("date_")
     is_timeish = (
         lower in {"date", "time", "timestamp", "published_at", "generated_at", "updated_at", "created_at"}
         or lower.endswith("_at")
@@ -457,6 +458,7 @@ def _maybe_format_timeish_series(name: str, series: pd.Series, verbose: bool = F
         or "generated" in lower
         or "updated" in lower
     )
+    fmt = "%b %d, %Y" if is_dateish else ("%b %d, %H:%M:%S IST" if verbose else "%b %d, %H:%M")
     if pd.api.types.is_datetime64_any_dtype(series):
         try:
             localized = series.dt.tz_convert(IST)
@@ -465,13 +467,13 @@ def _maybe_format_timeish_series(name: str, series: pd.Series, verbose: bool = F
                 localized = series.dt.tz_localize("UTC").dt.tz_convert(IST)
             except Exception:
                 localized = series
-        return localized.dt.strftime("%b %d, %H:%M:%S IST" if verbose else "%b %d, %H:%M")
+        return localized.dt.strftime(fmt)
     if not is_timeish:
         return series
     parsed = series.apply(parse_timestamp_any)
     if parsed.notna().sum() == 0:
         return series
-    return parsed.apply(lambda x: x.tz_convert(IST).strftime("%b %d, %H:%M:%S IST" if verbose else "%b %d, %H:%M") if x is not None and pd.notna(x) else "-")
+    return parsed.apply(lambda x: x.tz_convert(IST).strftime(fmt) if x is not None and pd.notna(x) else "-")
 
 
 def table_from_df(df: pd.DataFrame, table_id: str, page_size: int = 10) -> dash_table.DataTable | html.Div:
@@ -2395,9 +2397,17 @@ def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
     earnings_context = earnings_pipeline.get("upcoming_with_context") or []
     earnings_scoreboard = earnings_pipeline.get("symbol_scoreboard") or []
     if earnings_context:
-        children.append(section("EARNINGS PIPELINE", [table_from_df(pd.DataFrame(earnings_context[:12]), "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings enriched with how each symbol behaved after prior earnings-related news/results events."))
+        upcoming_df = pd.DataFrame(earnings_context[:12]).copy()
+        if "latest_earnings_headline" in upcoming_df.columns:
+            upcoming_df["latest_matched_headline"] = upcoming_df["latest_earnings_headline"].fillna("-").replace("", "-")
+            upcoming_df = upcoming_df.drop(columns=["latest_earnings_headline"])
+        children.append(section("EARNINGS PIPELINE", [table_from_df(upcoming_df, "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings enriched with how each symbol behaved after prior matched earnings/results headlines."))
     if earnings_scoreboard:
-        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(pd.DataFrame(earnings_scoreboard[:12]), "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after earnings/results news in the recent archive."))
+        scoreboard_df = pd.DataFrame(earnings_scoreboard[:12]).copy()
+        if "latest_title" in scoreboard_df.columns:
+            scoreboard_df["latest_matched_headline"] = scoreboard_df["latest_title"].fillna("-").replace("", "-")
+            scoreboard_df = scoreboard_df.drop(columns=["latest_title"])
+        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(scoreboard_df, "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after matched earnings/results headlines in the recent archive."))
 
     # ── 3. SECTOR HEATMAP ──────────────────────────────────
     sectors = eco.get("sectors") or []
