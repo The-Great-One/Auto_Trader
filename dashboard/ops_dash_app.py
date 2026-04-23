@@ -1526,20 +1526,19 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     ]
     available_equity_channels = [(label, payload) for label, payload in equity_channels if payload]
 
-    equity_cards_items = [metric_card("Equity channels", len(available_equity_channels), "tracked")]
-    for label, payload in available_equity_channels[:4]:
-        summary = payload.get("summary") or {}
-        label_short = label if len(label) <= 14 else label[:14]
-        equity_cards_items.append(metric_card(f"{label_short} signals", payload.get("signals_evaluated", 0), f"extracted {payload.get('signals_extracted', 0)}"))
-        equity_cards_items.append(metric_card(f"{label_short} 20d avg %", audit_stat(summary, "ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(summary, 'ret_20d_pct', 'positive_rate'))}"))
-
-    equity_cards = html.Div(equity_cards_items, style={"display": "flex", "gap": "12px", "flexWrap": "wrap"})
+    def avg_present(values: list[Any]) -> float | None:
+        clean = [float(v) for v in values if isinstance(v, (int, float)) and not math.isnan(float(v))]
+        if not clean:
+            return None
+        return round(sum(clean) / len(clean), 2)
 
     equity_audit_rows = []
+    equity_recent_rows = []
     for label, payload in available_equity_channels:
         summary = payload.get("summary") or {}
         best_examples = summary.get("best_examples") or []
         sample = best_examples[0] if best_examples else {}
+        tgt1_hit = audit_stat(summary, "target_1_hit_20d", "hit_rate")
         equity_audit_rows.append({
             "channel": f"{label} cash/equity",
             "signals_extracted": payload.get("signals_extracted", 0),
@@ -1547,12 +1546,117 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             "20d_avg_%": audit_stat(summary, "ret_20d_pct", "avg"),
             "20d_positive_rate": audit_stat(summary, "ret_20d_pct", "positive_rate"),
             "max_20d_avg_%": audit_stat(summary, "max_20d_pct", "avg"),
-            "tgt1_hit_%": (audit_stat(summary, "target_1_hit_20d", "hit_rate") or 0) * 100 if audit_stat(summary, "target_1_hit_20d", "hit_rate") is not None else None,
+            "tgt1_hit_%": tgt1_hit * 100 if tgt1_hit is not None else None,
             "best_symbol": sample.get("symbol"),
             "best_date": to_ist(sample.get("date")) if sample.get("date") else "-",
         })
+        for result in payload.get("sample_results") or []:
+            equity_recent_rows.append({
+                "channel": label,
+                "symbol": result.get("symbol") or result.get("raw_symbol") or "?",
+                "signal_type": result.get("signal_type") or "equity",
+                "date": result.get("date"),
+                "entry_ref": result.get("entry_ref"),
+                "ret_5d_pct": result.get("ret_5d_pct"),
+                "ret_10d_pct": result.get("ret_10d_pct"),
+                "ret_20d_pct": result.get("ret_20d_pct"),
+                "max_20d_pct": result.get("max_20d_pct"),
+                "target_1_hit_20d": result.get("target_1_hit_20d"),
+                "target_2_hit_20d": result.get("target_2_hit_20d"),
+                "text": result.get("text") or "",
+            })
+
+    total_equity_signals = sum(int(payload.get("signals_evaluated", 0) or 0) for _, payload in available_equity_channels)
+    total_equity_extracted = sum(int(payload.get("signals_extracted", 0) or 0) for _, payload in available_equity_channels)
+    avg_equity_20d = avg_present([row.get("20d_avg_%") for row in equity_audit_rows])
+    avg_equity_positive = avg_present([row.get("20d_positive_rate") for row in equity_audit_rows])
+    avg_equity_max = avg_present([row.get("max_20d_avg_%") for row in equity_audit_rows])
+    avg_equity_tgt1 = avg_present([row.get("tgt1_hit_%") for row in equity_audit_rows])
+    most_recent_equity_signal = None
+    if equity_recent_rows:
+        dated = []
+        for row in equity_recent_rows:
+            dt = pd.to_datetime(row.get("date"), errors="coerce")
+            if pd.notna(dt):
+                dated.append((dt, row))
+        if dated:
+            dated.sort(key=lambda item: item[0], reverse=True)
+            most_recent_equity_signal = dated[0][1]
+
+    equity_cards = html.Div(
+        [
+            metric_card("Equity channels", len(available_equity_channels), "tracked"),
+            metric_card("Equity signals", total_equity_signals, f"extracted {total_equity_extracted}"),
+            metric_card("Equity 20d avg %", avg_equity_20d, f"positive rate {friendly(avg_equity_positive)}"),
+            metric_card("Equity max 20d avg %", avg_equity_max, "best excursion"),
+            metric_card("Target 1 hit %", avg_equity_tgt1, "where available"),
+            metric_card(
+                "Latest signal",
+                most_recent_equity_signal.get("symbol") if most_recent_equity_signal else "-",
+                to_ist(most_recent_equity_signal.get("date")) if most_recent_equity_signal else "No recent scored setup",
+            ),
+        ],
+        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+    )
+
     if equity_audit_rows:
-        children.append(section("Telegram equity", [equity_cards, table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All available Telegram equity channel audits side by side. If 20d stats are blank, the signal is too recent to score."))
+        children.append(section("Telegram equity", [equity_cards], "Telegram equity now mirrors the options area with richer cards and drill-downs, while still using signal audit data instead of a live paper ledger."))
+
+        channel_cards = []
+        for row in equity_audit_rows:
+            edge = safe_num(row.get("20d_avg_%"))
+            if edge is None:
+                edge = safe_num(row.get("max_20d_avg_%"))
+            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
+            channel_cards.append(html.Div([
+                html.Div([
+                    html.Span(row.get("channel", "?"), style={"fontWeight": "700", "fontSize": "15px"}),
+                    html.Span(" equity audit", style={"fontSize": "12px", "color": "#9ca3af"}),
+                ], style={"flex": "1"}),
+                html.Div(f"Signals {row.get('signals_evaluated', 0)} | Extracted {row.get('signals_extracted', 0)}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                html.Div(f"20d avg {fmt_pct(safe_num(row.get('20d_avg_%')))} | Max 20d avg {fmt_pct(safe_num(row.get('max_20d_avg_%')))}", style=color_style),
+                html.Div(f"20d positive {friendly(row.get('20d_positive_rate'))}% | Tgt1 hit {friendly(row.get('tgt1_hit_%'))}%", style={"fontSize": "11px", "color": "#6b7280"}),
+                html.Div(f"Best symbol: {row.get('best_symbol') or '-'} | Best date: {row.get('best_date') or '-'}", style={"fontSize": "11px", "color": "#9ca3af"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram equity channel scorecards ({len(channel_cards)})", channel_cards))
+
+        recent_cards = []
+        if equity_recent_rows:
+            recent_df = pd.DataFrame(equity_recent_rows)
+            recent_df["sort_date"] = pd.to_datetime(recent_df["date"], errors="coerce")
+            recent_df = recent_df.sort_values("sort_date", ascending=False, na_position="last")
+            for _, row in recent_df.head(8).iterrows():
+                edge = safe_num(row.get("ret_20d_pct"))
+                if edge is None:
+                    edge = safe_num(row.get("max_20d_pct"))
+                color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
+                recent_cards.append(html.Div([
+                    html.Div([
+                        html.Span(f"{row.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
+                        html.Span(row.get("channel", ""), style={"fontSize": "12px", "color": "#9ca3af"}),
+                    ], style={"flex": "1"}),
+                    html.Div(f"{row.get('signal_type', 'equity')} | Entry ₹{friendly(row.get('entry_ref'))}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                    html.Div(f"5d {fmt_pct(safe_num(row.get('ret_5d_pct')))} | 10d {fmt_pct(safe_num(row.get('ret_10d_pct')))} | 20d {fmt_pct(safe_num(row.get('ret_20d_pct')))}", style=color_style),
+                    html.Div(f"Max 20d {fmt_pct(safe_num(row.get('max_20d_pct')))} | T1 {row.get('target_1_hit_20d')} | T2 {row.get('target_2_hit_20d')}", style={"fontSize": "11px", "color": "#6b7280"}),
+                    html.Div(to_ist(row.get("date")), style={"fontSize": "11px", "color": "#9ca3af"}),
+                    html.Div(str(row.get("text") or "")[:180], style={"fontSize": "11px", "color": "#9ca3af"}),
+                ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        if recent_cards:
+            children.append(section(f"Telegram equity recent setups ({len(recent_cards)})", recent_cards, "Latest scored equity ideas laid out as cards, matching the options section style."))
+        else:
+            children.append(section("Telegram equity recent setups", [empty_message("No recent Telegram equity setups yet.")]))
+
+        viz_df = pd.DataFrame(equity_audit_rows)
+        viz_df = viz_df.rename(columns={"20d_avg_%": "20d avg %", "max_20d_avg_%": "max 20d avg %"})
+        viz_df = viz_df[[c for c in ["channel", "20d avg %", "max 20d avg %"] if c in viz_df.columns]]
+        if not viz_df.empty:
+            plot_df = viz_df.melt(id_vars="channel", var_name="metric", value_name="value").dropna(subset=["value"])
+            if not plot_df.empty:
+                fig = px.bar(plot_df, x="channel", y="value", color="metric", barmode="group", title="Telegram equity channel quality")
+                fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827", margin=dict(l=40, r=20, t=30, b=30), xaxis_title="", yaxis_title="%")
+                children.append(section("Telegram equity quality view", [dcc.Graph(figure=fig)]))
+
+        children.append(section("Telegram equity audit table", [table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All available Telegram equity channel audits side by side. If 20d stats are blank, the signal is too recent to score."))
     else:
         children.append(section("Telegram equity", [equity_cards, empty_message("No Telegram equity audit rows yet.")]))
 
