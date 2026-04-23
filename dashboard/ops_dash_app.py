@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timezone, timedelta
@@ -1637,24 +1638,25 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             return None
         return round(sum(clean) / len(clean), 2)
 
-    equity_audit_rows = []
+    def infer_equity_targets(text: str) -> str:
+        low = str(text or "")
+        m = re.search(r'UPSIDE\s+RESISTANCE\s*[-–]?\s*([0-9+\-/. ]+)', low, re.IGNORECASE)
+        if m:
+            vals = re.findall(r'\d+(?:\.\d+)?', m.group(1))[:4]
+            return ", ".join(vals) if vals else "-"
+        m = re.search(r'Target\s*[-:]\s*([0-9+\-/. ]+)', low, re.IGNORECASE)
+        if m:
+            vals = re.findall(r'\d+(?:\.\d+)?', m.group(1))[:4]
+            return ", ".join(vals) if vals else "-"
+        return "-"
+
+    def infer_equity_stop(text: str) -> str:
+        low = str(text or "")
+        m = re.search(r'SL\s*[-:]\s*(\d+(?:\.\d+)?)', low, re.IGNORECASE)
+        return m.group(1) if m else "-"
+
     equity_recent_rows = []
     for label, payload in available_equity_channels:
-        summary = payload.get("summary") or {}
-        best_examples = summary.get("best_examples") or []
-        sample = best_examples[0] if best_examples else {}
-        tgt1_hit = audit_stat(summary, "target_1_hit_20d", "hit_rate")
-        equity_audit_rows.append({
-            "channel": f"{label} cash/equity",
-            "signals_extracted": payload.get("signals_extracted", 0),
-            "signals_evaluated": payload.get("signals_evaluated", 0),
-            "20d_avg_%": audit_stat(summary, "ret_20d_pct", "avg"),
-            "20d_positive_rate": audit_stat(summary, "ret_20d_pct", "positive_rate"),
-            "max_20d_avg_%": audit_stat(summary, "max_20d_pct", "avg"),
-            "tgt1_hit_%": tgt1_hit * 100 if tgt1_hit is not None else None,
-            "best_symbol": sample.get("symbol"),
-            "best_date": to_ist(sample.get("date")) if sample.get("date") else "-",
-        })
         for result in payload.get("sample_results") or []:
             equity_recent_rows.append({
                 "channel": label,
@@ -1673,120 +1675,160 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
 
     total_equity_signals = sum(int(payload.get("signals_evaluated", 0) or 0) for _, payload in available_equity_channels)
     total_equity_extracted = sum(int(payload.get("signals_extracted", 0) or 0) for _, payload in available_equity_channels)
-    avg_equity_20d = avg_present([row.get("20d_avg_%") for row in equity_audit_rows])
-    avg_equity_positive = avg_present([row.get("20d_positive_rate") for row in equity_audit_rows])
-    avg_equity_max = avg_present([row.get("max_20d_avg_%") for row in equity_audit_rows])
-    avg_equity_tgt1 = avg_present([row.get("tgt1_hit_%") for row in equity_audit_rows])
-    most_recent_equity_signal = None
-    if equity_recent_rows:
-        dated = []
-        for row in equity_recent_rows:
-            dt = pd.to_datetime(row.get("date"), errors="coerce")
-            if pd.notna(dt):
-                dated.append((dt, row))
-        if dated:
-            dated.sort(key=lambda item: item[0], reverse=True)
-            most_recent_equity_signal = dated[0][1]
 
-    equity_cards = html.Div(
+    open_equity_positions: list[dict[str, Any]] = []
+    closed_equity_positions: list[dict[str, Any]] = []
+    unresolved_equity_positions: list[dict[str, Any]] = []
+
+    if equity_recent_rows:
+        recent_df = pd.DataFrame(equity_recent_rows)
+        recent_df["sort_date"] = pd.to_datetime(recent_df["date"], errors="coerce")
+        recent_df = recent_df.sort_values("sort_date", ascending=False, na_position="last")
+        recent_df = recent_df.drop_duplicates(subset=["symbol"], keep="first")
+
+        valid_rows = []
+        for _, row in recent_df.iterrows():
+            entry_ref = safe_num(row.get("entry_ref"))
+            spot = get_equity_spot_snapshot(row.get("symbol"))
+            current_price = safe_num(spot.get("price"))
+            profit_pct = ((current_price / entry_ref) - 1.0) * 100.0 if current_price is not None and entry_ref not in (None, 0) else None
+            malformed_extract = profit_pct is not None and abs(profit_pct) > 200
+            text = str(row.get("text") or "")
+            optionish_noise = any(x in text.lower() for x in ["lot size", "premium", "ce", "pe"]) and (profit_pct is None or abs(profit_pct) > 100)
+            if malformed_extract or optionish_noise or entry_ref is None:
+                unresolved_equity_positions.append({
+                    "symbol": row.get("symbol"),
+                    "status": "filtered_out",
+                    "reason": "malformed_or_optionlike_equity_extract",
+                    "channel_update": text[:140],
+                })
+                continue
+            rec = dict(row)
+            rec["entry_ref"] = entry_ref
+            rec["current_price"] = current_price
+            rec["profit_pct_live"] = profit_pct
+            rec["profit_abs_live"] = (current_price - entry_ref) if current_price is not None else None
+            rec["spot_date"] = spot.get("date")
+            valid_rows.append(rec)
+
+        open_rows = [r for r in valid_rows if all(safe_num(r.get(k)) is None for k in ["ret_5d_pct", "ret_10d_pct", "ret_20d_pct"])]
+        closed_rows = [r for r in valid_rows if any(safe_num(r.get(k)) is not None for k in ["ret_5d_pct", "ret_10d_pct", "ret_20d_pct"])]
+
+        starting_equity_capital = 100000.0
+        open_alloc = starting_equity_capital / max(len(open_rows), 1) if open_rows else 0.0
+        closed_alloc = starting_equity_capital / max(len(closed_rows), 1) if closed_rows else 0.0
+
+        for r in open_rows:
+            entry = safe_num(r.get("entry_ref")) or 0.0
+            last = safe_num(r.get("current_price")) or entry
+            qty = int(open_alloc // entry) if entry > 0 and open_alloc > 0 else 0
+            qty = max(qty, 1) if entry > 0 else 0
+            invested = round(qty * entry, 2)
+            mtm_pnl = round(qty * (last - entry), 2) if qty > 0 else None
+            open_equity_positions.append({
+                "symbol": r.get("symbol"),
+                "tradingsymbol": r.get("channel") or "",
+                "entry_price": round(entry, 2),
+                "last_price": round(last, 2),
+                "mtm_return_pct": safe_num(r.get("profit_pct_live")),
+                "mtm_pnl": mtm_pnl,
+                "targets_hit": [],
+                "stop_loss": infer_equity_stop(r.get("text") or ""),
+                "targets_text": infer_equity_targets(r.get("text") or ""),
+                "posted_at": r.get("date"),
+                "snapshot_at": r.get("spot_date"),
+            })
+
+        for r in closed_rows:
+            entry = safe_num(r.get("entry_ref")) or 0.0
+            ret = safe_num(r.get("ret_20d_pct"))
+            exit_reason = "20d audit window"
+            if ret is None:
+                ret = safe_num(r.get("ret_10d_pct"))
+                exit_reason = "10d audit window"
+            if ret is None:
+                ret = safe_num(r.get("ret_5d_pct"))
+                exit_reason = "5d audit window"
+            if ret is None:
+                continue
+            qty = int(closed_alloc // entry) if entry > 0 and closed_alloc > 0 else 0
+            qty = max(qty, 1) if entry > 0 else 0
+            pnl = round((ret / 100.0) * entry * qty, 2) if qty > 0 else None
+            closed_equity_positions.append({
+                "symbol": r.get("symbol"),
+                "tradingsymbol": r.get("channel") or "",
+                "return_pct": ret,
+                "pnl": pnl,
+                "exit_reason": exit_reason,
+            })
+
+    eq_unrealized = sum(float(p.get("mtm_pnl") or 0.0) for p in open_equity_positions)
+    eq_realized = sum(float(p.get("pnl") or 0.0) for p in closed_equity_positions)
+    eq_starting = 100000.0
+    eq_net_pnl = eq_realized + eq_unrealized
+    eq_net_pct = (eq_net_pnl / eq_starting * 100.0) if eq_starting else 0.0
+    eq_portfolio = eq_starting + eq_net_pnl
+    eq_open_avg = avg_present([p.get("mtm_return_pct") for p in open_equity_positions])
+
+    equity_metrics = html.Div(
         [
-            metric_card("Equity channels", len(available_equity_channels), "tracked"),
-            metric_card("Equity signals", total_equity_signals, f"extracted {total_equity_extracted}"),
-            metric_card("Equity 20d avg %", avg_equity_20d, f"positive rate {friendly(avg_equity_positive)}"),
-            metric_card("Equity max 20d avg %", avg_equity_max, "best excursion"),
-            metric_card("Target 1 hit %", avg_equity_tgt1, "where available"),
-            metric_card(
-                "Latest signal",
-                most_recent_equity_signal.get("symbol") if most_recent_equity_signal else "-",
-                to_ist(most_recent_equity_signal.get("date")) if most_recent_equity_signal else "No recent scored setup",
-            ),
+            metric_card("Equity portfolio", f"₹{eq_portfolio:,.0f}", f"Signals {total_equity_signals} | extracted {total_equity_extracted}"),
+            metric_card("Equity net PnL", fmt_pnl(eq_net_pnl, "₹"), fmt_pct(eq_net_pct)),
+            metric_card("Realized", fmt_pnl(eq_realized, "₹"), "Booked"),
+            metric_card("Unrealized", fmt_pnl(eq_unrealized, "₹"), "Open MTM"),
+            metric_card("Equity signals", total_equity_signals, f"channels {len(available_equity_channels)}"),
+            metric_card("Equity open avg %", eq_open_avg, "live mark to market"),
+            metric_card("Open", len(open_equity_positions), "positions"),
+            metric_card("Closed", len(closed_equity_positions), "positions"),
+            metric_card("Unresolved", len(unresolved_equity_positions), "filtered or malformed"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
+    children.append(section("Telegram equity", [equity_metrics], "Telegram equity now uses the same portfolio-style section structure as Telegram options, powered by audited equity signals plus current spot prices."))
 
-    if equity_audit_rows:
-        children.append(section("Telegram equity", [equity_cards], "Telegram equity now mirrors the options area with richer cards and drill-downs, while still using signal audit data instead of a live paper ledger."))
-
-        channel_cards = []
-        for row in equity_audit_rows:
-            edge = safe_num(row.get("20d_avg_%"))
-            if edge is None:
-                edge = safe_num(row.get("max_20d_avg_%"))
-            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
-            channel_cards.append(html.Div([
-                html.Div([
-                    html.Span(row.get("channel", "?"), style={"fontWeight": "700", "fontSize": "15px"}),
-                    html.Span(" equity audit", style={"fontSize": "12px", "color": "#9ca3af"}),
-                ], style={"flex": "1"}),
-                html.Div(f"Signals {row.get('signals_evaluated', 0)} | Extracted {row.get('signals_extracted', 0)}", style={"fontSize": "12px", "color": "#9ca3af"}),
-                html.Div(f"20d avg {fmt_pct(safe_num(row.get('20d_avg_%')))} | Max 20d avg {fmt_pct(safe_num(row.get('max_20d_avg_%')))}", style=color_style),
-                html.Div(f"20d positive {friendly(row.get('20d_positive_rate'))}% | Tgt1 hit {friendly(row.get('tgt1_hit_%'))}%", style={"fontSize": "11px", "color": "#6b7280"}),
-                html.Div(f"Best symbol: {row.get('best_symbol') or '-'} | Best date: {row.get('best_date') or '-'}", style={"fontSize": "11px", "color": "#9ca3af"}),
+    if open_equity_positions:
+        rows = []
+        for p in open_equity_positions:
+            mtm = p.get("mtm_return_pct", 0) or 0
+            pnl = p.get("mtm_pnl", 0) or 0
+            targets_text = p.get("targets_text") or "-"
+            sl = p.get("stop_loss", "-")
+            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if mtm > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if mtm < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"Entry ₹{p.get('entry_price')} → Last ₹{p.get('last_price')}", style={"fontSize": "12px", "color": "#9ca3af"}),
+                html.Div(f"{mtm:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                html.Div(f"SL: {sl} | Targets: {targets_text}", style={"fontSize": "11px", "color": "#6b7280"}),
             ], style={**CARD_STYLE, "marginBottom": "8px"}))
-        children.append(section(f"Telegram equity channel scorecards ({len(channel_cards)})", channel_cards))
-
-        recent_cards = []
-        if equity_recent_rows:
-            recent_df = pd.DataFrame(equity_recent_rows)
-            recent_df["sort_date"] = pd.to_datetime(recent_df["date"], errors="coerce")
-            recent_df = recent_df.sort_values("sort_date", ascending=False, na_position="last")
-            recent_df = recent_df.drop_duplicates(subset=["symbol"], keep="first")
-            for _, row in recent_df.head(8).iterrows():
-                spot = get_equity_spot_snapshot(row.get("symbol"))
-                entry_ref = safe_num(row.get("entry_ref"))
-                current_price = safe_num(spot.get("price"))
-                profit_pct = ((current_price / entry_ref) - 1.0) * 100.0 if current_price is not None and entry_ref not in (None, 0) else None
-                profit_abs = (current_price - entry_ref) if current_price is not None and entry_ref is not None else None
-                age_days = None
-                sort_dt = pd.to_datetime(row.get("date"), errors="coerce")
-                if pd.notna(sort_dt):
-                    try:
-                        if getattr(sort_dt, "tzinfo", None) is not None:
-                            sort_dt = sort_dt.tz_convert(None)
-                        age_days = max((pd.Timestamp.utcnow().tz_localize(None) - sort_dt).days, 0)
-                    except Exception:
-                        age_days = None
-                malformed_extract = profit_pct is not None and abs(profit_pct) > 200 and (age_days is None or age_days <= 45)
-                if malformed_extract:
-                    continue
-
-                display_edge = profit_pct
-                if display_edge is None:
-                    display_edge = safe_num(row.get("ret_20d_pct"))
-                if display_edge is None:
-                    display_edge = safe_num(row.get("max_20d_pct"))
-                color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN} if (display_edge or 0) > 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if (display_edge or 0) < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}
-                recent_cards.append(html.Div([
-                    html.Div([
-                        html.Span(f"{row.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}),
-                        html.Span(row.get("channel", ""), style={"fontSize": "12px", "color": "#9ca3af"}),
-                    ], style={"flex": "1"}),
-                    html.Div(
-                        f"Entry ₹{friendly(entry_ref)} → Current ₹{friendly(current_price)}",
-                        style={"fontSize": "12px", "color": "#9ca3af"},
-                    ),
-                    html.Div(
-                        f"{fmt_pct(profit_pct)} ({fmt_pnl(profit_abs, '₹')}/share)" if profit_pct is not None and profit_abs is not None else f"5d {fmt_pct(safe_num(row.get('ret_5d_pct')))} | 10d {fmt_pct(safe_num(row.get('ret_10d_pct')))} | 20d {fmt_pct(safe_num(row.get('ret_20d_pct')))}",
-                        style=color_style,
-                    ),
-                    html.Div(
-                        f"Signal: {row.get('signal_type', 'equity')} | Max 20d {fmt_pct(safe_num(row.get('max_20d_pct')))}",
-                        style={"fontSize": "11px", "color": "#6b7280"},
-                    ),
-                    html.Div(
-                        f"As of {to_ist(spot.get('date')) if spot.get('date') else '-'} | Posted {to_ist(row.get('date'))}",
-                        style={"fontSize": "11px", "color": "#9ca3af"},
-                    ),
-                    html.Div(str(row.get("text") or "")[:180], style={"fontSize": "11px", "color": "#9ca3af"}),
-                ], style={**CARD_STYLE, "marginBottom": "8px"}))
-        if recent_cards:
-            children.append(section(f"Telegram equity recent setups ({len(recent_cards)})", recent_cards, "Latest scored equity ideas shown in the same entry to current to profit card style as options."))
-        else:
-            children.append(section("Telegram equity recent setups", [empty_message("No recent Telegram equity setups yet.")]))
-
-        children.append(section("Telegram equity audit table", [table_from_df(pd.DataFrame(equity_audit_rows), "tg-equity-audit-table", page_size=6)], "All available Telegram equity channel audits side by side. If 20d stats are blank, the signal is too recent to score."))
+        children.append(section(f"Telegram equity open positions ({len(open_equity_positions)})", rows))
     else:
-        children.append(section("Telegram equity", [equity_cards, empty_message("No Telegram equity audit rows yet.")]))
+        children.append(section("Telegram equity open positions", [empty_message("No open Telegram equity positions")]))
+
+    if closed_equity_positions:
+        rows = []
+        for p in closed_equity_positions:
+            pnl = p.get("pnl", 0) or 0
+            ret = p.get("return_pct", 0) or 0
+            color_style = {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_RED} if pnl < 0 else {"fontSize": "14px", "fontWeight": "700", "color": BLOOMBERG_GREEN}
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(p.get('tradingsymbol', ''), style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"{ret:+.2f}% (₹{pnl:+,.0f})", style=color_style),
+                html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram equity closed positions ({len(closed_equity_positions)})", rows))
+    else:
+        children.append(section("Telegram equity closed positions", [empty_message("No closed Telegram equity positions")]))
+
+    if unresolved_equity_positions:
+        rows = []
+        for p in unresolved_equity_positions:
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span("equity extract", style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"Status: {p.get('status', '-')}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}),
+                html.Div(f"Reason: {p.get('reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+                html.Div((p.get('channel_update') or '')[:140], style={"fontSize": "11px", "color": "#9ca3af"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram equity unresolved tracked calls ({len(unresolved_equity_positions)})", rows, "These were captured by the equity audit flow but filtered out because the extract looked malformed or option-like, so they were not shown as open equity positions."))
 
     # ── TELEGRAM OPTIONS ──
     equity = ledger.get("equity", 0)
