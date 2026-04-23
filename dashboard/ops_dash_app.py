@@ -378,8 +378,13 @@ def metric_card(title: str, value: Any, subtitle: str | None = None) -> html.Div
         else:
             val_style["color"] = BLOOMBERG_ORANGE
     else:
-        val_str_color = str(value).lower()
-        if val_str_color in ("active", "running", "ok", "true", "yes"):
+        val_str_color = str(value).lower().strip()
+        numeric_hint = val_str_color.replace(",", "").replace("₹", "").replace("%", "")
+        if numeric_hint.startswith("+"):
+            val_style["color"] = BLOOMBERG_GREEN
+        elif numeric_hint.startswith("-"):
+            val_style["color"] = BLOOMBERG_RED
+        elif val_str_color in ("active", "running", "ok", "true", "yes"):
             val_style["color"] = BLOOMBERG_GREEN
         elif val_str_color in ("stopped", "failed", "error", "false", "no"):
             val_style["color"] = BLOOMBERG_RED
