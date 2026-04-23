@@ -290,6 +290,133 @@ def positive_rate(values: list[Any]) -> float | None:
     return round(sum(1 for v in clean if v > 0) / len(clean) * 100.0, 1)
 
 
+def safe_num(value: Any) -> float | None:
+    try:
+        num = float(value)
+    except Exception:
+        return None
+    if pd.isna(num):
+        return None
+    return round(num, 2)
+
+
+def parse_date_only(value: Any) -> Any:
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            parsed = parse_date_only(item)
+            if parsed is not None:
+                return parsed
+        return None
+    try:
+        ts = pd.to_datetime(value, errors='coerce')
+    except Exception:
+        return None
+    if pd.isna(ts):
+        return None
+    try:
+        if getattr(ts, 'tzinfo', None) is not None:
+            ts = ts.tz_convert(UTC).tz_localize(None)
+    except Exception:
+        try:
+            ts = ts.tz_localize(None)
+        except Exception:
+            pass
+    return ts.date() if hasattr(ts, 'date') else None
+
+
+def eps_outcome_label(surprise_pct: float | None, reported_eps: float | None, earnings_date: Any) -> str:
+    if surprise_pct is not None:
+        if surprise_pct > 0.5:
+            return 'beat'
+        if surprise_pct < -0.5:
+            return 'miss'
+        return 'inline'
+    if reported_eps is not None:
+        return 'reported'
+    target = parse_date_only(earnings_date)
+    if target is not None and target >= datetime.now(UTC).date():
+        return 'upcoming'
+    return '-'
+
+
+def infer_revenue_signal(text: Any) -> str:
+    lower = str(text or '').lower()
+    if any(token in lower for token in ['revenue beat', 'beat on revenue', 'sales beat', 'topline beat', 'revenue rises', 'sales rise']):
+        return 'beat'
+    if any(token in lower for token in ['revenue miss', 'sales miss', 'revenue falls', 'sales fall', 'topline miss']):
+        return 'miss'
+    return '-'
+
+
+def infer_guidance_signal(text: Any) -> str:
+    lower = str(text or '').lower()
+    if any(token in lower for token in ['raised guidance', 'guidance raised', 'strong guidance', 'guidance upbeat']):
+        return 'raised'
+    if any(token in lower for token in ['guidance cut', 'cuts guidance', 'lowered guidance', 'weak guidance']):
+        return 'cut'
+    return '-'
+
+
+def load_symbol_earnings_meta(symbol: str, cache: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    if symbol in cache:
+        return cache[symbol]
+    meta: dict[str, Any] = {'calendar': {}, 'rows': []}
+    candidates = [f'{symbol}.NS', f'{symbol}.BO'] if '.' not in symbol else [symbol]
+    for cand in candidates:
+        try:
+            tk = yf.Ticker(cand)
+            cal = tk.calendar
+            if not isinstance(cal, dict):
+                cal = cal.to_dict() if hasattr(cal, 'to_dict') else {}
+            rows = []
+            ed = tk.get_earnings_dates(limit=16)
+            if ed is not None and not ed.empty:
+                tmp = ed.reset_index()
+                date_col = tmp.columns[0]
+                for _, rec in tmp.iterrows():
+                    row_date = parse_date_only(rec.get(date_col))
+                    if row_date is None:
+                        continue
+                    rows.append({
+                        'date': row_date,
+                        'eps_estimate': safe_num(rec.get('EPS Estimate')),
+                        'reported_eps': safe_num(rec.get('Reported EPS')),
+                        'eps_surprise_pct': safe_num(rec.get('Surprise(%)')),
+                    })
+            meta = {'calendar': cal or {}, 'rows': rows}
+            if meta['calendar'] or meta['rows']:
+                break
+        except Exception:
+            continue
+    cache[symbol] = meta
+    return meta
+
+
+def get_earnings_snapshot(symbol: str, earnings_date: Any, cache: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    meta = load_symbol_earnings_meta(symbol, cache)
+    target = parse_date_only(earnings_date)
+    matched = None
+    if target is not None:
+        rows = meta.get('rows') or []
+        ranked = sorted(rows, key=lambda row: abs((row.get('date') - target).days) if row.get('date') else 9999)
+        if ranked and ranked[0].get('date') is not None and abs((ranked[0]['date'] - target).days) <= 10:
+            matched = ranked[0]
+    cal = meta.get('calendar') or {}
+    eps_estimate = safe_num((matched or {}).get('eps_estimate'))
+    reported_eps = safe_num((matched or {}).get('reported_eps'))
+    eps_surprise_pct = safe_num((matched or {}).get('eps_surprise_pct'))
+    if eps_estimate is None:
+        eps_estimate = safe_num(cal.get('Earnings Average') or cal.get('Earnings Estimate'))
+    if eps_surprise_pct is None and reported_eps is not None and eps_estimate not in (None, 0):
+        eps_surprise_pct = round(((reported_eps / eps_estimate) - 1.0) * 100.0, 2)
+    return {
+        'eps_estimate': eps_estimate,
+        'reported_eps': reported_eps,
+        'eps_surprise_pct': eps_surprise_pct,
+        'eps_outcome': eps_outcome_label(eps_surprise_pct, reported_eps, earnings_date),
+    }
+
+
 def build_news_behavior(rows: list[dict[str, Any]], registry: dict[str, list[str]]) -> dict[str, Any]:
     cache: dict[str, pd.DataFrame] = {}
     events: list[dict[str, Any]] = []
@@ -382,6 +509,7 @@ def is_earnings_row(row: dict[str, Any]) -> bool:
 
 def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list[str]], eco: dict[str, Any]) -> dict[str, Any]:
     cache: dict[str, pd.DataFrame] = {}
+    earnings_meta_cache: dict[str, dict[str, Any]] = {}
     events: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
 
@@ -423,11 +551,14 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
     for event in events:
         grouped[str(event.get('symbol') or '')].append(event)
 
+    eco_by_symbol = {str(row.get('symbol') or '').upper(): row for row in (eco.get('earnings') or [])}
     scoreboard = []
     latest_event_by_symbol: dict[str, dict[str, Any]] = {}
     for symbol, bucket in grouped.items():
         latest_event = sorted(bucket, key=lambda x: x.get('published_at', 0), reverse=True)[0]
         latest_event_by_symbol[symbol] = latest_event
+        snapshot = get_earnings_snapshot(symbol, (eco_by_symbol.get(symbol) or {}).get('earnings_date'), earnings_meta_cache)
+        headline = latest_event.get('title')
         scoreboard.append({
             'symbol': symbol,
             'events': len(bucket),
@@ -436,12 +567,18 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
             'avg_ret_5d_pct': average([b.get('ret_5d_pct') for b in bucket]),
             'avg_alignment_3d_pct': average([b.get('alignment_3d_pct') for b in bucket]),
             'positive_rate_3d': positive_rate([b.get('ret_3d_pct') for b in bucket]),
-            'latest_title': latest_event.get('title'),
+            'latest_title': headline,
             'latest_published_at': latest_event.get('published_at'),
             'latest_signal': latest_event.get('direction_label'),
             'latest_signal_score': latest_event.get('sentiment'),
             'latest_ret_1d_pct': latest_event.get('ret_1d_pct'),
             'latest_ret_3d_pct': latest_event.get('ret_3d_pct'),
+            'eps_outcome': snapshot.get('eps_outcome'),
+            'eps_estimate': snapshot.get('eps_estimate'),
+            'reported_eps': snapshot.get('reported_eps'),
+            'eps_surprise_pct': snapshot.get('eps_surprise_pct'),
+            'revenue_signal': infer_revenue_signal(headline),
+            'guidance_signal': infer_guidance_signal(headline),
         })
     scoreboard.sort(key=lambda x: (x.get('events', 0), x.get('avg_alignment_3d_pct') or -999), reverse=True)
 
@@ -450,14 +587,22 @@ def build_earnings_pipeline(rows: list[dict[str, Any]], registry: dict[str, list
         symbol = str(row.get('symbol') or '').upper()
         hist = next((item for item in scoreboard if item.get('symbol') == symbol), None) or {}
         latest_event = latest_event_by_symbol.get(symbol) or {}
+        headline = latest_event.get('title')
+        snapshot = get_earnings_snapshot(symbol, row.get('earnings_date'), earnings_meta_cache)
         upcoming.append({
             'symbol': symbol,
             'earnings_date': row.get('earnings_date'),
             'historical_events': hist.get('events', 0),
+            'eps_outcome': snapshot.get('eps_outcome'),
+            'eps_estimate': snapshot.get('eps_estimate'),
+            'reported_eps': snapshot.get('reported_eps'),
+            'eps_surprise_pct': snapshot.get('eps_surprise_pct'),
+            'revenue_signal': infer_revenue_signal(headline),
+            'guidance_signal': infer_guidance_signal(headline),
             'avg_post_earnings_3d_pct': hist.get('avg_ret_3d_pct'),
             'avg_post_earnings_5d_pct': hist.get('avg_ret_5d_pct'),
             'avg_alignment_3d_pct': hist.get('avg_alignment_3d_pct'),
-            'latest_earnings_headline': latest_event.get('title'),
+            'latest_earnings_headline': headline,
             'latest_signal': latest_event.get('direction_label'),
             'latest_signal_score': latest_event.get('sentiment'),
             'latest_ret_1d_pct': latest_event.get('ret_1d_pct'),

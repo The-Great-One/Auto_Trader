@@ -2398,20 +2398,34 @@ def build_calendar_tab(data: dict[str, Any]) -> list[Any]:
     earnings_scoreboard = earnings_pipeline.get("symbol_scoreboard") or []
     if earnings_context:
         upcoming_df = pd.DataFrame(earnings_context[:12]).copy()
-        if "latest_signal" in upcoming_df.columns:
-            upcoming_df["latest_signal"] = upcoming_df["latest_signal"].fillna("-").replace("", "-").str.upper()
+        for col in ["latest_signal", "eps_outcome", "revenue_signal", "guidance_signal"]:
+            if col in upcoming_df.columns:
+                upcoming_df[col] = upcoming_df[col].fillna("-").replace("", "-").astype(str).str.upper()
         if "latest_earnings_headline" in upcoming_df.columns:
             upcoming_df["latest_matched_headline"] = upcoming_df["latest_earnings_headline"].fillna("-").replace("", "-")
             upcoming_df = upcoming_df.drop(columns=["latest_earnings_headline"])
-        children.append(section("EARNINGS PIPELINE", [table_from_df(upcoming_df, "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings with prior matched earnings headline, signal, and follow-through move."))
+        desired_cols = [
+            "symbol", "earnings_date", "historical_events", "eps_outcome", "eps_surprise_pct", "eps_estimate", "reported_eps",
+            "revenue_signal", "guidance_signal", "latest_signal", "latest_signal_score", "latest_ret_1d_pct", "latest_ret_3d_pct",
+            "avg_post_earnings_3d_pct", "avg_post_earnings_5d_pct", "avg_alignment_3d_pct", "latest_matched_headline"
+        ]
+        upcoming_df = upcoming_df[[c for c in desired_cols if c in upcoming_df.columns] + [c for c in upcoming_df.columns if c not in desired_cols]]
+        children.append(section("EARNINGS PIPELINE", [table_from_df(upcoming_df, "earnings-pipeline-upcoming-table", page_size=12)], "Upcoming earnings with actual EPS beat/miss where available, plus revenue/guidance reads and post-headline follow-through."))
     if earnings_scoreboard:
         scoreboard_df = pd.DataFrame(earnings_scoreboard[:12]).copy()
-        if "latest_signal" in scoreboard_df.columns:
-            scoreboard_df["latest_signal"] = scoreboard_df["latest_signal"].fillna("-").replace("", "-").str.upper()
+        for col in ["latest_signal", "eps_outcome", "revenue_signal", "guidance_signal"]:
+            if col in scoreboard_df.columns:
+                scoreboard_df[col] = scoreboard_df[col].fillna("-").replace("", "-").astype(str).str.upper()
         if "latest_title" in scoreboard_df.columns:
             scoreboard_df["latest_matched_headline"] = scoreboard_df["latest_title"].fillna("-").replace("", "-")
             scoreboard_df = scoreboard_df.drop(columns=["latest_title"])
-        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(scoreboard_df, "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after matched earnings headlines, including latest signal and move."))
+        desired_cols = [
+            "symbol", "events", "eps_outcome", "eps_surprise_pct", "eps_estimate", "reported_eps", "revenue_signal", "guidance_signal",
+            "latest_signal", "latest_signal_score", "latest_ret_1d_pct", "latest_ret_3d_pct", "avg_ret_1d_pct", "avg_ret_3d_pct",
+            "avg_ret_5d_pct", "avg_alignment_3d_pct", "positive_rate_3d", "latest_published_at", "latest_matched_headline"
+        ]
+        scoreboard_df = scoreboard_df[[c for c in desired_cols if c in scoreboard_df.columns] + [c for c in scoreboard_df.columns if c not in desired_cols]]
+        children.append(section("POST-EARNINGS BEHAVIOR", [table_from_df(scoreboard_df, "post-earnings-behavior-table", page_size=12)], "Historical reaction of symbols after matched earnings headlines, with actual EPS surprise where available."))
 
     # ── 3. SECTOR HEATMAP ──────────────────────────────────
     sectors = eco.get("sectors") or []
