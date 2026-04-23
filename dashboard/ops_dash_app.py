@@ -1418,6 +1418,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
     net_pct = net_pnl / starting * 100 if starting else 0
     open_pos = ledger.get("open_positions", [])
     closed_pos = ledger.get("closed_positions", [])
+    unresolved_pos = ledger.get("unresolved_positions", [])
     updated_at = to_ist(ledger.get("updated_at"))
     sunil_options = pick_audit_channel("financewithsunil_options", "finance_with_sunil_options")
     opt_summary = sunil_options.get("summary") or {}
@@ -1432,6 +1433,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             metric_card("Options 20d dir avg %", audit_stat(opt_summary, "dir_ret_20d_pct", "avg"), f"positive rate {friendly(audit_stat(opt_summary, 'dir_ret_20d_pct', 'positive_rate'))}"),
             metric_card("Open", len(open_pos), "positions"),
             metric_card("Closed", len(closed_pos), "positions"),
+            metric_card("Unresolved", len(unresolved_pos), "tracked but not opened"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
@@ -1469,6 +1471,17 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
                 html.Div(f"Exit: {p.get('exit_reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
             ], style={**CARD_STYLE, "marginBottom": "8px"}))
         children.append(section(f"Telegram options closed positions ({len(closed_pos)})", rows))
+
+    if unresolved_pos:
+        rows = []
+        for p in unresolved_pos:
+            rows.append(html.Div([
+                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span(f"{p.get('option_side', '')} {p.get('option_strike', '')}", style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
+                html.Div(f"Status: {p.get('status', '-')}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}),
+                html.Div(f"Reason: {p.get('reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
+                html.Div((p.get('channel_update') or '')[:140], style={"fontSize": "11px", "color": "#9ca3af"}),
+            ], style={**CARD_STYLE, "marginBottom": "8px"}))
+        children.append(section(f"Telegram options unresolved tracked calls ({len(unresolved_pos)})", rows, "These were captured from Telegram and tracked, but the paper ledger could not open them yet, usually because the exact option contract could not be resolved."))
 
     if not history.empty:
         fig = px.line(history, x="timestamp", y=[c for c in ["equity", "cash"] if c in history.columns], markers=False)

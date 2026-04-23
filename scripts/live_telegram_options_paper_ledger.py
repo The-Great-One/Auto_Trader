@@ -306,10 +306,12 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
     unrealized = 0.0
     open_rows = []
     closed_rows = []
+    unresolved_rows = []
     for pos_key, pos in positions.items():
         invested = float(pos.get('invested') or 0.0)
         realized_value = float(pos.get('realized_value') or 0.0)
-        if pos.get('status') == 'closed':
+        status = pos.get('status')
+        if status == 'closed':
             pnl = float(pos.get('pnl') or (realized_value - invested))
             realized += pnl
             closed_rows.append({
@@ -321,7 +323,19 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
                 'exit_reason': pos.get('exit_reason'),
             })
             continue
-        if pos.get('status') != 'open':
+        if status != 'open':
+            unresolved_rows.append({
+                'key': pos_key,
+                'status': status,
+                'reason': pos.get('reason'),
+                'symbol': pos.get('call', {}).get('symbol') or pos.get('symbol'),
+                'option_side': pos.get('call', {}).get('option_side'),
+                'option_strike': pos.get('call', {}).get('option_strike'),
+                'entry_ref': pos.get('call', {}).get('entry_ref'),
+                'source_message_id': pos.get('call', {}).get('source_message_id'),
+                'created_at': pos.get('created_at'),
+                'channel_update': pos.get('call', {}).get('text') or pos.get('channel_confidence_note'),
+            })
             continue
         current_value = float(pos.get('realized_cash') or 0.0) + float(pos.get('remaining_qty') or 0) * float(pos.get('last_price') or 0.0)
         pnl = current_value - invested
@@ -348,6 +362,7 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
         'unrealized_pnl': round(unrealized, 2),
         'open_positions': open_rows,
         'closed_positions': closed_rows,
+        'unresolved_positions': unresolved_rows,
     }
 
 
@@ -406,6 +421,12 @@ def render_md(summary: dict[str, Any]) -> str:
     if summary['closed_positions']:
         for row in summary['closed_positions']:
             lines.append(f"- {row['symbol']} `{row['tradingsymbol']}` pnl {row['pnl']} ({row['return_pct']}%), reason {row['exit_reason']}")
+    else:
+        lines.append('- none')
+    lines += ['', '## Unresolved / not opened']
+    if summary.get('unresolved_positions'):
+        for row in summary['unresolved_positions']:
+            lines.append(f"- {row['symbol']} {row.get('option_side') or ''} {row.get('option_strike') or ''} status {row['status']}, reason {row.get('reason') or '-'}")
     else:
         lines.append('- none')
     lines += ['', '## Weekly returns']
