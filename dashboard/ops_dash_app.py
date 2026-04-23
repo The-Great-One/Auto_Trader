@@ -443,8 +443,20 @@ def json_block(obj: Any, title: str) -> html.Details:
 
 
 def _maybe_format_timeish_series(name: str, series: pd.Series, verbose: bool = False) -> pd.Series:
-    lower = str(name).lower()
-    is_timeish = any(token in lower for token in ["date", "time", "timestamp", "published", "generated", "updated", "_at"])
+    lower = str(name).lower().strip()
+    is_timeish = (
+        lower in {"date", "time", "timestamp", "published_at", "generated_at", "updated_at", "created_at"}
+        or lower.endswith("_at")
+        or lower.endswith("_time")
+        or lower.endswith("_date")
+        or lower.endswith("_timestamp")
+        or lower.startswith("date_")
+        or lower.startswith("time_")
+        or lower.startswith("timestamp_")
+        or "published" in lower
+        or "generated" in lower
+        or "updated" in lower
+    )
     if pd.api.types.is_datetime64_any_dtype(series):
         try:
             localized = series.dt.tz_convert(IST)
