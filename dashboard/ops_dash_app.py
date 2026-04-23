@@ -2643,13 +2643,7 @@ app.layout = html.Div(
             colors={"border": "#1e2a3a", "primary": BLOOMBERG_ORANGE, "background": "#111827"},
             style={"borderBottom": f"1px solid #1e2a3a"},
         ),
-        dcc.Loading(
-            id="tab-loading",
-            type="default",
-            color=BLOOMBERG_ORANGE,
-            children=html.Div(id="tab-content", style={"marginTop": "12px"}),
-            style={"marginTop": "12px"},
-        ),
+        html.Div(id="tab-content", style={"marginTop": "12px"}),
     ],
 )
 
