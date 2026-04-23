@@ -1669,6 +1669,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             score_rows = []
             for chat, s in channels.items():
                 option_audit = s.get("options_audit") or {}
+                equity_audit = s.get("equity_audit") or {}
                 paper_stats = s.get("paper_stats") or {}
                 score_rows.append({
                     "channel": chat,
@@ -1677,8 +1678,10 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
                     "sizing_mult": s.get("sizing_mult", "-"),
                     "win_rate%": s.get("win_rate", "-"),
                     "avg_ret%": s.get("avg_return_pct", "-"),
-                    "option_10d_avg%": option_audit.get("dir_ret_10d_avg", "-"),
-                    "option_20d_pos%": option_audit.get("dir_ret_20d_positive_rate", "-"),
+                    "opt_10d_avg%": option_audit.get("dir_ret_10d_avg", "-"),
+                    "opt_20d_pos%": option_audit.get("dir_ret_20d_positive_rate", "-"),
+                    "eq_5d_pos%": equity_audit.get("ret_5d_positive_rate", "-"),
+                    "eq_10d_pos%": equity_audit.get("ret_10d_positive_rate", "-"),
                     "resolve_rate%": paper_stats.get("contract_resolution_rate", "-"),
                     "n_trades": s.get("n_trades", 0),
                     "ladder": s.get("ladder_style", "-"),
