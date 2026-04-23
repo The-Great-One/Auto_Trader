@@ -26,14 +26,20 @@ def run_ticker(sub_tokens, q):
     def on_close(ws, code, reason):
         logger.warning(f"WebSocket closed with code: {code}, reason: {reason}")
         try:
-            ws.stop()
+            from twisted.internet import reactor
+            if reactor.running:
+                ws.stop()
         except Exception as e:
             logger.error(
                 f"Error stopping WebSocket: {e}, Traceback: {traceback.format_exc()}"
             )
-        # Optionally reconnect
-        logger.warning("Attempting to reconnect...")
-        kws.connect()
+        # Reconnect only for abnormal close; skip if market hours ended (code 1000 = normal)
+        if code != 1000:
+            logger.warning("Attempting to reconnect...")
+            try:
+                kws.connect()
+            except Exception as e:
+                logger.error(f"Reconnect failed: {e}")
 
     kws.on_ticks = on_ticks
     kws.on_connect = on_connect
