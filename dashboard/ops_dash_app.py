@@ -26,6 +26,7 @@ TELEGRAM_TRADE_AUDIT_PATH = REPORTS_DIR / "telegram_trade_audit_latest.json"
 ECO_CALENDAR_PATH = REPORTS_DIR / "economic_calendar_sector_latest.json"
 GLOBAL_MACRO_PATH = REPORTS_DIR / "global_macro_latest.json"
 NEWS_BEHAVIOR_PATH = REPORTS_DIR / "news_topic_symbol_behavior_latest.json"
+PORTFOLIO_TRACKER_PATH = REPORTS_DIR / "portfolio_tracker_latest.json"
 EARNINGS_PIPELINE_PATH = REPORTS_DIR / "earnings_call_pipeline_latest.json"
 WATCH_UPDATES_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_channel_updates.jsonl"
 WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_receipts.jsonl"
@@ -44,6 +45,7 @@ GLOBAL_MACRO_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 ECO_CALENDAR_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 TELEGRAM_AUDIT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 EVENT_PIPELINES_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+PORTFOLIO_TRACKER_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 DASH_DATA_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 LAST_COMPACT_TS: float = 0.0
 COMPACT_INTERVAL_SECONDS = 300  # compact JSONL every 5 min
@@ -668,6 +670,25 @@ def load_event_pipelines() -> dict[str, Any]:
     return out
 
 
+def load_portfolio_tracker() -> dict[str, Any]:
+    now = time.time()
+    cached = PORTFOLIO_TRACKER_CACHE.get("data")
+    if cached is not None and now - float(PORTFOLIO_TRACKER_CACHE.get("ts", 0.0)) < 60:
+        return cached if isinstance(cached, dict) else {}
+    payload = load_json(PORTFOLIO_TRACKER_PATH) or {}
+    if not payload:
+        try:
+            subprocess.run(
+                [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "generate_portfolio_tracker.py")],
+                cwd=str(ROOT), capture_output=True, text=True, timeout=60,
+            )
+            payload = load_json(PORTFOLIO_TRACKER_PATH) or {}
+        except Exception:
+            pass
+    PORTFOLIO_TRACKER_CACHE.update({"ts": now, "data": payload})
+    return payload if isinstance(payload, dict) else {}
+
+
 def recent_report_files(limit: int = 80) -> pd.DataFrame:
     rows = []
     for path in REPORTS_DIR.iterdir():
@@ -791,6 +812,7 @@ def collect_data() -> dict[str, Any]:
     news_payload = load_json(REPORTS_DIR / "news_sentiment_latest.json") or {}
     topics_payload = load_json(REPORTS_DIR / "market_topics_latest.json") or {}
     event_pipelines = load_event_pipelines()
+    portfolio_tracker = load_portfolio_tracker()
     hourly_lab = load_json(REPORTS_DIR / "hourly_lab_status_latest.json") or {}
     lab_status = load_json(LAB_STATUS_PATH) or {}
     combined_labs = load_combined_lab_table(limit=30)
@@ -830,6 +852,7 @@ def collect_data() -> dict[str, Any]:
         "topics_payload": topics_payload,
         "news_behavior": event_pipelines.get("news_behavior") or {},
         "earnings_pipeline": event_pipelines.get("earnings_pipeline") or {},
+        "portfolio_tracker": portfolio_tracker,
         "hourly_lab": hourly_lab,
         "lab_status": lab_status,
         "combined_labs": combined_labs,
@@ -1022,6 +1045,65 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("Paper portfolio", [live_cards], "Your live Telegram paper portfolio sits here so you can compare it against the real one quickly."))
+
+    # ── PORTFOLIO TRACKER: MF + recommendations ──
+    tracker = data.get("portfolio_tracker") or {}
+    mf_holdings = tracker.get("mf_holdings") or []
+    eq_holdings = tracker.get("equity_holdings") or []
+    psum = tracker.get("portfolio_summary") or {}
+    if tracker:
+        tracker_cards = html.Div(
+            [
+                metric_card("MF value", friendly(psum.get("mf_value")), f"{psum.get('n_mf_holdings', 0)} funds"),
+                metric_card("MF weight", friendly(psum.get("mf_weight_pct")), "% of portfolio"),
+                metric_card("Equity value", friendly(psum.get("equity_value")), f"{psum.get('n_equity_holdings', 0)} holdings"),
+                metric_card("Equity weight", friendly(psum.get("equity_weight_pct")), "% of portfolio"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        children.append(section("Portfolio tracker (equity + MF)", [tracker_cards], "Live holdings from Kite with buy/sell/hold recommendations."))
+
+    # Category allocation table
+    cat_breakdown = tracker.get("category_breakdown") or {}
+    if cat_breakdown:
+        cat_rows = []
+        for cat, vals in sorted(cat_breakdown.items(), key=lambda x: -x[1]["value"]):
+            pct = vals["value"] / (psum.get("total_value") or 1) * 100
+            gain = ((vals["value"] - vals["cost"]) / vals["cost"] * 100) if vals["cost"] > 0 else 0
+            cat_rows.append({"category": cat, "value_inr": round(vals["value"]), "weight_pct": round(pct, 1), "gain_pct": round(gain, 1)})
+        children.append(section("Category allocation", [table_from_df(pd.DataFrame(cat_rows), "category-alloc-table", page_size=15)]))
+
+    # MF recommendations table
+    if mf_holdings:
+        mf_rows = []
+        for m in sorted(mf_holdings, key=lambda x: -x.get("weight_pct", 0)):
+            fund_short = (m.get("fund") or m.get("tradingsymbol", "?"))[:50]
+            mf_rows.append({
+                "fund": fund_short,
+                "recommend": m.get("recommendation", "-"),
+                "category": m.get("category", "?"),
+                "risk": m.get("risk_level", "?"),
+                "value_inr": m.get("current_value", 0),
+                "weight_pct": m.get("weight_pct", 0),
+                "gain_pct": m.get("gain_pct", 0),
+                "rationale": (m.get("rationale") or "")[:80],
+            })
+        children.append(section("MF holdings + recommendations", [table_from_df(pd.DataFrame(mf_rows), "mf-recommendations-table", page_size=15)], "Buy/sell/hold based on P\u0026L, risk, category outlook, and portfolio concentration."))
+
+    # Equity recommendations table
+    if eq_holdings:
+        eq_rows = []
+        for h in eq_holdings:
+            eq_rows.append({
+                "symbol": h.get("tradingsymbol", "?"),
+                "recommend": h.get("recommendation", "-"),
+                "value_inr": h.get("current_value", 0),
+                "weight_pct": h.get("weight_pct", 0),
+                "gain_pct": h.get("gain_pct", 0),
+                "rationale": (h.get("rationale") or "")[:80],
+            })
+        children.append(section("Equity recommendations", [table_from_df(pd.DataFrame(eq_rows), "eq-recommendations-table", page_size=10)]))
+
     return children
 
 
