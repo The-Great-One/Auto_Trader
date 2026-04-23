@@ -1683,7 +1683,6 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
 
     open_equity_positions: list[dict[str, Any]] = []
     closed_equity_positions: list[dict[str, Any]] = []
-    unresolved_equity_positions: list[dict[str, Any]] = []
 
     if equity_recent_rows:
         recent_df = pd.DataFrame(equity_recent_rows)
@@ -1701,12 +1700,6 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             text = str(row.get("text") or "")
             optionish_noise = any(x in text.lower() for x in ["lot size", "premium", "ce", "pe"]) and (profit_pct is None or abs(profit_pct) > 100)
             if malformed_extract or optionish_noise or entry_ref is None:
-                unresolved_equity_positions.append({
-                    "symbol": row.get("symbol"),
-                    "status": "filtered_out",
-                    "reason": "malformed_or_optionlike_equity_extract",
-                    "channel_update": text[:140],
-                })
                 continue
             rec = dict(row)
             rec["entry_ref"] = entry_ref
@@ -1798,7 +1791,7 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
             metric_card("Equity open avg %", eq_open_avg, "live mark to market"),
             metric_card("Open", len(open_equity_positions), "positions"),
             metric_card("Closed", len(closed_equity_positions), "positions"),
-            metric_card("Unresolved", len(unresolved_equity_positions), "filtered or malformed"),
+            metric_card("Channels", len(available_equity_channels), "tracked"),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
@@ -1838,17 +1831,6 @@ def build_telegram_tab(data: dict[str, Any]) -> list[Any]:
         children.append(section(f"Telegram equity closed positions ({len(closed_equity_positions)})", rows))
     else:
         children.append(section("Telegram equity closed positions", [empty_message("No closed Telegram equity positions")]))
-
-    if unresolved_equity_positions:
-        rows = []
-        for p in unresolved_equity_positions:
-            rows.append(html.Div([
-                html.Div([html.Span(f"{p.get('symbol', '?')} ", style={"fontWeight": "700", "fontSize": "15px"}), html.Span("equity extract", style={"fontSize": "12px", "color": "#9ca3af"})], style={"flex": "1"}),
-                html.Div(f"Status: {p.get('status', '-')}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE}),
-                html.Div(f"Reason: {p.get('reason', '-')}", style={"fontSize": "11px", "color": "#6b7280"}),
-                html.Div((p.get('channel_update') or '')[:140], style={"fontSize": "11px", "color": "#9ca3af"}),
-            ], style={**CARD_STYLE, "marginBottom": "8px"}))
-        children.append(section(f"Telegram equity unresolved tracked calls ({len(unresolved_equity_positions)})", rows, "These were captured by the equity audit flow but filtered out because the extract looked malformed or option-like, so they were not shown as open equity positions."))
 
     # ── TELEGRAM OPTIONS ──
     equity = ledger.get("equity", 0)
