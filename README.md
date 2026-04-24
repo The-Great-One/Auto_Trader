@@ -396,6 +396,7 @@ What it shows:
 - RNN-vs-baseline lab outcomes
 - paper trader snapshots
 - live paper-shadow snapshots
+- embedded MF FIRE planner for mutual-fund SIP, compare, P&C scan, and SWP analysis
 - cached Twitter sentiment by symbol
 - Oracle server state and recent reports over SSH
 

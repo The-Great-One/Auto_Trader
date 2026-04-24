@@ -1171,641 +1171,571 @@ def universe_scan_top5(
 # Streamlit UI
 # --------------------------------------------------------------------
 
-st.set_page_config(page_title="MF FIRE Planner", layout="wide")
-st.title("🪙 MF FIRE Planner — SIP → SWP")
-st.caption("Compare, derive a custom NAV, P&C your best 5 with diversification (progress + robust correlations), then run an inflation-aware SWP.")
-
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    df_schemes = fetch_scheme_list()
-    q = st.text_input("Search fund (type 3+ chars)")
-    if q and len(q) >= 3:
-        matches = df_schemes[df_schemes["scheme_name_lc"].str.contains(q.lower())].head(25)
+def render_mf_fire_app(*, embed: bool = False) -> None:
+    if not embed:
+        st.set_page_config(page_title="MF FIRE Planner", layout="wide")
+        st.title("🪙 MF FIRE Planner — SIP → SWP")
+        st.caption("Compare, derive a custom NAV, P&C your best 5 with diversification (progress + robust correlations), then run an inflation-aware SWP.")
     else:
-        matches = df_schemes.head(0)
-    chosen = st.selectbox("Choose fund", options=matches["scheme_name"].tolist(), index=None)
+        st.subheader("🪙 MF FIRE Planner")
+        st.caption("Compare, derive a custom NAV, P&C your best 5 with diversification (progress + robust correlations), then run an inflation-aware SWP.")
 
-# === Historical chart + download for chosen ===
-nav_hist = None
-scode = None
-if chosen:
-    try:
-        scode = int(df_schemes.loc[df_schemes["scheme_name"] == chosen, "scheme_code"].iloc[0])
-        nav_hist = fetch_nav_history(scode)
-        with st.expander("📈 Historical NAV & Downloads", expanded=False):
-            c1, c2, c3 = st.columns([1.2, 1, 1])
-            with c1:
-                tf_choice = st.selectbox("Timeframe", ["Full","YTD","1Y","3Y","5Y","10Y"], index=0)
-            with c2:
-                use_normalized = st.checkbox("Normalize to ₹10", value=True)
-            with c3:
-                show_points = st.checkbox("Show monthly table", value=False)
-            nav_to_show = nav_hist.copy()
-            if not nav_to_show.empty:
-                last_date = nav_to_show["date"].iloc[-1]
-                start_map = {
-                    "YTD": pd.Timestamp(year=last_date.year, month=1, day=1),
-                    "1Y": last_date - pd.DateOffset(years=1),
-                    "3Y": last_date - pd.DateOffset(years=3),
-                    "5Y": last_date - pd.DateOffset(years=5),
-                    "10Y": last_date - pd.DateOffset(years=10),
-                }
-                if tf_choice != "Full":
-                    nav_to_show = nav_to_show[nav_to_show["date"] >= start_map[tf_choice]].reset_index(drop=True)
-            ycol = "nav_norm" if use_normalized else "nav"
-            if use_normalized:
-                nav_to_show = normalize_nav(nav_to_show, base=10.0)
-            if not nav_to_show.empty:
-                st.line_chart(nav_to_show.set_index("date")[[ycol]], height=260)
-                if show_points:
-                    me = nav_to_show.copy()
-                    me["ME"] = me["date"].dt.to_period("M").dt.to_timestamp("M")
-                    me = me.groupby("ME", as_index=False)[[ycol]].last().rename(columns={"ME":"month"})
-                    st.dataframe(me, use_container_width=True, height=220)
-                full_csv = nav_hist.to_csv(index=False).encode("utf-8")
-                file_slug = f"{scode}_{chosen.replace(' ','_').replace('/','_')}"
-                st.download_button("⬇️ Download full history (CSV)", data=full_csv, file_name=f"{file_slug}_history.csv", mime="text/csv", use_container_width=True)
-    except Exception as e:
-        st.warning(f"Could not load NAV history for the selected fund. {e}")
+    col1, col2 = st.columns([2, 1])
 
-# === Compare panel (stateful) ===
-if "compare_funds" not in st.session_state:
-    st.session_state.compare_funds = []
-if "weight_map" not in st.session_state:
-    st.session_state.weight_map = {}
-
-with st.expander("📊 Compare up to 5 funds", expanded=False):
-    code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
-    c1, c2, c3 = st.columns([1.3,1,1])
-    with c1:
-        comp_q = st.text_input("Find a fund (type 3+ chars)", key="comp_q")
-        if comp_q and len(comp_q) >= 3:
-            comp_matches = df_schemes[df_schemes["scheme_name_lc"].str.contains(comp_q.lower())].head(200)
+    with col1:
+        df_schemes = fetch_scheme_list()
+        q = st.text_input("Search fund (type 3+ chars)")
+        if q and len(q) >= 3:
+            matches = df_schemes[df_schemes["scheme_name_lc"].str.contains(q.lower())].head(25)
         else:
-            comp_matches = df_schemes.head(0)
-        comp_pick = st.selectbox("Pick from results", options=comp_matches["scheme_name"].tolist(), index=None, key="comp_pick")
-    with c2:
-        if st.button("➕ Add picked", use_container_width=True):
-            if comp_pick and comp_pick not in st.session_state.compare_funds:
-                if len(st.session_state.compare_funds) < 5:
-                    st.session_state.compare_funds.append(comp_pick)
-                else:
-                    st.warning("You can compare at most 5 funds.")
-    with c3:
-        if st.button("➕ Add currently selected", use_container_width=True):
-            if chosen and chosen not in st.session_state.compare_funds:
-                if len(st.session_state.compare_funds) < 5:
-                    st.session_state.compare_funds.append(chosen)
-                else:
-                    st.warning("You can compare at most 5 funds.")
-    if st.session_state.compare_funds:
-        st.caption("Selected funds (click to remove):")
-        cols = st.columns(min(5, len(st.session_state.compare_funds)))
-        to_remove = None
-        for i, nm in enumerate(st.session_state.compare_funds):
-            if cols[i % len(cols)].button(f"❌ {nm}", key=f"rm_{i}"):
-                to_remove = nm
-        if to_remove:
-            st.session_state.compare_funds = [x for x in st.session_state.compare_funds if x != to_remove]
-            st.session_state.weight_map.pop(to_remove, None)
+            matches = df_schemes.head(0)
+        chosen = st.selectbox("Choose fund", options=matches["scheme_name"].tolist(), index=None)
 
-# === 🧮 P&C: Best 5 diversified funds ===
-with st.expander("🧮 P&C: Best 5 diversified funds", expanded=False):
-    st.caption("Simple flow: score funds by return vs risk, then pick a diversified top 5 with correlation control.")
-    preset_map = {
-        "Conservative": {
-            "include_regex": "Direct|Growth|Index|Large|Flexi|Balanced|Hybrid",
-            "exclude_regex": "Regular|Dividend|IDCW|Sector|Thematic|Small|Mid|Liquid|Overnight|Debt|Gilt|Arbitrage",
-            "lookback": "120M",
-            "min_months": 60,
-            "profile": "Low",
-            "corr_cap": 0.75,
-            "one_per_bucket": True,
-        },
-        "Balanced": {
-            "include_regex": "Direct|Growth",
-            "exclude_regex": "Regular|Dividend|IDCW|Liquid|Overnight|Debt|Gilt|Arbitrage",
-            "lookback": "60M",
-            "min_months": 36,
-            "profile": "Medium",
-            "corr_cap": 0.88,
-            "one_per_bucket": True,
-        },
-        "Aggressive": {
-            "include_regex": "Direct|Growth|Flexi|Mid|Small|International|Global|Sector|Thematic",
-            "exclude_regex": "Regular|Dividend|IDCW|Liquid|Overnight|Debt|Gilt|Arbitrage",
-            "lookback": "36M",
-            "min_months": 24,
-            "profile": "High",
-            "corr_cap": 0.93,
-            "one_per_bucket": False,
-        },
-    }
-
-    pnc_defaults = {
-        "pnc_include_regex": preset_map["Balanced"]["include_regex"],
-        "pnc_exclude_regex": preset_map["Balanced"]["exclude_regex"],
-        "pnc_lookback": preset_map["Balanced"]["lookback"],
-        "pnc_min_months": preset_map["Balanced"]["min_months"],
-        "pnc_profile": preset_map["Balanced"]["profile"],
-        "pnc_corr_cap": preset_map["Balanced"]["corr_cap"],
-        "pnc_one_per_bucket": preset_map["Balanced"]["one_per_bucket"],
-        "pnc_show_adv": False,
-        "pnc_preset_choice": "Balanced",
-    }
-    for k, v in pnc_defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-    if "pnc_last_picks" not in st.session_state:
-        st.session_state["pnc_last_picks"] = []
-
-    pr1, pr2 = st.columns([1.5, 1])
-    with pr1:
-        preset_choice = st.selectbox("Preset", ["Conservative", "Balanced", "Aggressive"], key="pnc_preset_choice")
-    with pr2:
-        if st.button("Apply preset", use_container_width=True, key="pnc_apply_preset"):
-            cfg = preset_map[preset_choice]
-            st.session_state["pnc_include_regex"] = cfg["include_regex"]
-            st.session_state["pnc_exclude_regex"] = cfg["exclude_regex"]
-            st.session_state["pnc_lookback"] = cfg["lookback"]
-            st.session_state["pnc_min_months"] = int(cfg["min_months"])
-            st.session_state["pnc_profile"] = cfg["profile"]
-            st.session_state["pnc_corr_cap"] = float(cfg["corr_cap"])
-            st.session_state["pnc_one_per_bucket"] = bool(cfg["one_per_bucket"])
-            st.session_state["pnc_show_adv"] = True
-            try:
-                st.rerun()
-            except Exception:
-                st.experimental_rerun()
-
-    p1, p2, p3 = st.columns(3)
-    with p1:
-        include_regex = st.text_input("Include names (regex)", key="pnc_include_regex")
-        exclude_regex = st.text_input("Exclude names (regex)", key="pnc_exclude_regex")
-    with p2:
-        lookback = st.selectbox("Lookback window", ["36M", "60M", "120M"], key="pnc_lookback")
-        lbm = {"36M": 36, "60M": 60, "120M": 120}[lookback]
-        min_months = st.number_input("Minimum months of history", 12, 240, step=6, key="pnc_min_months")
-    with p3:
-        profile = st.selectbox("Risk profile", ["Low", "Medium", "High"], key="pnc_profile")
-        st.caption("Universe: all matching mutual funds (no cap)")
-
-    show_adv_pnc = st.checkbox("Show advanced diversification settings", key="pnc_show_adv")
-    corr_cap = float(st.session_state.get("pnc_corr_cap", 0.88))
-    one_per_bucket = bool(st.session_state.get("pnc_one_per_bucket", True))
-    if show_adv_pnc:
-        a1, a2 = st.columns(2)
-        with a1:
-            corr_cap = st.slider("Max pairwise absolute correlation", 0.60, 0.99, step=0.01, key="pnc_corr_cap")
-        with a2:
-            one_per_bucket = st.checkbox("Prefer one fund per style bucket", key="pnc_one_per_bucket")
-
-    if st.button("🔍 Run Best-5 scan", use_container_width=True):
-        prog = st.progress(0, text="Starting scan…")
-        def _cb(frac: float, msg: str): prog.progress(frac, text=f"{msg} ({int(frac*100)}%)")
-        scan_error = False
+    # === Historical chart + download for chosen ===
+    nav_hist = None
+    scode = None
+    if chosen:
         try:
-            picks, metrics, corr_sel, chart_df = universe_scan_top5(
-                df_schemes=df_schemes,
-                include_regex=include_regex,
-                exclude_regex=exclude_regex,
-                lookback_months=lbm,
-                min_months=int(min_months),
-                universe_cap=None,
-                profile=profile,
-                corr_cap=float(corr_cap),
-                progress_cb=_cb,
-                one_per_bucket=one_per_bucket,
-            )
-        except ValueError as e:
-            _cb(1.0, "Scan stopped")
-            st.warning(str(e))
-            scan_error = True
-            st.session_state["pnc_last_picks"] = []
-            picks, metrics, corr_sel, chart_df = [], pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            scode = int(df_schemes.loc[df_schemes["scheme_name"] == chosen, "scheme_code"].iloc[0])
+            nav_hist = fetch_nav_history(scode)
+            with st.expander("📈 Historical NAV & Downloads", expanded=False):
+                c1, c2, c3 = st.columns([1.2, 1, 1])
+                with c1:
+                    tf_choice = st.selectbox("Timeframe", ["Full","YTD","1Y","3Y","5Y","10Y"], index=0)
+                with c2:
+                    use_normalized = st.checkbox("Normalize to ₹10", value=True)
+                with c3:
+                    show_points = st.checkbox("Show monthly table", value=False)
+                nav_to_show = nav_hist.copy()
+                if not nav_to_show.empty:
+                    last_date = nav_to_show["date"].iloc[-1]
+                    start_map = {
+                        "YTD": pd.Timestamp(year=last_date.year, month=1, day=1),
+                        "1Y": last_date - pd.DateOffset(years=1),
+                        "3Y": last_date - pd.DateOffset(years=3),
+                        "5Y": last_date - pd.DateOffset(years=5),
+                        "10Y": last_date - pd.DateOffset(years=10),
+                    }
+                    if tf_choice != "Full":
+                        nav_to_show = nav_to_show[nav_to_show["date"] >= start_map[tf_choice]].reset_index(drop=True)
+                ycol = "nav_norm" if use_normalized else "nav"
+                if use_normalized:
+                    nav_to_show = normalize_nav(nav_to_show, base=10.0)
+                if not nav_to_show.empty:
+                    st.line_chart(nav_to_show.set_index("date")[[ycol]], height=260)
+                    if show_points:
+                        me = nav_to_show.copy()
+                        me["ME"] = me["date"].dt.to_period("M").dt.to_timestamp("M")
+                        me = me.groupby("ME", as_index=False)[[ycol]].last().rename(columns={"ME":"month"})
+                        st.dataframe(me, use_container_width=True, height=220)
+                    full_csv = nav_hist.to_csv(index=False).encode("utf-8")
+                    file_slug = f"{scode}_{chosen.replace(' ','_').replace('/','_')}"
+                    st.download_button("⬇️ Download full history (CSV)", data=full_csv, file_name=f"{file_slug}_history.csv", mime="text/csv", use_container_width=True)
         except Exception as e:
-            _cb(1.0, "Scan failed")
-            st.error(f"Scan failed: {e}")
-            scan_error = True
-            st.session_state["pnc_last_picks"] = []
-            picks, metrics, corr_sel, chart_df = [], pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        _cb(1.0, "Scan complete")
+            st.warning(f"Could not load NAV history for the selected fund. {e}")
 
-        if not picks and not scan_error:
-            st.warning("No suitable combination found with the current filters.")
-            st.session_state["pnc_last_picks"] = []
-        elif picks:
-            st.session_state["pnc_last_picks"] = list(picks)
-            st.success(f"Selected 5: {', '.join(picks)}")
-            if not metrics.empty:
-                st.dataframe(metrics, use_container_width=True, height=240)
-                st.download_button(
-                    "⬇️ Download selected metrics (CSV)",
-                    data=metrics.to_csv(index=False).encode("utf-8"),
-                    file_name="pnc_selected_metrics.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
-            if not corr_sel.empty:
-                st.markdown("**Pairwise absolute Pearson correlation (selected funds)**")
-                st.dataframe(corr_sel, use_container_width=True, height=220)
+    # === Compare panel (stateful) ===
+    if "compare_funds" not in st.session_state:
+        st.session_state.compare_funds = []
+    if "weight_map" not in st.session_state:
+        st.session_state.weight_map = {}
 
-            if not chart_df.empty:
-                st.markdown("**Normalized performance (base ₹10 at common start)**")
-                st.line_chart(chart_df.set_index("date"), height=320, use_container_width=True)
-
-    last_picks = st.session_state.get("pnc_last_picks", [])
-    if last_picks:
-        st.caption(f"Last scan picks: {', '.join(last_picks)}")
-        if st.button("➕ Push last Best-5 into Compare", use_container_width=True, key="pnc_push_last"):
-            picked_codes = []
-            for p in last_picks:
-                m = re.search(r"\[(\d+)\]\s*$", str(p))
-                if m:
-                    picked_codes.append(int(m.group(1)))
-            if not picked_codes:
-                st.warning("Could not parse scheme codes from selected picks.")
-            else:
-                code_to_name = df_schemes.set_index("scheme_code")["scheme_name"].to_dict()
-                to_add = [code_to_name[c] for c in picked_codes if c in code_to_name]
-                st.session_state.compare_funds = to_add[:5]
-                st.success("Loaded into Compare panel (up to 5).")
-
-# === 🔁 DERIVED NAV (weighted mix) — above SWP ===
-with st.expander("🧪 Build derived NAV (weighted mix)", expanded=False):
-    selected = st.session_state.compare_funds
-    if len(selected) < 2:
-        st.info("Pick at least two funds in the comparison panel above to build a derived NAV.")
-    else:
+    with st.expander("📊 Compare up to 5 funds", expanded=False):
         code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
-        histories = {}
+        c1, c2, c3 = st.columns([1.3,1,1])
+        with c1:
+            comp_q = st.text_input("Find a fund (type 3+ chars)", key="comp_q")
+            if comp_q and len(comp_q) >= 3:
+                comp_matches = df_schemes[df_schemes["scheme_name_lc"].str.contains(comp_q.lower())].head(200)
+            else:
+                comp_matches = df_schemes.head(0)
+            comp_pick = st.selectbox("Pick from results", options=comp_matches["scheme_name"].tolist(), index=None, key="comp_pick")
+        with c2:
+            if st.button("➕ Add picked", use_container_width=True):
+                if comp_pick and comp_pick not in st.session_state.compare_funds:
+                    if len(st.session_state.compare_funds) < 5:
+                        st.session_state.compare_funds.append(comp_pick)
+                    else:
+                        st.warning("You can compare at most 5 funds.")
+        with c3:
+            if st.button("➕ Add currently selected", use_container_width=True):
+                if chosen and chosen not in st.session_state.compare_funds:
+                    if len(st.session_state.compare_funds) < 5:
+                        st.session_state.compare_funds.append(chosen)
+                    else:
+                        st.warning("You can compare at most 5 funds.")
+        if st.session_state.compare_funds:
+            st.caption("Selected funds (click to remove):")
+            cols = st.columns(min(5, len(st.session_state.compare_funds)))
+            to_remove = None
+            for i, nm in enumerate(st.session_state.compare_funds):
+                if cols[i % len(cols)].button(f"❌ {nm}", key=f"rm_{i}"):
+                    to_remove = nm
+            if to_remove:
+                st.session_state.compare_funds = [x for x in st.session_state.compare_funds if x != to_remove]
+                st.session_state.weight_map.pop(to_remove, None)
+
+    # === 🧮 P&C: Best 5 diversified funds ===
+    with st.expander("🧮 P&C: Best 5 diversified funds", expanded=False):
+        st.caption("Simple flow: score funds by return vs risk, then pick a diversified top 5 with correlation control.")
+        preset_map = {
+            "Conservative": {
+                "include_regex": "Direct|Growth|Index|Large|Flexi|Balanced|Hybrid",
+                "exclude_regex": "Regular|Dividend|IDCW|Sector|Thematic|Small|Mid|Liquid|Overnight|Debt|Gilt|Arbitrage",
+                "lookback": "120M",
+                "min_months": 60,
+                "profile": "Low",
+                "corr_cap": 0.75,
+                "one_per_bucket": True,
+            },
+            "Balanced": {
+                "include_regex": "Direct|Growth",
+                "exclude_regex": "Regular|Dividend|IDCW|Liquid|Overnight|Debt|Gilt|Arbitrage",
+                "lookback": "60M",
+                "min_months": 36,
+                "profile": "Medium",
+                "corr_cap": 0.88,
+                "one_per_bucket": True,
+            },
+            "Aggressive": {
+                "include_regex": "Direct|Growth|Flexi|Mid|Small|International|Global|Sector|Thematic",
+                "exclude_regex": "Regular|Dividend|IDCW|Liquid|Overnight|Debt|Gilt|Arbitrage",
+                "lookback": "36M",
+                "min_months": 24,
+                "profile": "High",
+                "corr_cap": 0.93,
+                "one_per_bucket": False,
+            },
+        }
+
+        pnc_defaults = {
+            "pnc_include_regex": preset_map["Balanced"]["include_regex"],
+            "pnc_exclude_regex": preset_map["Balanced"]["exclude_regex"],
+            "pnc_lookback": preset_map["Balanced"]["lookback"],
+            "pnc_min_months": preset_map["Balanced"]["min_months"],
+            "pnc_profile": preset_map["Balanced"]["profile"],
+            "pnc_corr_cap": preset_map["Balanced"]["corr_cap"],
+            "pnc_one_per_bucket": preset_map["Balanced"]["one_per_bucket"],
+            "pnc_show_adv": False,
+            "pnc_preset_choice": "Balanced",
+        }
+        for k, v in pnc_defaults.items():
+            if k not in st.session_state:
+                st.session_state[k] = v
+        if "pnc_last_picks" not in st.session_state:
+            st.session_state["pnc_last_picks"] = []
+
+        pr1, pr2 = st.columns([1.5, 1])
+        with pr1:
+            preset_choice = st.selectbox("Preset", ["Conservative", "Balanced", "Aggressive"], key="pnc_preset_choice")
+        with pr2:
+            if st.button("Apply preset", use_container_width=True, key="pnc_apply_preset"):
+                cfg = preset_map[preset_choice]
+                st.session_state["pnc_include_regex"] = cfg["include_regex"]
+                st.session_state["pnc_exclude_regex"] = cfg["exclude_regex"]
+                st.session_state["pnc_lookback"] = cfg["lookback"]
+                st.session_state["pnc_min_months"] = int(cfg["min_months"])
+                st.session_state["pnc_profile"] = cfg["profile"]
+                st.session_state["pnc_corr_cap"] = float(cfg["corr_cap"])
+                st.session_state["pnc_one_per_bucket"] = bool(cfg["one_per_bucket"])
+                st.session_state["pnc_show_adv"] = True
+                try:
+                    st.rerun()
+                except Exception:
+                    st.experimental_rerun()
+
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            include_regex = st.text_input("Include names (regex)", key="pnc_include_regex")
+            exclude_regex = st.text_input("Exclude names (regex)", key="pnc_exclude_regex")
+        with p2:
+            lookback = st.selectbox("Lookback window", ["36M", "60M", "120M"], key="pnc_lookback")
+            lbm = {"36M": 36, "60M": 60, "120M": 120}[lookback]
+            min_months = st.number_input("Minimum months of history", 12, 240, step=6, key="pnc_min_months")
+        with p3:
+            profile = st.selectbox("Risk profile", ["Low", "Medium", "High"], key="pnc_profile")
+            st.caption("Universe: all matching mutual funds (no cap)")
+
+        show_adv_pnc = st.checkbox("Show advanced diversification settings", key="pnc_show_adv")
+        corr_cap = float(st.session_state.get("pnc_corr_cap", 0.88))
+        one_per_bucket = bool(st.session_state.get("pnc_one_per_bucket", True))
+        if show_adv_pnc:
+            a1, a2 = st.columns(2)
+            with a1:
+                corr_cap = st.slider("Max pairwise absolute correlation", 0.60, 0.99, step=0.01, key="pnc_corr_cap")
+            with a2:
+                one_per_bucket = st.checkbox("Prefer one fund per style bucket", key="pnc_one_per_bucket")
+
+        if st.button("🔍 Run Best-5 scan", use_container_width=True):
+            prog = st.progress(0, text="Starting scan…")
+            def _cb(frac: float, msg: str): prog.progress(frac, text=f"{msg} ({int(frac*100)}%)")
+            scan_error = False
+            try:
+                picks, metrics, corr_sel, chart_df = universe_scan_top5(
+                    df_schemes=df_schemes,
+                    include_regex=include_regex,
+                    exclude_regex=exclude_regex,
+                    lookback_months=lbm,
+                    min_months=int(min_months),
+                    universe_cap=None,
+                    profile=profile,
+                    corr_cap=float(corr_cap),
+                    progress_cb=_cb,
+                    one_per_bucket=one_per_bucket,
+                )
+            except ValueError as e:
+                _cb(1.0, "Scan stopped")
+                st.warning(str(e))
+                scan_error = True
+                st.session_state["pnc_last_picks"] = []
+                picks, metrics, corr_sel, chart_df = [], pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            except Exception as e:
+                _cb(1.0, "Scan failed")
+                st.error(f"Scan failed: {e}")
+                scan_error = True
+                st.session_state["pnc_last_picks"] = []
+                picks, metrics, corr_sel, chart_df = [], pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            _cb(1.0, "Scan complete")
+
+            if not picks and not scan_error:
+                st.warning("No suitable combination found with the current filters.")
+                st.session_state["pnc_last_picks"] = []
+            elif picks:
+                st.session_state["pnc_last_picks"] = list(picks)
+                st.success(f"Selected 5: {', '.join(picks)}")
+                if not metrics.empty:
+                    st.dataframe(metrics, use_container_width=True, height=240)
+                    st.download_button(
+                        "⬇️ Download selected metrics (CSV)",
+                        data=metrics.to_csv(index=False).encode("utf-8"),
+                        file_name="pnc_selected_metrics.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                if not corr_sel.empty:
+                    st.markdown("**Pairwise absolute Pearson correlation (selected funds)**")
+                    st.dataframe(corr_sel, use_container_width=True, height=220)
+
+                if not chart_df.empty:
+                    st.markdown("**Normalized performance (base ₹10 at common start)**")
+                    st.line_chart(chart_df.set_index("date"), height=320, use_container_width=True)
+
+        last_picks = st.session_state.get("pnc_last_picks", [])
+        if last_picks:
+            st.caption(f"Last scan picks: {', '.join(last_picks)}")
+            if st.button("➕ Push last Best-5 into Compare", use_container_width=True, key="pnc_push_last"):
+                picked_codes = []
+                for p in last_picks:
+                    m = re.search(r"\[(\d+)\]\s*$", str(p))
+                    if m:
+                        picked_codes.append(int(m.group(1)))
+                if not picked_codes:
+                    st.warning("Could not parse scheme codes from selected picks.")
+                else:
+                    code_to_name = df_schemes.set_index("scheme_code")["scheme_name"].to_dict()
+                    to_add = [code_to_name[c] for c in picked_codes if c in code_to_name]
+                    st.session_state.compare_funds = to_add[:5]
+                    st.success("Loaded into Compare panel (up to 5).")
+
+    # === 🔁 DERIVED NAV (weighted mix) — above SWP ===
+    with st.expander("🧪 Build derived NAV (weighted mix)", expanded=False):
+        selected = st.session_state.compare_funds
+        if len(selected) < 2:
+            st.info("Pick at least two funds in the comparison panel above to build a derived NAV.")
+        else:
+            code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
+            histories = {}
+            for nm in selected:
+                try:
+                    sc = int(code_map[nm]); h = fetch_nav_history(sc)
+                    if not h.empty: histories[nm] = h
+                except Exception: pass
+
+            if len(histories) < 2:
+                st.warning("Could not fetch enough histories.")
+            else:
+                c1, c2, c3 = st.columns([1, 1, 1])
+                with c1: tf_derived = st.selectbox("Timeframe", ["Full","YTD","1Y","3Y","5Y","10Y"], index=0)
+                with c2: overlay_const = st.checkbox("Overlay constituents", value=True)
+                with c3: base_val = st.number_input("Base index value", min_value=1.0, value=10.0, step=1.0)
+
+                starts = [df["date"].iloc[0] for df in histories.values()]
+                common_start = max(starts)
+
+                def _apply_tf(df: pd.DataFrame, label: str) -> pd.DataFrame:
+                    if df.empty or label == "Full": return df
+                    last_date = df["date"].iloc[-1]
+                    start_map = {
+                        "YTD": pd.Timestamp(year=last_date.year, month=1, day=1),
+                        "1Y": last_date - pd.DateOffset(years=1),
+                        "3Y": last_date - pd.DateOffset(years=3),
+                        "5Y": last_date - pd.DateOffset(years=5),
+                        "10Y": last_date - pd.DateOffset(years=10),
+                    }
+                    return df[df["date"] >= start_map[label]].reset_index(drop=True)
+
+                norm_frames = []
+                for nm, h in histories.items():
+                    dfh = h[h["date"] >= common_start].reset_index(drop=True).copy()
+                    if dfh.empty: continue
+                    base_row = nearest_nav_on_or_after(dfh, common_start)
+                    if base_row is None or float(base_row["nav"]) <= 0: continue
+                    factor = float(base_val) / float(base_row["nav"])
+                    col = f"{nm}"
+                    dfh[col] = dfh["nav"] * factor
+                    dfh = _apply_tf(dfh[["date", col]], tf_derived)
+                    if not dfh.empty: norm_frames.append(dfh)
+
+                if len(norm_frames) < 2:
+                    st.warning("Not enough overlapping data in the chosen timeframe.")
+                else:
+                    df_all = norm_frames[0]
+                    for dfh in norm_frames[1:]:
+                        df_all = df_all.merge(dfh, on="date", how="inner")
+
+                    if df_all.empty or df_all.shape[1] < 3:
+                        st.warning("No overlapping dates after alignment/timeframe.")
+                    else:
+                        st.subheader("Weights (percent)")
+                        cols = st.columns(min(5, len(selected)))
+                        percents = []
+                        for i, nm in enumerate(selected):
+                            default_pct = st.session_state.weight_map.get(nm, round(100.0 / len(selected), 2))
+                            val = cols[i % len(cols)].number_input(nm, min_value=0.0, max_value=100.0, value=float(default_pct), step=1.0, key=f"w_{nm}")
+                            st.session_state.weight_map[nm] = val
+                            percents.append(val)
+
+                        w_raw = np.array(percents, dtype=float); w_sum = float(w_raw.sum())
+                        w_norm = (np.ones_like(w_raw) / len(w_raw)) if w_sum <= 0 else (w_raw / w_sum)
+
+                        fund_cols = [nm for nm in selected if nm in df_all.columns]
+                        W = np.array([w_norm[selected.index(nm)] for nm in fund_cols], dtype=float)
+                        w_present_sum = float(W.sum())
+                        if w_present_sum <= 0:
+                            W = np.ones(len(fund_cols), dtype=float) / max(1, len(fund_cols))
+                        else:
+                            W = W / w_present_sum
+                        values = df_all[fund_cols].to_numpy()
+                        derived = values.dot(W)
+                        out = pd.DataFrame({"date": df_all["date"], f"Derived (base ₹{int(base_val)})": derived})
+
+                        plot_df = out.merge(df_all[["date"] + fund_cols], on="date", how="left") if overlay_const else out
+                        st.line_chart(plot_df.set_index("date"), height=330)
+
+                        applied = {nm: round(float(w)*100, 2) for nm, w in zip(fund_cols, W)}
+                        dropped = [nm for nm in selected if nm not in fund_cols]
+                        cap = f"Applied weights (normalized over available funds): {applied}"
+                        if dropped:
+                            cap += f" | Dropped (no overlap): {dropped}"
+                        st.caption(cap)
+
+                        st.download_button("⬇️ Download derived NAV (CSV)", data=out.to_csv(index=False).encode("utf-8"),
+                                           file_name="derived_nav_weighted.csv", mime="text/csv", use_container_width=True)
+
+                        # Trailing returns matrix
+                        st.subheader("Trailing returns (CAGR) — Derived + constituents")
+                        dcol = out.columns[1]; end_date = out["date"].iloc[-1]
+                        periods = [("3M", 3), ("6M", 6), ("12M", 12), ("36M", 36), ("60M", 60)]
+
+                        def cagr_for(df: pd.DataFrame, col: str, months: int) -> float:
+                            if df.empty or months <= 0 or col not in df.columns: return np.nan
+                            target = end_date - pd.DateOffset(months=months)
+                            idxs = df.index[df["date"] >= target]
+                            if len(idxs) == 0: return np.nan
+                            start_idx = int(idxs[0]); start_val = float(df.loc[start_idx, col]); end_val_local = float(df[col].iloc[-1])
+                            if start_val <= 0 or end_val_local <= 0: return np.nan
+                            start_dt = pd.Timestamp(df.loc[start_idx, "date"])
+                            end_dt = pd.Timestamp(df["date"].iloc[-1])
+                            years = max(1e-9, (end_dt - start_dt).days / 365.25)
+                            return (end_val_local / start_val) ** (1.0 / years) - 1.0
+
+                        rows = []
+                        derived_row = {"Instrument": dcol}
+                        for label, m in periods: derived_row[label] = cagr_for(out, dcol, m)
+                        rows.append(derived_row)
+                        for nm in fund_cols:
+                            r = {"Instrument": nm}
+                            for label, m in periods: r[label] = cagr_for(df_all, nm, m)
+                            rows.append(r)
+
+                        ret_df = pd.DataFrame(rows); fmt_df = ret_df.copy()
+                        for label, _ in periods: fmt_df[label] = fmt_df[label].apply(lambda x: "—" if pd.isna(x) else f"{x * 100:.2f}%")
+                        st.dataframe(fmt_df, use_container_width=True, height=260)
+                        st.download_button("⬇️ Download trailing returns matrix (CSV)",
+                                           data=ret_df.to_csv(index=False).encode("utf-8"),
+                                           file_name="trailing_returns_matrix.csv", mime="text/csv",
+                                           use_container_width=True)
+
+    # === 🔧 SWP Framework (inflation + risk-weighted portfolio) — AUTO projection CAGR ===
+    with st.expander("🔧 SWP Framework (inflation + risk-weighted portfolio)", expanded=True):
+        colA, colB, colC, colD = st.columns(4)
+        with colA: swp_years = st.number_input("Years funds needed", min_value=1, max_value=60, value=30, step=1)
+        with colB: annual_infl = st.number_input("Annual inflation step-up (%)", min_value=0.0, max_value=20.0, value=6.0, step=0.5) / 100.0
+        with colC: risk_profile = st.selectbox("Risk profile by volatility", ["Low","Medium","High"], index=1)
+        with colD: risk_lookback = st.selectbox("Vol lookback", ["3Y","5Y","1Y","Full"], index=0)
+
+        colE, colF = st.columns(2)
+        with colE: start_date = st.date_input("SWP start month", value=dt.date.today().replace(day=1))
+        with colF:
+            corpus_mode = st.radio("Corpus reference", ["NAV at start (units=1)", "Custom amount (₹)"], index=0)
+            custom_corpus = st.number_input("Custom starting amount (₹)", min_value=1.0, value=1_000_000.0, step=50_000.0) if corpus_mode == "Custom amount (₹)" else None
+
+        colG, colH, colI = st.columns(3)
+        with colG:
+            withdrawal_source_ui = st.selectbox(
+                "Withdrawal source policy",
+                ["Tax/exit-load aware", "Lowest-return first"],
+                index=0,
+            )
+        with colH:
+            use_guardrails = st.checkbox("Enable guardrail spending", value=True)
+        with colI:
+            mc_paths = st.selectbox("Monte Carlo paths", [0, 200, 500, 1000], index=2, help="0 disables MC simulation.")
+
+        guardrail_band = 0.20
+        guardrail_cut_pct = 0.10
+        guardrail_raise_pct = 0.05
+        if use_guardrails:
+            g1, g2, g3 = st.columns(3)
+            with g1:
+                guardrail_band = st.slider("Guardrail band (%)", 5, 50, value=20, step=5) / 100.0
+            with g2:
+                guardrail_cut_pct = st.slider("Cut spending when above upper rail (%)", 5, 40, value=10, step=1) / 100.0
+            with g3:
+                guardrail_raise_pct = st.slider("Raise spending when below lower rail (%)", 2, 25, value=5, step=1) / 100.0
+
+        equity_stcg_rate = 0.15
+        equity_ltcg_rate = 0.10
+        equity_ltcg_days = 365
+        debt_stcg_rate = 0.30
+        debt_ltcg_rate = 0.20
+        debt_ltcg_days = 1095
+        exit_load_days = 365
+        exit_load_pct = 0.01
+        show_tax_exit_assumptions = st.checkbox("Show tax and exit-load assumptions", value=False, key="show_tax_exit_assumptions")
+        if show_tax_exit_assumptions:
+            t1, t2, t3, t4 = st.columns(4)
+            with t1:
+                equity_stcg_rate = st.number_input("Equity STCG rate (%)", min_value=0.0, max_value=50.0, value=equity_stcg_rate * 100.0, step=0.5) / 100.0
+                equity_ltcg_days = st.number_input("Equity LTCG threshold (days)", min_value=1, max_value=3650, value=equity_ltcg_days, step=1)
+            with t2:
+                equity_ltcg_rate = st.number_input("Equity LTCG rate (%)", min_value=0.0, max_value=50.0, value=equity_ltcg_rate * 100.0, step=0.5) / 100.0
+                debt_ltcg_days = st.number_input("Debt LTCG threshold (days)", min_value=1, max_value=3650, value=debt_ltcg_days, step=1)
+            with t3:
+                debt_stcg_rate = st.number_input("Debt STCG rate (%)", min_value=0.0, max_value=50.0, value=debt_stcg_rate * 100.0, step=0.5) / 100.0
+                exit_load_days = st.number_input("Exit load window (days)", min_value=0, max_value=3650, value=exit_load_days, step=1)
+            with t4:
+                debt_ltcg_rate = st.number_input("Debt LTCG rate (%)", min_value=0.0, max_value=50.0, value=debt_ltcg_rate * 100.0, step=0.5) / 100.0
+                exit_load_pct = st.number_input("Exit load rate (%)", min_value=0.0, max_value=10.0, value=exit_load_pct * 100.0, step=0.1) / 100.0
+
+        selected = st.session_state.compare_funds.copy()
+        if not selected and chosen: selected = [chosen]
+        st.caption(f"Funds in SWP portfolio: {', '.join(selected) if selected else '—'}")
+
+        code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
+        histories: Dict[str, pd.DataFrame] = {}
         for nm in selected:
             try:
                 sc = int(code_map[nm]); h = fetch_nav_history(sc)
                 if not h.empty: histories[nm] = h
             except Exception: pass
 
-        if len(histories) < 2:
-            st.warning("Could not fetch enough histories.")
+        if not histories:
+            st.info("Add at least one fund in the compare panel or choose a fund above.")
         else:
-            c1, c2, c3 = st.columns([1, 1, 1])
-            with c1: tf_derived = st.selectbox("Timeframe", ["Full","YTD","1Y","3Y","5Y","10Y"], index=0)
-            with c2: overlay_const = st.checkbox("Overlay constituents", value=True)
-            with c3: base_val = st.number_input("Base index value", min_value=1.0, value=10.0, step=1.0)
+            vol_table, bucket_map = compute_vol_buckets(histories, lookback=risk_lookback)
+            tgt_bucket = profile_bucket_weights(risk_profile)
+            fund_weights_raw = derive_fund_weights_from_buckets(list(histories.keys()), bucket_map, tgt_bucket)
+            fund_weights, floor_feasible = apply_min_weight_floor(fund_weights_raw, min_weight=0.20)
 
-            starts = [df["date"].iloc[0] for df in histories.values()]
-            common_start = max(starts)
-
-            def _apply_tf(df: pd.DataFrame, label: str) -> pd.DataFrame:
-                if df.empty or label == "Full": return df
-                last_date = df["date"].iloc[-1]
-                start_map = {
-                    "YTD": pd.Timestamp(year=last_date.year, month=1, day=1),
-                    "1Y": last_date - pd.DateOffset(years=1),
-                    "3Y": last_date - pd.DateOffset(years=3),
-                    "5Y": last_date - pd.DateOffset(years=5),
-                    "10Y": last_date - pd.DateOffset(years=10),
-                }
-                return df[df["date"] >= start_map[label]].reset_index(drop=True)
-
-            norm_frames = []
-            for nm, h in histories.items():
-                dfh = h[h["date"] >= common_start].reset_index(drop=True).copy()
-                if dfh.empty: continue
-                base_row = nearest_nav_on_or_after(dfh, common_start)
-                if base_row is None or float(base_row["nav"]) <= 0: continue
-                factor = float(base_val) / float(base_row["nav"])
-                col = f"{nm}"
-                dfh[col] = dfh["nav"] * factor
-                dfh = _apply_tf(dfh[["date", col]], tf_derived)
-                if not dfh.empty: norm_frames.append(dfh)
-
-            if len(norm_frames) < 2:
-                st.warning("Not enough overlapping data in the chosen timeframe.")
+            if not vol_table.empty:
+                vt = vol_table.copy(); vt["weight_%"] = vt["fund"].map(lambda f: round(fund_weights.get(f, 0.0)*100.0, 2)); vt["vol"] = vt["vol"].round(4)
+                st.dataframe(vt.rename(columns={"fund":"Fund","vol":"StdDev (monthly)","bucket":"Vol Bucket","weight_%":"Weight %"}),
+                             use_container_width=True, height=220)
+            if not floor_feasible:
+                st.warning("Min-20% floor was infeasible for this fund count; using equal weights.")
             else:
-                df_all = norm_frames[0]
-                for dfh in norm_frames[1:]:
-                    df_all = df_all.merge(dfh, on="date", how="inner")
+                st.caption("SWP rules: minimum **20%** per fund, configurable withdrawal-source policy, and rebalance to target weights every **24 months**.")
 
-                if df_all.empty or df_all.shape[1] < 3:
-                    st.warning("No overlapping dates after alignment/timeframe.")
-                else:
-                    st.subheader("Weights (percent)")
-                    cols = st.columns(min(5, len(selected)))
-                    percents = []
-                    for i, nm in enumerate(selected):
-                        default_pct = st.session_state.weight_map.get(nm, round(100.0 / len(selected), 2))
-                        val = cols[i % len(cols)].number_input(nm, min_value=0.0, max_value=100.0, value=float(default_pct), step=1.0, key=f"w_{nm}")
-                        st.session_state.weight_map[nm] = val
-                        percents.append(val)
+                start_ts = pd.Timestamp(start_date)
+                start_month = start_ts.normalize().replace(day=1)
+                nav_forward_map: Dict[str, pd.DataFrame] = {}
+                est_cagr_map: Dict[str, float] = {}
 
-                    w_raw = np.array(percents, dtype=float); w_sum = float(w_raw.sum())
-                    w_norm = (np.ones_like(w_raw) / len(w_raw)) if w_sum <= 0 else (w_raw / w_sum)
-
-                    fund_cols = [nm for nm in selected if nm in df_all.columns]
-                    W = np.array([w_norm[selected.index(nm)] for nm in fund_cols], dtype=float)
-                    w_present_sum = float(W.sum())
-                    if w_present_sum <= 0:
-                        W = np.ones(len(fund_cols), dtype=float) / max(1, len(fund_cols))
-                    else:
-                        W = W / w_present_sum
-                    values = df_all[fund_cols].to_numpy()
-                    derived = values.dot(W)
-                    out = pd.DataFrame({"date": df_all["date"], f"Derived (base ₹{int(base_val)})": derived})
-
-                    plot_df = out.merge(df_all[["date"] + fund_cols], on="date", how="left") if overlay_const else out
-                    st.line_chart(plot_df.set_index("date"), height=330)
-
-                    applied = {nm: round(float(w)*100, 2) for nm, w in zip(fund_cols, W)}
-                    dropped = [nm for nm in selected if nm not in fund_cols]
-                    cap = f"Applied weights (normalized over available funds): {applied}"
-                    if dropped:
-                        cap += f" | Dropped (no overlap): {dropped}"
-                    st.caption(cap)
-
-                    st.download_button("⬇️ Download derived NAV (CSV)", data=out.to_csv(index=False).encode("utf-8"),
-                                       file_name="derived_nav_weighted.csv", mime="text/csv", use_container_width=True)
-
-                    # Trailing returns matrix
-                    st.subheader("Trailing returns (CAGR) — Derived + constituents")
-                    dcol = out.columns[1]; end_date = out["date"].iloc[-1]
-                    periods = [("3M", 3), ("6M", 6), ("12M", 12), ("36M", 36), ("60M", 60)]
-
-                    def cagr_for(df: pd.DataFrame, col: str, months: int) -> float:
-                        if df.empty or months <= 0 or col not in df.columns: return np.nan
-                        target = end_date - pd.DateOffset(months=months)
-                        idxs = df.index[df["date"] >= target]
-                        if len(idxs) == 0: return np.nan
-                        start_idx = int(idxs[0]); start_val = float(df.loc[start_idx, col]); end_val_local = float(df[col].iloc[-1])
-                        if start_val <= 0 or end_val_local <= 0: return np.nan
-                        start_dt = pd.Timestamp(df.loc[start_idx, "date"])
-                        end_dt = pd.Timestamp(df["date"].iloc[-1])
-                        years = max(1e-9, (end_dt - start_dt).days / 365.25)
-                        return (end_val_local / start_val) ** (1.0 / years) - 1.0
-
-                    rows = []
-                    derived_row = {"Instrument": dcol}
-                    for label, m in periods: derived_row[label] = cagr_for(out, dcol, m)
-                    rows.append(derived_row)
-                    for nm in fund_cols:
-                        r = {"Instrument": nm}
-                        for label, m in periods: r[label] = cagr_for(df_all, nm, m)
-                        rows.append(r)
-
-                    ret_df = pd.DataFrame(rows); fmt_df = ret_df.copy()
-                    for label, _ in periods: fmt_df[label] = fmt_df[label].apply(lambda x: "—" if pd.isna(x) else f"{x * 100:.2f}%")
-                    st.dataframe(fmt_df, use_container_width=True, height=260)
-                    st.download_button("⬇️ Download trailing returns matrix (CSV)",
-                                       data=ret_df.to_csv(index=False).encode("utf-8"),
-                                       file_name="trailing_returns_matrix.csv", mime="text/csv",
-                                       use_container_width=True)
-
-# === 🔧 SWP Framework (inflation + risk-weighted portfolio) — AUTO projection CAGR ===
-with st.expander("🔧 SWP Framework (inflation + risk-weighted portfolio)", expanded=True):
-    colA, colB, colC, colD = st.columns(4)
-    with colA: swp_years = st.number_input("Years funds needed", min_value=1, max_value=60, value=30, step=1)
-    with colB: annual_infl = st.number_input("Annual inflation step-up (%)", min_value=0.0, max_value=20.0, value=6.0, step=0.5) / 100.0
-    with colC: risk_profile = st.selectbox("Risk profile by volatility", ["Low","Medium","High"], index=1)
-    with colD: risk_lookback = st.selectbox("Vol lookback", ["3Y","5Y","1Y","Full"], index=0)
-
-    colE, colF = st.columns(2)
-    with colE: start_date = st.date_input("SWP start month", value=dt.date.today().replace(day=1))
-    with colF:
-        corpus_mode = st.radio("Corpus reference", ["NAV at start (units=1)", "Custom amount (₹)"], index=0)
-        custom_corpus = st.number_input("Custom starting amount (₹)", min_value=1.0, value=1_000_000.0, step=50_000.0) if corpus_mode == "Custom amount (₹)" else None
-
-    colG, colH, colI = st.columns(3)
-    with colG:
-        withdrawal_source_ui = st.selectbox(
-            "Withdrawal source policy",
-            ["Tax/exit-load aware", "Lowest-return first"],
-            index=0,
-        )
-    with colH:
-        use_guardrails = st.checkbox("Enable guardrail spending", value=True)
-    with colI:
-        mc_paths = st.selectbox("Monte Carlo paths", [0, 200, 500, 1000], index=2, help="0 disables MC simulation.")
-
-    guardrail_band = 0.20
-    guardrail_cut_pct = 0.10
-    guardrail_raise_pct = 0.05
-    if use_guardrails:
-        g1, g2, g3 = st.columns(3)
-        with g1:
-            guardrail_band = st.slider("Guardrail band (%)", 5, 50, value=20, step=5) / 100.0
-        with g2:
-            guardrail_cut_pct = st.slider("Cut spending when above upper rail (%)", 5, 40, value=10, step=1) / 100.0
-        with g3:
-            guardrail_raise_pct = st.slider("Raise spending when below lower rail (%)", 2, 25, value=5, step=1) / 100.0
-
-    equity_stcg_rate = 0.15
-    equity_ltcg_rate = 0.10
-    equity_ltcg_days = 365
-    debt_stcg_rate = 0.30
-    debt_ltcg_rate = 0.20
-    debt_ltcg_days = 1095
-    exit_load_days = 365
-    exit_load_pct = 0.01
-    show_tax_exit_assumptions = st.checkbox("Show tax and exit-load assumptions", value=False, key="show_tax_exit_assumptions")
-    if show_tax_exit_assumptions:
-        t1, t2, t3, t4 = st.columns(4)
-        with t1:
-            equity_stcg_rate = st.number_input("Equity STCG rate (%)", min_value=0.0, max_value=50.0, value=equity_stcg_rate * 100.0, step=0.5) / 100.0
-            equity_ltcg_days = st.number_input("Equity LTCG threshold (days)", min_value=1, max_value=3650, value=equity_ltcg_days, step=1)
-        with t2:
-            equity_ltcg_rate = st.number_input("Equity LTCG rate (%)", min_value=0.0, max_value=50.0, value=equity_ltcg_rate * 100.0, step=0.5) / 100.0
-            debt_ltcg_days = st.number_input("Debt LTCG threshold (days)", min_value=1, max_value=3650, value=debt_ltcg_days, step=1)
-        with t3:
-            debt_stcg_rate = st.number_input("Debt STCG rate (%)", min_value=0.0, max_value=50.0, value=debt_stcg_rate * 100.0, step=0.5) / 100.0
-            exit_load_days = st.number_input("Exit load window (days)", min_value=0, max_value=3650, value=exit_load_days, step=1)
-        with t4:
-            debt_ltcg_rate = st.number_input("Debt LTCG rate (%)", min_value=0.0, max_value=50.0, value=debt_ltcg_rate * 100.0, step=0.5) / 100.0
-            exit_load_pct = st.number_input("Exit load rate (%)", min_value=0.0, max_value=10.0, value=exit_load_pct * 100.0, step=0.1) / 100.0
-
-    selected = st.session_state.compare_funds.copy()
-    if not selected and chosen: selected = [chosen]
-    st.caption(f"Funds in SWP portfolio: {', '.join(selected) if selected else '—'}")
-
-    code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
-    histories: Dict[str, pd.DataFrame] = {}
-    for nm in selected:
-        try:
-            sc = int(code_map[nm]); h = fetch_nav_history(sc)
-            if not h.empty: histories[nm] = h
-        except Exception: pass
-
-    if not histories:
-        st.info("Add at least one fund in the compare panel or choose a fund above.")
-    else:
-        vol_table, bucket_map = compute_vol_buckets(histories, lookback=risk_lookback)
-        tgt_bucket = profile_bucket_weights(risk_profile)
-        fund_weights_raw = derive_fund_weights_from_buckets(list(histories.keys()), bucket_map, tgt_bucket)
-        fund_weights, floor_feasible = apply_min_weight_floor(fund_weights_raw, min_weight=0.20)
-
-        if not vol_table.empty:
-            vt = vol_table.copy(); vt["weight_%"] = vt["fund"].map(lambda f: round(fund_weights.get(f, 0.0)*100.0, 2)); vt["vol"] = vt["vol"].round(4)
-            st.dataframe(vt.rename(columns={"fund":"Fund","vol":"StdDev (monthly)","bucket":"Vol Bucket","weight_%":"Weight %"}),
-                         use_container_width=True, height=220)
-        if not floor_feasible:
-            st.warning("Min-20% floor was infeasible for this fund count; using equal weights.")
-        else:
-            st.caption("SWP rules: minimum **20%** per fund, configurable withdrawal-source policy, and rebalance to target weights every **24 months**.")
-
-            start_ts = pd.Timestamp(start_date)
-            start_month = start_ts.normalize().replace(day=1)
-            nav_forward_map: Dict[str, pd.DataFrame] = {}
-            est_cagr_map: Dict[str, float] = {}
-
-            for nm, h in histories.items():
-                hist_upto_start = h[h["date"] <= start_ts].copy()
-                if hist_upto_start.empty:
-                    continue
-                months_avail = max(0, (hist_upto_start["date"].iloc[-1] - hist_upto_start["date"].iloc[0]).days // 30) if len(hist_upto_start) > 1 else 0
-                years_avail = months_avail / 12.0
-                lb_years = 10 if years_avail >= 10 else (5 if years_avail >= 5 else None)
-                est_cagr_i, _diag_i = estimate_proj_cagr(
-                    hist_upto_start,
-                    end_date=start_ts,
-                    method="Blended (EWMA + Long)",
-                    lookback_years=lb_years,
-                    winsorize_pct=0.015,
-                    ewma_half_life_months=12,
-                    blend_alpha=0.65,
-                )
-                est_cagr_map[nm] = est_cagr_i
-                h_proj = hist_upto_start
-                if h_proj["date"].iloc[-1] < start_ts:
-                    h_proj = extend_nav_with_projection(h_proj, years_forward=5.0, assumed_annual_return=est_cagr_i)
-                nav_forward_map[nm] = extend_nav_with_projection(h_proj, years_forward=swp_years + 50.0, assumed_annual_return=est_cagr_i)
-
-            if not nav_forward_map:
-                st.warning("Could not prepare forward NAV series for the selected funds.")
-            else:
-                active = []
-                nav_at_start_map: Dict[str, float] = {}
-                for nm, df in nav_forward_map.items():
-                    row = nearest_nav_on_or_after(df, start_month)
-                    if row is None:
+                for nm, h in histories.items():
+                    hist_upto_start = h[h["date"] <= start_ts].copy()
+                    if hist_upto_start.empty:
                         continue
-                    nv = float(row["nav"])
-                    if nv > 0:
-                        active.append(nm)
-                        nav_at_start_map[nm] = nv
-                if not active:
-                    st.warning("No NAV available at/after SWP start for selected funds.")
+                    months_avail = max(0, (hist_upto_start["date"].iloc[-1] - hist_upto_start["date"].iloc[0]).days // 30) if len(hist_upto_start) > 1 else 0
+                    years_avail = months_avail / 12.0
+                    lb_years = 10 if years_avail >= 10 else (5 if years_avail >= 5 else None)
+                    est_cagr_i, _diag_i = estimate_proj_cagr(
+                        hist_upto_start,
+                        end_date=start_ts,
+                        method="Blended (EWMA + Long)",
+                        lookback_years=lb_years,
+                        winsorize_pct=0.015,
+                        ewma_half_life_months=12,
+                        blend_alpha=0.65,
+                    )
+                    est_cagr_map[nm] = est_cagr_i
+                    h_proj = hist_upto_start
+                    if h_proj["date"].iloc[-1] < start_ts:
+                        h_proj = extend_nav_with_projection(h_proj, years_forward=5.0, assumed_annual_return=est_cagr_i)
+                    nav_forward_map[nm] = extend_nav_with_projection(h_proj, years_forward=swp_years + 50.0, assumed_annual_return=est_cagr_i)
+
+                if not nav_forward_map:
+                    st.warning("Could not prepare forward NAV series for the selected funds.")
                 else:
-                    w_act = np.array([max(0.0, float(fund_weights.get(nm, 0.0))) for nm in active], dtype=float)
-                    if float(w_act.sum()) <= 0:
-                        w_act = np.ones(len(active), dtype=float) / len(active)
+                    active = []
+                    nav_at_start_map: Dict[str, float] = {}
+                    for nm, df in nav_forward_map.items():
+                        row = nearest_nav_on_or_after(df, start_month)
+                        if row is None:
+                            continue
+                        nv = float(row["nav"])
+                        if nv > 0:
+                            active.append(nm)
+                            nav_at_start_map[nm] = nv
+                    if not active:
+                        st.warning("No NAV available at/after SWP start for selected funds.")
                     else:
-                        w_act = w_act / float(w_act.sum())
-                    effective_weights = {nm: float(wi) for nm, wi in zip(active, w_act)}
-                    est_cagr = float(sum(effective_weights[nm] * est_cagr_map.get(nm, 0.0) for nm in active))
-                    withdrawal_mode = "tax_aware" if withdrawal_source_ui == "Tax/exit-load aware" else "lowest_return"
-                    fund_tax_profiles = {nm: infer_tax_profile_from_name(nm) for nm in active}
-                    tax_cfg = {
-                        "equity_stcg_rate": float(equity_stcg_rate),
-                        "equity_ltcg_rate": float(equity_ltcg_rate),
-                        "equity_ltcg_days": int(equity_ltcg_days),
-                        "debt_stcg_rate": float(debt_stcg_rate),
-                        "debt_ltcg_rate": float(debt_ltcg_rate),
-                        "debt_ltcg_days": int(debt_ltcg_days),
-                    }
-                    guardrail_upper_mult = 1.0 + float(guardrail_band)
-                    guardrail_lower_mult = max(0.0, 1.0 - float(guardrail_band))
-
-                    nav_at_start = float(sum(effective_weights[nm] * nav_at_start_map[nm] for nm in active))
-                    corpus_value = float(custom_corpus) if (custom_corpus is not None and custom_corpus > 0) else nav_at_start
-
-                    sim_nav_map = {nm: nav_forward_map[nm] for nm in active}
-
-                    def _sim_for_withdrawal(start_w: float, years: Optional[int], extra_years: int) -> pd.DataFrame:
-                        return simulate_swp_multifund_inflation(
-                            nav_map=sim_nav_map,
-                            start_date=start_date,
-                            corpus_value=corpus_value,
-                            start_withdrawal_monthly=float(start_w),
-                            annual_inflation=annual_infl,
-                            target_weights=effective_weights,
-                            rebalance_every_months=24,
-                            max_years=years,
-                            max_extra_years=extra_years,
-                            withdrawal_mode=withdrawal_mode,
-                            fund_tax_profiles=fund_tax_profiles,
-                            tax_cfg=tax_cfg,
-                            exit_load_days=int(exit_load_days),
-                            exit_load_pct=float(exit_load_pct),
-                            use_guardrails=bool(use_guardrails),
-                            guardrail_upper_mult=float(guardrail_upper_mult),
-                            guardrail_lower_mult=float(guardrail_lower_mult),
-                            guardrail_cut_pct=float(guardrail_cut_pct),
-                            guardrail_raise_pct=float(guardrail_raise_pct),
-                        )
-
-                    pct, path_best = find_max_starting_withdrawal_percent(
-                        nav_series=pd.DataFrame(),
-                        start_date=start_date,
-                        corpus_value=corpus_value,
-                        annual_inflation=annual_infl,
-                        years_needed=swp_years,
-                        sim_fn=lambda w: _sim_for_withdrawal(w, swp_years, 80),
-                    )
-                    start_w_best = pct * corpus_value
-
-                    red_pp = st.number_input("Withdraw less by (percentage points of corpus per month)", min_value=0.00, max_value=10.00, value=0.10, step=0.01)
-                    red_dec = red_pp / 100.0
-                    reduced_pct = max(0.0, pct - red_dec)
-                    start_w_reduced = reduced_pct * corpus_value
-                    months_reduced, path_reduced = longevity_for_withdrawal(
-                        nav_series=pd.DataFrame(),
-                        start_date=start_date,
-                        corpus_value=corpus_value,
-                        start_withdrawal_monthly=start_w_reduced,
-                        annual_inflation=annual_infl,
-                        sim_fn=lambda w: _sim_for_withdrawal(w, None, 100),
-                    )
-
-                    horizon_months = swp_years * 12
-                    extra_months = max(0, months_reduced - horizon_months)
-                    extra_years = extra_months // 12
-                    extra_rem_m = extra_months % 12
-
-                    ca, cb, cc, cd = st.columns(4)
-                    with ca: st.metric("Projected CAGR (weighted auto)", f"{est_cagr*100:.2f}% p.a.")
-                    with cb: st.metric("Max % of corpus / month", f"{pct*100:.3f}%")
-                    with cc:
-                        if custom_corpus is not None and custom_corpus > 0:
-                            st.metric("Max start withdrawal", f"₹{start_w_best:,.0f}/mo")
+                        w_act = np.array([max(0.0, float(fund_weights.get(nm, 0.0))) for nm in active], dtype=float)
+                        if float(w_act.sum()) <= 0:
+                            w_act = np.ones(len(active), dtype=float) / len(active)
                         else:
-                            st.metric("Max amount per NAV unit", f"₹{start_w_best:,.4f}/mo")
-                    with cd: st.metric("Longevity gain", f"+{extra_years}y {extra_rem_m}m")
+                            w_act = w_act / float(w_act.sum())
+                        effective_weights = {nm: float(wi) for nm, wi in zip(active, w_act)}
+                        est_cagr = float(sum(effective_weights[nm] * est_cagr_map.get(nm, 0.0) for nm in active))
+                        withdrawal_mode = "tax_aware" if withdrawal_source_ui == "Tax/exit-load aware" else "lowest_return"
+                        fund_tax_profiles = {nm: infer_tax_profile_from_name(nm) for nm in active}
+                        tax_cfg = {
+                            "equity_stcg_rate": float(equity_stcg_rate),
+                            "equity_ltcg_rate": float(equity_ltcg_rate),
+                            "equity_ltcg_days": int(equity_ltcg_days),
+                            "debt_stcg_rate": float(debt_stcg_rate),
+                            "debt_ltcg_rate": float(debt_ltcg_rate),
+                            "debt_ltcg_days": int(debt_ltcg_days),
+                        }
+                        guardrail_upper_mult = 1.0 + float(guardrail_band)
+                        guardrail_lower_mult = max(0.0, 1.0 - float(guardrail_band))
 
-                    st.caption(
-                        "Auto projection per fund: **Blended (EWMA+Long)** with winsorization **1.5%** and EWMA half-life **12m**.  \n"
-                        f"Withdrawal policy: **{withdrawal_source_ui}**; rebalanced every **24 months** back to target weights.  \n"
-                        f"If you withdraw **−{red_pp:.2f} pp** of corpus/month (start at **{reduced_pct*100:.3f}%**), "
-                        f"your money lasts about **+{extra_years} years {extra_rem_m} months** longer than {swp_years} years.  \n"
-                        f"**Annual inflation:** {annual_infl*100:.2f}% p.a."
-                    )
+                        nav_at_start = float(sum(effective_weights[nm] * nav_at_start_map[nm] for nm in active))
+                        corpus_value = float(custom_corpus) if (custom_corpus is not None and custom_corpus > 0) else nav_at_start
 
-                    if mc_paths > 0 and st.button("Run Monte Carlo survival analysis", use_container_width=True):
-                        hist_active = {nm: histories[nm] for nm in active if nm in histories}
-                        ret_panel = build_joint_monthly_return_panel(hist_active, start_ts)
-                        if ret_panel.empty or len(ret_panel) < 24:
-                            st.warning("Not enough overlapping monthly history for Monte Carlo (need at least 24 months).")
-                        else:
-                            mc = monte_carlo_swp_survival(
+                        sim_nav_map = {nm: nav_forward_map[nm] for nm in active}
+
+                        def _sim_for_withdrawal(start_w: float, years: Optional[int], extra_years: int) -> pd.DataFrame:
+                            return simulate_swp_multifund_inflation(
+                                nav_map=sim_nav_map,
                                 start_date=start_date,
-                                years_needed=int(swp_years),
-                                paths=int(mc_paths),
-                                random_seed=42,
-                                start_nav_map={nm: nav_at_start_map[nm] for nm in active},
-                                return_panel=ret_panel,
                                 corpus_value=corpus_value,
-                                start_withdrawal_monthly=start_w_best,
+                                start_withdrawal_monthly=float(start_w),
                                 annual_inflation=annual_infl,
                                 target_weights=effective_weights,
+                                rebalance_every_months=24,
+                                max_years=years,
+                                max_extra_years=extra_years,
                                 withdrawal_mode=withdrawal_mode,
                                 fund_tax_profiles=fund_tax_profiles,
                                 tax_cfg=tax_cfg,
@@ -1817,44 +1747,123 @@ with st.expander("🔧 SWP Framework (inflation + risk-weighted portfolio)", exp
                                 guardrail_cut_pct=float(guardrail_cut_pct),
                                 guardrail_raise_pct=float(guardrail_raise_pct),
                             )
-                            m1, m2, m3 = st.columns(3)
-                            with m1:
-                                st.metric("MC survival probability", "—" if pd.isna(mc["survival_prob"]) else f"{mc['survival_prob']*100:.1f}%")
-                            with m2:
-                                st.metric("MC median end corpus", "—" if pd.isna(mc["p50_end"]) else f"₹{mc['p50_end']:,.0f}")
-                            with m3:
-                                st.metric("MC P10/P90 end corpus", "—" if (pd.isna(mc["p10_end"]) or pd.isna(mc["p90_end"])) else f"₹{mc['p10_end']:,.0f} / ₹{mc['p90_end']:,.0f}")
 
-                    if not path_best.empty:
-                        st.markdown("**Portfolio value — Max % path**")
-                        st.area_chart(path_best.set_index("date")["portfolio_value"], height=220, use_container_width=True)
-                    if not path_reduced.empty:
-                        st.markdown(f"**Portfolio value — Reduced path (−{red_pp:.2f} pp)**")
-                        st.area_chart(path_reduced.set_index("date")["portfolio_value"], height=220, use_container_width=True)
+                        pct, path_best = find_max_starting_withdrawal_percent(
+                            nav_series=pd.DataFrame(),
+                            start_date=start_date,
+                            corpus_value=corpus_value,
+                            annual_inflation=annual_infl,
+                            years_needed=swp_years,
+                            sim_fn=lambda w: _sim_for_withdrawal(w, swp_years, 80),
+                        )
+                        start_w_best = pct * corpus_value
 
-                    show_cashflow_tables = st.checkbox("Show SWP cashflow tables", value=False, key="show_swp_cashflow_tables")
-                    if show_cashflow_tables:
+                        red_pp = st.number_input("Withdraw less by (percentage points of corpus per month)", min_value=0.00, max_value=10.00, value=0.10, step=0.01)
+                        red_dec = red_pp / 100.0
+                        reduced_pct = max(0.0, pct - red_dec)
+                        start_w_reduced = reduced_pct * corpus_value
+                        months_reduced, path_reduced = longevity_for_withdrawal(
+                            nav_series=pd.DataFrame(),
+                            start_date=start_date,
+                            corpus_value=corpus_value,
+                            start_withdrawal_monthly=start_w_reduced,
+                            annual_inflation=annual_infl,
+                            sim_fn=lambda w: _sim_for_withdrawal(w, None, 100),
+                        )
+
+                        horizon_months = swp_years * 12
+                        extra_months = max(0, months_reduced - horizon_months)
+                        extra_years = extra_months // 12
+                        extra_rem_m = extra_months % 12
+
+                        ca, cb, cc, cd = st.columns(4)
+                        with ca: st.metric("Projected CAGR (weighted auto)", f"{est_cagr*100:.2f}% p.a.")
+                        with cb: st.metric("Max % of corpus / month", f"{pct*100:.3f}%")
+                        with cc:
+                            if custom_corpus is not None and custom_corpus > 0:
+                                st.metric("Max start withdrawal", f"₹{start_w_best:,.0f}/mo")
+                            else:
+                                st.metric("Max amount per NAV unit", f"₹{start_w_best:,.4f}/mo")
+                        with cd: st.metric("Longevity gain", f"+{extra_years}y {extra_rem_m}m")
+
+                        st.caption(
+                            "Auto projection per fund: **Blended (EWMA+Long)** with winsorization **1.5%** and EWMA half-life **12m**.  \n"
+                            f"Withdrawal policy: **{withdrawal_source_ui}**; rebalanced every **24 months** back to target weights.  \n"
+                            f"If you withdraw **−{red_pp:.2f} pp** of corpus/month (start at **{reduced_pct*100:.3f}%**), "
+                            f"your money lasts about **+{extra_years} years {extra_rem_m} months** longer than {swp_years} years.  \n"
+                            f"**Annual inflation:** {annual_infl*100:.2f}% p.a."
+                        )
+
+                        if mc_paths > 0 and st.button("Run Monte Carlo survival analysis", use_container_width=True):
+                            hist_active = {nm: histories[nm] for nm in active if nm in histories}
+                            ret_panel = build_joint_monthly_return_panel(hist_active, start_ts)
+                            if ret_panel.empty or len(ret_panel) < 24:
+                                st.warning("Not enough overlapping monthly history for Monte Carlo (need at least 24 months).")
+                            else:
+                                mc = monte_carlo_swp_survival(
+                                    start_date=start_date,
+                                    years_needed=int(swp_years),
+                                    paths=int(mc_paths),
+                                    random_seed=42,
+                                    start_nav_map={nm: nav_at_start_map[nm] for nm in active},
+                                    return_panel=ret_panel,
+                                    corpus_value=corpus_value,
+                                    start_withdrawal_monthly=start_w_best,
+                                    annual_inflation=annual_infl,
+                                    target_weights=effective_weights,
+                                    withdrawal_mode=withdrawal_mode,
+                                    fund_tax_profiles=fund_tax_profiles,
+                                    tax_cfg=tax_cfg,
+                                    exit_load_days=int(exit_load_days),
+                                    exit_load_pct=float(exit_load_pct),
+                                    use_guardrails=bool(use_guardrails),
+                                    guardrail_upper_mult=float(guardrail_upper_mult),
+                                    guardrail_lower_mult=float(guardrail_lower_mult),
+                                    guardrail_cut_pct=float(guardrail_cut_pct),
+                                    guardrail_raise_pct=float(guardrail_raise_pct),
+                                )
+                                m1, m2, m3 = st.columns(3)
+                                with m1:
+                                    st.metric("MC survival probability", "—" if pd.isna(mc["survival_prob"]) else f"{mc['survival_prob']*100:.1f}%")
+                                with m2:
+                                    st.metric("MC median end corpus", "—" if pd.isna(mc["p50_end"]) else f"₹{mc['p50_end']:,.0f}")
+                                with m3:
+                                    st.metric("MC P10/P90 end corpus", "—" if (pd.isna(mc["p10_end"]) or pd.isna(mc["p90_end"])) else f"₹{mc['p10_end']:,.0f} / ₹{mc['p90_end']:,.0f}")
+
                         if not path_best.empty:
-                            t1 = path_best.copy(); t1["withdrawal"] = t1["withdrawal"].round(4); t1["portfolio_value"] = t1["portfolio_value"].round(4)
-                            st.markdown("**Max withdrawal path**"); st.dataframe(t1.head(12), use_container_width=True, height=240); st.dataframe(t1.tail(12), height=240)
+                            st.markdown("**Portfolio value — Max % path**")
+                            st.area_chart(path_best.set_index("date")["portfolio_value"], height=220, use_container_width=True)
                         if not path_reduced.empty:
-                            t2 = path_reduced.copy(); t2["withdrawal"] = t2["withdrawal"].round(4); t2["portfolio_value"] = t2["portfolio_value"].round(4)
-                            st.markdown(f"**Reduced withdrawal path (−{red_pp:.2f} pp)**"); st.dataframe(t2.head(12), height=240); st.dataframe(t2.tail(12), height=240)
+                            st.markdown(f"**Portfolio value — Reduced path (−{red_pp:.2f} pp)**")
+                            st.area_chart(path_reduced.set_index("date")["portfolio_value"], height=220, use_container_width=True)
 
-                    if not path_best.empty:
-                        st.download_button("⬇️ Download SWP path (max) CSV", data=path_best.to_csv(index=False).encode("utf-8"),
-                                           file_name="swp_path_max.csv", mime="text/csv", use_container_width=True)
-                    if not path_reduced.empty:
-                        st.download_button("⬇️ Download SWP path (reduced) CSV", data=path_reduced.to_csv(index=False).encode("utf-8"),
-                                           file_name="swp_path_reduced.csv", mime="text/csv", use_container_width=True)
+                        show_cashflow_tables = st.checkbox("Show SWP cashflow tables", value=False, key="show_swp_cashflow_tables")
+                        if show_cashflow_tables:
+                            if not path_best.empty:
+                                t1 = path_best.copy(); t1["withdrawal"] = t1["withdrawal"].round(4); t1["portfolio_value"] = t1["portfolio_value"].round(4)
+                                st.markdown("**Max withdrawal path**"); st.dataframe(t1.head(12), use_container_width=True, height=240); st.dataframe(t1.tail(12), height=240)
+                            if not path_reduced.empty:
+                                t2 = path_reduced.copy(); t2["withdrawal"] = t2["withdrawal"].round(4); t2["portfolio_value"] = t2["portfolio_value"].round(4)
+                                st.markdown(f"**Reduced withdrawal path (−{red_pp:.2f} pp)**"); st.dataframe(t2.head(12), height=240); st.dataframe(t2.tail(12), height=240)
 
-# Optional legacy inputs
-with col2:
-    st.subheader("Legacy Inputs (optional)")
-    lump_sum = st.number_input("Lump sum invested (₹)", min_value=0, value=0, step=1000)
-    lump_date = st.date_input("Lump sum date", value=dt.date.today().replace(day=1))
-    sip_amt = st.number_input("SIP monthly (₹)", min_value=0, value=10000, step=1000)
-    sip_start = st.date_input("SIP start", value=dt.date.today().replace(day=1))
-    sip_end = st.date_input("SIP end (inclusive)", value=dt.date.today().replace(day=1))
+                        if not path_best.empty:
+                            st.download_button("⬇️ Download SWP path (max) CSV", data=path_best.to_csv(index=False).encode("utf-8"),
+                                               file_name="swp_path_max.csv", mime="text/csv", use_container_width=True)
+                        if not path_reduced.empty:
+                            st.download_button("⬇️ Download SWP path (reduced) CSV", data=path_reduced.to_csv(index=False).encode("utf-8"),
+                                               file_name="swp_path_reduced.csv", mime="text/csv", use_container_width=True)
 
-st.caption("Diversified P&C uses pairwise correlations on an outer-joined returns panel, so selections won’t collapse. SWP now supports a 20% per-fund floor, tax/exit-load aware drawdown, guardrail spending, biennial rebalance, and Monte Carlo survival checks.")
+    # Optional legacy inputs
+    with col2:
+        st.subheader("Legacy Inputs (optional)")
+        lump_sum = st.number_input("Lump sum invested (₹)", min_value=0, value=0, step=1000)
+        lump_date = st.date_input("Lump sum date", value=dt.date.today().replace(day=1))
+        sip_amt = st.number_input("SIP monthly (₹)", min_value=0, value=10000, step=1000)
+        sip_start = st.date_input("SIP start", value=dt.date.today().replace(day=1))
+        sip_end = st.date_input("SIP end (inclusive)", value=dt.date.today().replace(day=1))
+
+    st.caption("Diversified P&C uses pairwise correlations on an outer-joined returns panel, so selections won’t collapse. SWP now supports a 20% per-fund floor, tax/exit-load aware drawdown, guardrail spending, biennial rebalance, and Monte Carlo survival checks.")
+
+
+if __name__ == "__main__":
+    render_mf_fire_app(embed=False)

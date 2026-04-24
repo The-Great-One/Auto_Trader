@@ -3,12 +3,19 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+DASHBOARD_DIR = Path(__file__).resolve().parent
+if str(DASHBOARD_DIR) not in sys.path:
+    sys.path.insert(0, str(DASHBOARD_DIR))
+
+from mf_app_core import render_mf_fire_app
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "reports"
@@ -287,7 +294,7 @@ def status_badge_text(status: dict) -> str:
 
 
 st.title("Auto Trader Ops Dashboard")
-st.caption("A clearer view of live, paper, labs, RNN sweeps, sentiment, and server state")
+st.caption("A clearer view of live, paper, labs, RNN sweeps, sentiment, server state, and MF planning")
 
 with st.sidebar:
     st.header("Controls")
@@ -348,9 +355,10 @@ if scorecard:
     quick3.metric("Realized PnL", scorecard.get("estimated_realized_pnl", "-"))
     quick4.metric("Scorecard verdict", scorecard.get("verdict", "-"))
 
-summary_tab, trader_tab, telegram_tab, labs_tab, sentiment_tab, server_tab = st.tabs([
+summary_tab, trader_tab, mf_tab, telegram_tab, labs_tab, sentiment_tab, server_tab = st.tabs([
     "Mission Control",
     "Live + Paper",
+    "MF FIRE",
     "Telegram Options",
     "Labs + RNN",
     "Twitter Sentiment",
@@ -414,6 +422,9 @@ with trader_tab:
         st.json(live_paper or {"status": "missing"})
     st.subheader("Available local report files")
     st.dataframe(pd.DataFrame({"report": sorted([p.name for p in REPORTS_DIR.glob("*.json")], reverse=True)}), use_container_width=True, hide_index=True)
+
+with mf_tab:
+    render_mf_fire_app(embed=True)
 
 with telegram_tab:
     st.subheader("Telegram options paper returns")
