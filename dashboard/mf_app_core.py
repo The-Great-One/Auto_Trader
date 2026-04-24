@@ -11,8 +11,10 @@
 
 from __future__ import annotations
 import datetime as dt
+import json
 import re
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Callable
 
@@ -29,6 +31,13 @@ SCHEME_LIST_URL = "https://api.mfapi.in/mf"
 NAV_URL_TEMPLATE = "https://api.mfapi.in/mf/{scheme_code}"
 NAV_CACHE_DIR = Path(__file__).resolve().parent / ".nav_cache"
 NAV_DISK_CACHE_MAX_AGE_HOURS = 24
+PORTFOLIO_TRACKER_PATH = Path(__file__).resolve().parents[1] / "reports" / "portfolio_tracker_latest.json"
+MAX_COMPARE_FUNDS = 20
+FUND_NAME_STOPWORDS = {
+    "fund", "plan", "direct", "regular", "growth", "option", "idcw", "income", "distribution",
+    "cum", "capital", "withdrawal", "dividend", "daily", "weekly", "monthly", "quarterly",
+    "yearly", "annual", "bonus", "payout", "reinvestment",
+}
 
 def _nav_cache_path(scheme_code: int) -> Path:
     return NAV_CACHE_DIR / f"{int(scheme_code)}.csv"
@@ -105,6 +114,117 @@ def fetch_monthly_returns(scheme_code: int) -> pd.DataFrame:
     me = resample_month_end(h)
     me["ret"] = me["nav"].pct_change()
     return me[["date", "ret"]].dropna().reset_index(drop=True)
+
+def _clean_tracker_text(text: str) -> str:
+    return str(text or "").replace("u0026", "&").replace("\\u0026", "&")
+
+def _normalize_fund_text(text: str) -> str:
+    cleaned = _clean_tracker_text(text).lower().replace("&", " and ")
+    cleaned = re.sub(r"[^a-z0-9]+", " ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+def _fund_tokens(text: str) -> list[str]:
+    return [tok for tok in _normalize_fund_text(text).split() if tok not in FUND_NAME_STOPWORDS and len(tok) >= 3]
+
+@st.cache_data(show_spinner=False, ttl=15 * 60)
+def load_current_mf_holdings() -> pd.DataFrame:
+    cols = ["fund", "current_value", "weight_pct", "mf_weight_pct", "gain_pct", "recommendation", "category", "risk_level", "tradingsymbol"]
+    if not PORTFOLIO_TRACKER_PATH.exists():
+        return pd.DataFrame(columns=cols)
+    try:
+        payload = json.loads(PORTFOLIO_TRACKER_PATH.read_text())
+    except Exception:
+        return pd.DataFrame(columns=cols)
+
+    total_mf_weight = max(1e-9, float((payload.get("portfolio_summary") or {}).get("mf_weight_pct") or 0.0))
+    rows = []
+    for holding in payload.get("mf_holdings") or []:
+        portfolio_weight = float(holding.get("weight_pct") or 0.0)
+        rows.append({
+            "fund": _clean_tracker_text(holding.get("fund") or holding.get("tradingsymbol") or ""),
+            "current_value": float(holding.get("current_value") or 0.0),
+            "weight_pct": portfolio_weight,
+            "mf_weight_pct": (portfolio_weight / total_mf_weight) * 100.0,
+            "gain_pct": float(holding.get("gain_pct") or 0.0),
+            "recommendation": str(holding.get("recommendation") or "hold"),
+            "category": str(holding.get("category") or ""),
+            "risk_level": str(holding.get("risk_level") or ""),
+            "tradingsymbol": str(holding.get("tradingsymbol") or ""),
+        })
+    return pd.DataFrame(rows)
+
+def match_holding_to_scheme_name(holding_name: str, scheme_df: pd.DataFrame) -> Optional[str]:
+    if scheme_df.empty:
+        return None
+    name_norm = _normalize_fund_text(holding_name)
+    tokens = _fund_tokens(holding_name)
+    if not tokens:
+        return None
+
+    candidates = scheme_df.copy()
+    candidates["scheme_name_norm"] = candidates["scheme_name"].map(_normalize_fund_text)
+
+    strong_tokens = [tok for tok in tokens if len(tok) >= 4][:3] or tokens[:2]
+    for tok in strong_tokens[:2]:
+        mask = candidates["scheme_name_norm"].str.contains(rf"\b{re.escape(tok)}\b", regex=True, na=False)
+        if mask.any():
+            candidates = candidates[mask].copy()
+
+    if candidates.empty:
+        candidates = scheme_df.copy()
+        candidates["scheme_name_norm"] = candidates["scheme_name"].map(_normalize_fund_text)
+
+    desired_direct = "direct" in name_norm
+    token_set = set(tokens)
+    scored: list[tuple[float, str]] = []
+    for _, row in candidates.iterrows():
+        scheme_name = str(row["scheme_name"])
+        scheme_norm = str(row["scheme_name_norm"])
+        scheme_tokens = set(_fund_tokens(scheme_norm))
+        overlap = len(token_set & scheme_tokens)
+        if overlap == 0:
+            continue
+        score = overlap * 12.0 + SequenceMatcher(None, name_norm, scheme_norm).ratio() * 10.0
+        if desired_direct and "direct" in scheme_norm:
+            score += 3.0
+        if "growth" in scheme_norm:
+            score += 2.0
+        if "bonus" in scheme_norm:
+            score -= 2.0
+        if "idcw" in scheme_norm or "dividend" in scheme_norm:
+            score -= 3.0
+        scored.append((score, scheme_name))
+
+    if not scored:
+        return None
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_score, top_name = scored[0]
+    return top_name if top_score >= 12.0 else None
+
+def resolve_current_mf_defaults(scheme_df: pd.DataFrame) -> tuple[list[str], dict[str, float], pd.DataFrame, list[str]]:
+    holdings_df = load_current_mf_holdings()
+    if holdings_df.empty:
+        return [], {}, holdings_df, []
+
+    selected: list[str] = []
+    weight_map: dict[str, float] = {}
+    unmatched: list[str] = []
+    matched_scheme_names: list[str] = []
+
+    for _, row in holdings_df.sort_values("mf_weight_pct", ascending=False).iterrows():
+        fund_name = str(row["fund"])
+        matched = match_holding_to_scheme_name(fund_name, scheme_df)
+        matched_scheme_names.append(matched or "")
+        if matched:
+            if matched not in selected:
+                selected.append(matched)
+                weight_map[matched] = float(row["mf_weight_pct"])
+        else:
+            unmatched.append(fund_name)
+
+    holdings_df = holdings_df.copy()
+    holdings_df["matched_scheme_name"] = matched_scheme_names
+    return selected[:MAX_COMPARE_FUNDS], weight_map, holdings_df, unmatched
 
 # --------------------------------------------------------------------
 # Helpers
@@ -1234,8 +1354,16 @@ if "compare_funds" not in st.session_state:
     st.session_state.compare_funds = []
 if "weight_map" not in st.session_state:
     st.session_state.weight_map = {}
+if "current_mf_defaults_loaded" not in st.session_state:
+    st.session_state.current_mf_defaults_loaded = False
 
-with st.expander("📊 Compare up to 5 funds", expanded=False):
+current_default_funds, current_default_weights, current_holdings_df, unmatched_current_holdings = resolve_current_mf_defaults(df_schemes)
+if not st.session_state.current_mf_defaults_loaded and current_default_funds:
+    st.session_state.compare_funds = current_default_funds.copy()
+    st.session_state.weight_map = current_default_weights.copy()
+    st.session_state.current_mf_defaults_loaded = True
+
+with st.expander("📊 Compare / analyze funds", expanded=True):
     code_map = df_schemes.set_index("scheme_name")["scheme_code"].to_dict()
     c1, c2, c3 = st.columns([1.3,1,1])
     with c1:
@@ -1248,17 +1376,44 @@ with st.expander("📊 Compare up to 5 funds", expanded=False):
     with c2:
         if st.button("➕ Add picked", use_container_width=True):
             if comp_pick and comp_pick not in st.session_state.compare_funds:
-                if len(st.session_state.compare_funds) < 5:
+                if len(st.session_state.compare_funds) < MAX_COMPARE_FUNDS:
                     st.session_state.compare_funds.append(comp_pick)
                 else:
-                    st.warning("You can compare at most 5 funds.")
+                    st.warning(f"You can compare at most {MAX_COMPARE_FUNDS} funds.")
     with c3:
+        if st.button("↺ Reload current MF holdings", use_container_width=True):
+            if current_default_funds:
+                st.session_state.compare_funds = current_default_funds.copy()
+                st.session_state.weight_map = current_default_weights.copy()
+                st.success("Reloaded current MF holdings into MF FIRE.")
+            else:
+                st.warning("Current MF holdings were not available to load.")
+
+    if not current_holdings_df.empty:
+        st.caption(f"Loaded {len(current_default_funds)} current MF holdings by default from your portfolio tracker. Weights below are normalized within the MF sleeve.")
+        show_cols = ["fund", "current_value", "weight_pct", "mf_weight_pct", "gain_pct", "recommendation", "category", "risk_level"]
+        pretty = current_holdings_df[show_cols].copy()
+        pretty = pretty.rename(columns={
+            "fund": "Fund",
+            "current_value": "Current Value ₹",
+            "weight_pct": "Portfolio %",
+            "mf_weight_pct": "MF Sleeve %",
+            "gain_pct": "Gain %",
+            "recommendation": "Reco",
+            "category": "Category",
+            "risk_level": "Risk",
+        })
+        st.dataframe(pretty, use_container_width=True, height=260)
+    if unmatched_current_holdings:
+        st.warning("Could not map these holdings cleanly into MF API scheme names: " + ", ".join(unmatched_current_holdings[:5]))
+
+    if chosen and chosen not in st.session_state.compare_funds:
         if st.button("➕ Add currently selected", use_container_width=True):
-            if chosen and chosen not in st.session_state.compare_funds:
-                if len(st.session_state.compare_funds) < 5:
-                    st.session_state.compare_funds.append(chosen)
-                else:
-                    st.warning("You can compare at most 5 funds.")
+            if len(st.session_state.compare_funds) < MAX_COMPARE_FUNDS:
+                st.session_state.compare_funds.append(chosen)
+            else:
+                st.warning(f"You can compare at most {MAX_COMPARE_FUNDS} funds.")
+
     if st.session_state.compare_funds:
         st.caption("Selected funds (click to remove):")
         cols = st.columns(min(5, len(st.session_state.compare_funds)))
