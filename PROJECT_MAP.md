@@ -33,8 +33,9 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `README.md` - setup and ops notes
 - `requirements.txt` - Python deps
 - `PROJECT_MAP.md` - this file
-- `dashboard/ops_dashboard.py` - Streamlit TraderOps dashboard for labs, live/paper snapshots, sentiment cache, Oracle server visibility, and the embedded MF FIRE planner tab
-- `dashboard/ops_dash_app.py` - default Dash ops cockpit on port 8504, covering service health, portfolios, paper trading, news, Telegram, research outputs, and recent reports
+- `dashboard/ops_dashboard.py` - legacy Streamlit ops dashboard kept for older local workflows, not the main TraderOps surface
+- `dashboard/ops_dash_app.py` - active Dash TraderOps cockpit on port 8504, covering service health, portfolios, paper trading, MF FIRE, news, Telegram, research outputs, and recent reports
+- `dashboard/mf_dash_utils.py` - Dash-safe MFAPI helpers used by the active TraderOps MF FIRE tab
 
 ### `Auto_Trader/`
 - `__init__.py` - exports runtime entrypoints and sets up logging

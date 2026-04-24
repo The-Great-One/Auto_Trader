@@ -386,30 +386,37 @@ AT_LAB_RNN_ENABLED=1 python scripts/weekly_strategy_lab.py
 
 ## 📊 Ops Dashboard
 
-A local Streamlit dashboard is available for operational visibility across the system.
+The active TraderOps dashboard is the Dash app.
 
-File:
-- `dashboard/ops_dashboard.py`
+Primary file:
+- `dashboard/ops_dash_app.py`
 
-What it shows:
-- latest strategy lab runs and top variants
-- RNN-vs-baseline lab outcomes
-- paper trader snapshots
-- live paper-shadow snapshots
-- embedded MF FIRE planner for mutual-fund SIP, compare, P&C scan, and SWP analysis
-- cached Twitter sentiment by symbol
-- Oracle server state and recent reports over SSH
+Legacy file:
+- `dashboard/ops_dashboard.py` (older Streamlit dashboard, not the main TraderOps surface)
 
-Run it locally:
+What the active Dash TraderOps app shows:
+- service health and runtime state
+- portfolio, paper, news, Telegram, research, and reports tabs
+- MF portfolio/rebalance visibility
+- MF FIRE tab for fund lookup inside TraderOps, with optional embedded full planner via `MF_FIRE_PUBLIC_URL`
+
+Run the active dashboard locally:
+
+```bash
+npm run dashboard
+# or
+./scripts/start_dash_ops_dashboard.sh
+```
+
+Legacy Streamlit dashboard, if you explicitly need it:
 
 ```bash
 streamlit run dashboard/ops_dashboard.py
-# or
-npm run dashboard
 ```
 
 Notes:
-- server panel uses the configured Oracle SSH key already used for Auto_Trader ops
+- the active TraderOps app runs on Dash, default port `8504`
+- server panels use the configured Oracle SSH key already used for Auto_Trader ops
 - the dashboard reads existing JSON/CSV artifacts, so it stays lightweight and does not interfere with trading runtime
 
 ## 🛠️ Future Enhancements

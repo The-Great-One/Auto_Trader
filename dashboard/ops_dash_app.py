@@ -16,6 +16,8 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, dcc, html, dash_table, no_update
 from dash.exceptions import PreventUpdate
 
+from mf_dash_utils import fetch_nav_history, fetch_scheme_list, filter_nav_timeframe, normalize_nav
+
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT / "reports"
 INTERMEDIARY_DIR = ROOT / "intermediary_files"
@@ -34,6 +36,7 @@ WATCH_RECEIPTS_PATH = Path.home() / ".openclaw" / "telegram-user" / "watch_recei
 SERVER_KEY = Path(os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key")))
 SERVER_HOST = os.getenv("AT_SERVER_HOST", os.getenv("AT_ORACLE", ""))
 SERVER_REPO = os.getenv("AT_SERVER_REPO", "/home/ubuntu/Auto_Trader")
+MF_FIRE_PUBLIC_URL = os.getenv("MF_FIRE_PUBLIC_URL", os.getenv("AT_MF_FIRE_PUBLIC_URL", ""))
 COMBINED_LAB_STATUS_FILES = [
     "sizing_exit_sweep_latest.json",
     "volatility_sizing_lab_latest.json",
@@ -2546,6 +2549,87 @@ def build_reports_tab(data: dict[str, Any]) -> list[Any]:
     return children
 
 
+def build_mf_tab(data: dict[str, Any]) -> list[Any]:
+    children: list[Any] = []
+    tracker = data.get("portfolio_tracker") or {}
+    psum = tracker.get("portfolio_summary") or {}
+    mf_plan = data.get("mf_rebalance_plan") or {}
+
+    cards = html.Div(
+        [
+            metric_card("MF value", friendly(psum.get("mf_value")), f"{psum.get('n_mf_holdings', 0)} funds"),
+            metric_card("MF weight", friendly(psum.get("mf_weight_pct")), "% of portfolio"),
+            metric_card("MF plan profile", mf_plan.get("profile", "-"), data.get("mf_rebalance_plan_path") or "mf_rebalance_plan"),
+            metric_card("MF planned orders", len(mf_plan.get("orders") or []), mf_plan.get("tag", "mf_rebalance")),
+        ],
+        style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+    )
+    children.append(section("MF command deck", [cards], "Dash-native MF entrypoint inside TraderOps."))
+
+    explorer = html.Div(
+        [
+            html.Div("Fund search", style={"fontSize": "11px", "color": BLOOMBERG_GRAY, "marginBottom": "6px"}),
+            dcc.Input(
+                id="mf-query",
+                type="text",
+                debounce=True,
+                placeholder="Type 3+ chars, for example nifty or parag",
+                style={"width": "100%", "marginBottom": "10px", "padding": "10px", "background": "#030712", "color": "#e5e7eb", "border": "1px solid #1e2a3a"},
+            ),
+            dcc.Dropdown(id="mf-picker", options=[], placeholder="Pick a mutual fund", style={"marginBottom": "10px"}),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Div("Timeframe", style={"fontSize": "11px", "color": BLOOMBERG_GRAY, "marginBottom": "6px"}),
+                            dcc.Dropdown(
+                                id="mf-timeframe",
+                                options=[{"label": x, "value": x} for x in ["Full", "YTD", "1Y", "3Y", "5Y", "10Y"]],
+                                value="Full",
+                                clearable=False,
+                            ),
+                        ],
+                        style={"flex": "1", "minWidth": "180px"},
+                    ),
+                    html.Div(
+                        [
+                            html.Div("Scale", style={"fontSize": "11px", "color": BLOOMBERG_GRAY, "marginBottom": "6px"}),
+                            dcc.Checklist(
+                                id="mf-normalize",
+                                options=[{"label": "Normalize to ₹10", "value": "norm"}],
+                                value=["norm"],
+                                inputStyle={"marginRight": "6px"},
+                                style={"color": "#d1d5db", "paddingTop": "10px"},
+                            ),
+                        ],
+                        style={"flex": "1", "minWidth": "180px"},
+                    ),
+                ],
+                style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "marginBottom": "12px"},
+            ),
+            html.Div(id="mf-nav-meta", style={"color": "#9ca3af", "fontSize": "11px", "marginBottom": "8px"}),
+            dcc.Graph(id="mf-nav-chart", figure=empty_figure("MF NAV history"), config={"displayModeBar": False}),
+        ],
+        style=CARD_STYLE,
+    )
+    children.append(section("MF fund explorer", [explorer], "Quick Dash-native mutual-fund lookup so TraderOps stays the main cockpit."))
+
+    if MF_FIRE_PUBLIC_URL:
+        link_card = html.Div(
+            [
+                html.Div("Full planner", style={"fontSize": "11px", "color": BLOOMBERG_GRAY, "marginBottom": "6px"}),
+                html.A("Open MF FIRE planner in a new tab", href=MF_FIRE_PUBLIC_URL, target="_blank", style={"color": BLOOMBERG_ORANGE, "fontWeight": "700", "textDecoration": "none"}),
+                html.Div(MF_FIRE_PUBLIC_URL, style={"marginTop": "6px", "fontSize": "11px", "color": "#94a3b8"}),
+            ],
+            style=CARD_STYLE,
+        )
+        children.append(section("Full MF FIRE planner", [link_card, html.Iframe(src=MF_FIRE_PUBLIC_URL, style={"width": "100%", "height": "1200px", "border": "1px solid #1e2a3a", "background": "#030712"})], "Embedded into the active Dash TraderOps surface via the configured public MF app URL."))
+    else:
+        children.append(section("Full MF FIRE planner", [empty_message("Set MF_FIRE_PUBLIC_URL (or AT_MF_FIRE_PUBLIC_URL) to embed the full planner here. The Dash tab is live now; the iframe just needs the public MF app URL.")]))
+
+    return children
+
+
 def render_tab(tab: str, data: dict[str, Any]) -> list[Any]:
     if tab == "runtime":
         return build_runtime_tab(data)
@@ -2553,6 +2637,8 @@ def render_tab(tab: str, data: dict[str, Any]) -> list[Any]:
         return build_portfolio_tab(data)
     if tab == "paper":
         return build_paper_tab(data)
+    if tab == "mf":
+        return build_mf_tab(data)
     if tab == "news":
         return build_news_tab(data)
     if tab == "global_macro":
@@ -2700,6 +2786,7 @@ app.layout = html.Div(
                 dcc.Tab(label="RUNTIME", value="runtime"),
                 dcc.Tab(label="PORTFOLIO", value="portfolio"),
                 dcc.Tab(label="PAPER", value="paper"),
+                dcc.Tab(label="MF FIRE", value="mf"),
                 dcc.Tab(label="NEWS", value="news"),
                 dcc.Tab(label="GLOBAL MACRO", value="global_macro"),
                 dcc.Tab(label="CALENDAR + SECTORS", value="calendar"),
@@ -2765,6 +2852,54 @@ def render_active_tab(tab: str, _data_version: dict[str, Any] | None):
         traceback.print_exc()
         err_msg = f"Error at {datetime.now(IST).strftime('%H:%M:%S')} IST — {exc}"
         return [html.Div(err_msg, style={**CARD_STYLE, "color": BLOOMBERG_RED})]
+
+
+@app.callback(
+    Output("mf-picker", "options"),
+    Input("mf-query", "value"),
+)
+def update_mf_picker(query: str | None):
+    q = (query or "").strip().lower()
+    if len(q) < 3:
+        return []
+    try:
+        schemes = fetch_scheme_list()
+        matches = schemes[schemes["scheme_name_lc"].str.contains(q, na=False)].head(50)
+        return [{"label": row["scheme_name"], "value": int(row["scheme_code"])} for _, row in matches.iterrows()]
+    except Exception as exc:
+        return [{"label": f"MF lookup failed: {exc}", "value": ""}]
+
+
+@app.callback(
+    Output("mf-nav-chart", "figure"),
+    Output("mf-nav-meta", "children"),
+    Input("mf-picker", "value"),
+    Input("mf-timeframe", "value"),
+    Input("mf-normalize", "value"),
+)
+def update_mf_nav_chart(scheme_code: int | str | None, timeframe: str | None, normalize_flags: list[str] | None):
+    if not scheme_code:
+        return empty_figure("MF NAV history"), "Search and pick a fund to load its NAV history."
+    try:
+        scheme_code_int = int(scheme_code)
+        schemes = fetch_scheme_list()
+        match = schemes[schemes["scheme_code"] == scheme_code_int]
+        scheme_name = match["scheme_name"].iloc[0] if not match.empty else str(scheme_code_int)
+        nav = fetch_nav_history(scheme_code_int)
+        nav = filter_nav_timeframe(nav, timeframe or "Full")
+        if nav.empty:
+            return empty_figure("MF NAV history"), f"No NAV history found for {scheme_name}."
+
+        use_normalized = "norm" in (normalize_flags or [])
+        y_col = "nav_norm" if use_normalized else "nav"
+        chart_df = normalize_nav(nav, base=10.0) if use_normalized else nav.copy()
+        fig = px.line(chart_df, x="date", y=y_col, title=scheme_name)
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#030712", plot_bgcolor="#111827", margin={"l": 40, "r": 20, "t": 50, "b": 40})
+        latest_nav = float(nav["nav"].iloc[-1])
+        meta = f"{scheme_name} | latest NAV ₹{latest_nav:.2f} | {len(nav)} points | timeframe {timeframe or 'Full'}"
+        return fig, meta
+    except Exception as exc:
+        return empty_figure("MF NAV history"), f"MF chart failed: {exc}"
 
 
 @app.callback(
