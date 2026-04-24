@@ -118,10 +118,11 @@ def download_symbol_data(symbol, fetched_mgr, api_key, access_token, token_map):
         print(f"[Error] Constructing feather path for '{symbol}': {e}")
         return symbol, False, 0
 
+    existing_df = None
     try:
         if os.path.exists(feather_path):
-            existing = pd.read_feather(feather_path)
-            last_ts = pd.to_datetime(existing["Date"], errors="coerce").max()
+            existing_df = pd.read_feather(feather_path)
+            last_ts = pd.to_datetime(existing_df["Date"], errors="coerce").max()
             if pd.isna(last_ts):
                 raise ValueError("No valid timestamp in historical data")
             if _is_intraday_interval():
@@ -230,6 +231,19 @@ def download_symbol_data(symbol, fetched_mgr, api_key, access_token, token_map):
             df = df.iloc[:-1]
     except Exception as e:
         print(f"[Error] Dropping today's partial bar for '{symbol}': {e}")
+
+    # Merge with existing history if available
+    if existing_df is not None and len(existing_df) > 0:
+        try:
+            existing_df["Date"] = pd.to_datetime(existing_df["Date"], errors="coerce")
+            if not _is_intraday_interval():
+                existing_df["Date"] = existing_df["Date"].dt.date
+            df = pd.concat([existing_df, df], ignore_index=True)
+            df.drop_duplicates(subset=["Date"], keep="last", inplace=True)
+            df.sort_values("Date", inplace=True)
+            df.reset_index(drop=True, inplace=True)
+        except Exception as e:
+            print(f"[Warning] Could not merge existing data for {symbol}: {e}")
 
     try:
         os.makedirs(HIST_DIR, exist_ok=True)
