@@ -1042,6 +1042,10 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     old_r7 = dict(RULE_SET_7.CONFIG)
     RULE_SET_2.CONFIG.update(sell_params)
     RULE_SET_7.CONFIG.update(buy_params)
+    # Lab override: if AT_LAB_REGIME_FILTER_ENABLED is set, force regime filter on/off
+    lab_regime = os.getenv("AT_LAB_REGIME_FILTER_ENABLED", "").strip()
+    if lab_regime:
+        RULE_SET_7.CONFIG["regime_filter_enabled"] = int(float(lab_regime))
     rnn_params = rnn_params or {"enabled": False}
     rnn_models = rnn_models or {}
     match_live = os.getenv("AT_LAB_MATCH_LIVE", "1").strip().lower() not in {"0", "false", "no"}
