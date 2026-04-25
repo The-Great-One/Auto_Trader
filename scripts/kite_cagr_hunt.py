@@ -274,6 +274,7 @@ def run_variant(data_map: dict[str, pd.DataFrame], buy: dict, sell: dict) -> Var
         eq = sim_meta.get("portfolio_equity")
         curve = _compute_curve_metrics(eq) if eq is not None and len(eq) > 20 else {"cagr_pct": 0.0, "sharpe": 0.0}
         return VariantResult(
+            name="",
             total_return_pct=round(result.total_return_pct, 2),
             cagr_pct=curve["cagr_pct"],
             max_drawdown_pct=round(result.max_drawdown_pct, 2),
