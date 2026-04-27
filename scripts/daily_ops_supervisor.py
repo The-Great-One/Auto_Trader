@@ -269,8 +269,35 @@ def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
     requested_variants = int(max_variants or resolve_strategy_lab_max_variants())
     env = os.environ.copy()
     env["AT_LAB_MAX_VARIANTS"] = str(requested_variants)
+    # Timeout: strategy lab should finish within 30 min; kill if it hangs
+    # (prevents orphan multiprocessing workers from accumulating and causing OOM)
+    _lab_timeout = int(os.getenv("AT_DAILY_OPS_LAB_TIMEOUT", "1800"))
     cmd = ["/home/ubuntu/Auto_Trader/venv/bin/python", str(SCRIPTS / "weekly_strategy_lab.py")]
-    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    try:
+        proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env, timeout=_lab_timeout)
+    except subprocess.TimeoutExpired:
+        out = {
+            "ok": False,
+            "returncode": -1,
+            "stderr": f"Strategy lab timed out after {_lab_timeout}s — likely hung multiprocessing workers",
+            "stdout": "",
+            "file": None,
+            "requested_variants": requested_variants,
+            "tested_variants": 0,
+            "baseline_return_pct": None,
+            "baseline_trades": None,
+            "best_return_pct": None,
+            "best_trades": None,
+            "improvement_return_pct": None,
+            "improvement_score": None,
+            "should_promote": False,
+            "best_name": None,
+            "candidate": None,
+            "report_generated_at": None,
+            "stale_report": True,
+            "stale_reason": f"lab_timed_out_{_lab_timeout}s",
+        }
+        return out
 
     latest = sorted(REPORTS.glob("strategy_lab_*.json"))
     out = {

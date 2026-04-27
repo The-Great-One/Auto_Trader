@@ -9,9 +9,11 @@ Strategy lab:
 
 from __future__ import annotations
 
+import atexit
 import json
 import multiprocessing as mp
 import os
+import signal
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -1309,6 +1311,81 @@ def main():
     print(f"Saved: {out_json}")
     print(f"Saved: {out_csv}")
 
+
+# --- Process cleanup guard ---
+# Prevent orphan multiprocessing workers from accumulating and eating RAM.
+# When the parent process exits (normally or via signal), kill all child processes
+# that were spawned by ProcessPoolExecutor.
+_children: set[int] = set()
+_original_sigint = signal.getsignal(signal.SIGINT)
+_original_sigterm = signal.getsignal(signal.SIGTERM)
+
+
+def _register_child(pid: int) -> None:
+    _children.add(pid)
+
+
+def _cleanup_children() -> None:
+    """Terminate orphan child processes on exit."""
+    for pid in _children:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    # Give them a moment, then force-kill
+    if _children:
+        import time
+        time.sleep(0.5)
+        for pid in list(_children):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+    _children.clear()
+
+
+def _signal_handler(signum: int, frame) -> None:
+    """Handle SIGTERM/SIGINT by cleaning up children before exiting."""
+    _cleanup_children()
+    # Restore original handler and re-raise
+    signal.signal(signum, _original_sigint if signum == signal.SIGINT else _original_sigterm)
+    os.kill(os.getpid(), signum)
+
+
+atexit.register(_cleanup_children)
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
+
+# Patch ProcessPoolExecutor to track child PIDs
+_OriginalProcessPoolExecutor = ProcessPoolExecutor
+
+
+class _TrackedProcessPoolExecutor(_OriginalProcessPoolExecutor):
+    """ProcessPoolExecutor that registers child PIDs for cleanup on exit."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # PIDs become available after the executor starts
+        self._registered = False
+
+    def _register_workers(self):
+        if self._registered:
+            return
+        try:
+            for p in self._processes.values():
+                _register_child(p.pid)
+            self._registered = True
+        except Exception:
+            pass
+
+    def submit(self, *args, **kwargs):
+        fut = super().submit(*args, **kwargs)
+        self._register_workers()
+        return fut
+
+
+ProcessPoolExecutor = _TrackedProcessPoolExecutor
+# --- End process cleanup guard ---
 
 if __name__ == "__main__":
     try:
