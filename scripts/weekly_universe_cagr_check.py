@@ -312,6 +312,11 @@ def _portfolio_targets() -> dict[str, float]:
 def _portfolio_limits() -> tuple[float, float]:
     band = max(0.0, float(os.getenv("AT_PORTFOLIO_BAND", "0.05")))
     max_symbol = max(0.0, float(os.getenv("AT_MAX_SINGLE_SYMBOL_WEIGHT", "0.15")))
+    # Lab mode: allow more concentrated positions for strategy testing
+    lab_mode = os.getenv("AT_LAB_MODE", "0").strip().lower() in {"1", "true", "yes"}
+    if lab_mode:
+        band = max(band, 0.15)
+        max_symbol = max(max_symbol, 0.50)
     return band, max_symbol
 
 
@@ -369,11 +374,15 @@ def _portfolio_allows_buy(asset_class: str, symbol: str, order_notional: float, 
 
 def _resolve_position_sizing_config() -> dict:
     enabled = os.getenv("AT_BACKTEST_VOL_SIZING_ENABLED", "0").strip().lower() not in {"0", "false", "no"}
+    lab_mode = os.getenv("AT_LAB_MODE", "0").strip().lower() in {"1", "true", "yes"}
+    # Lab defaults: more aggressive sizing to generate enough trades for evaluation
+    default_max_notional = 0.2 if not lab_mode else 0.15
+    default_risk = 0.0075 if not lab_mode else 0.02
     return {
         "enabled": enabled,
-        "risk_per_trade_pct": float(os.getenv("AT_BACKTEST_RISK_PER_TRADE_PCT", "0.0075") or 0.0075),
+        "risk_per_trade_pct": float(os.getenv("AT_BACKTEST_RISK_PER_TRADE_PCT", str(default_risk)) or default_risk),
         "atr_stop_mult": float(os.getenv("AT_BACKTEST_ATR_STOP_MULT", "2.0") or 2.0),
-        "max_position_notional_pct": float(os.getenv("AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT", "0.2") or 0.2),
+        "max_position_notional_pct": float(os.getenv("AT_BACKTEST_MAX_POSITION_NOTIONAL_PCT", str(default_max_notional)) or default_max_notional),
         "fallback_notional": float(os.getenv("FUND_ALLOCATION", "20000") or 20000),
     }
 
@@ -429,6 +438,12 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
 
     old_r2 = dict(lab.RULE_SET_2.CONFIG)
     old_r7 = dict(lab.RULE_SET_7.CONFIG)
+    # Lab mode: propagate AT_LAB_MODE so portfolio constraints are relaxed
+    lab_mode = os.getenv("AT_LAB_MODE", "0").strip().lower() in {"1", "true", "yes"}
+    # Lab override: if AT_LAB_REGIME_FILTER_ENABLED is set, force regime filter on/off
+    lab_regime = os.getenv("AT_LAB_REGIME_FILTER_ENABLED", "").strip()
+    if lab_regime:
+        lab.RULE_SET_7.CONFIG["regime_filter_enabled"] = int(float(lab_regime))
     asset_classes = _asset_class_lookup(universe_df)
     per_buy_allocation = float(os.getenv("FUND_ALLOCATION", "20000") or 20000)
     starting_capital = float(os.getenv("AT_BACKTEST_STARTING_CAPITAL", os.getenv("AT_WEEKLY_CAGR_STARTING_CAPITAL", "100000")) or 100000)

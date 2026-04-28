@@ -876,6 +876,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
                     add(f"focus_combo_{combo_idx:03d}", {bkey: bval}, {skey: sval}, {"enabled": False})
 
     curated_buy = [
+        # Original curated combos
         {"volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
         {"volume_confirm_mult": 0.9, "vwap_buy_above": 0},
         {"volume_confirm_mult": 0.9, "ich_cloud_bull": 0, "vwap_buy_above": 0},
@@ -887,14 +888,36 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         {"adx_min": 8, "volume_confirm_mult": 0.75, "rsi_floor": 38, "stoch_pull_max": 90, "ich_cloud_bull": 0, "vwap_buy_above": 0},
         {"adx_min": 8, "volume_confirm_mult": 0.75, "max_extension_atr": 3.2, "obv_min_zscore": 0.0, "ich_cloud_bull": 0},
         {"adx_min": 6, "volume_confirm_mult": 0.7, "rsi_floor": 36, "stoch_pull_max": 95, "cci_buy_min": -150, "vwap_buy_above": 0},
+        # Ultra-loose combos: maximize signal density (these match best-performing symbols)
+        {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5, "max_obv_zscore": 5.0, "cci_buy_min": -175, "cmf_base_min": 0.0, "mmi_risk_off": 75},
+        {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 36, "stoch_pull_max": 90, "max_extension_atr": 3.2, "obv_min_zscore": 0.0, "cci_buy_min": -150},
+        {"adx_min": 8, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5},
+        {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "rsi_floor": 38, "stoch_pull_max": 85, "cci_buy_min": -125},
+        {"adx_min": 8, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 36, "stoch_pull_max": 90, "obv_min_zscore": 0.25},
+        # High-conviction combos (tighter buy, wider hold)
+        {"adx_strong_min": 18, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0, "rsi_floor": 40, "stoch_pull_max": 85},
+        {"adx_strong_min": 20, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0, "rsi_floor": 38, "cci_buy_min": -100},
+        # Contrarian / mean-reversion adjacent
+        {"adx_min": 6, "rsi_floor": 34, "stoch_pull_max": 95, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "cci_buy_min": -175, "max_extension_atr": 3.5, "obv_min_zscore": 0.0, "cmf_base_min": 0.0},
+        {"adx_min": 8, "rsi_floor": 36, "stoch_pull_max": 90, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0, "cci_buy_min": -150, "max_extension_atr": 3.2},
     ]
     curated_sell = [
+        # Original sell combos
         {},
         {"breakeven_trigger_pct": 4.0},
         {"breakeven_trigger_pct": 5.0, "equity_time_stop_bars": 12},
         {"breakeven_trigger_pct": 4.0, "fund_time_stop_bars": 18},
         {"equity_time_stop_bars": 15, "fund_time_stop_bars": 22},
         {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0},
+        # Longer holds: let winners run
+        {"equity_time_stop_bars": 20, "fund_time_stop_bars": 26, "breakeven_trigger_pct": 5.0},
+        {"equity_time_stop_bars": 15, "fund_time_stop_bars": 22, "momentum_exit_rsi": 35.0},
+        # Wider breakeven to avoid whipsaw exits
+        {"breakeven_trigger_pct": 5.0, "equity_review_rsi": 42.0, "fund_time_stop_min_profit_pct": 0.5},
+        {"breakeven_trigger_pct": 3.5, "equity_time_stop_bars": 12, "fund_time_stop_bars": 18},
+        # Aggressive momentum capture
+        {"momentum_exit_rsi": 35.0, "equity_review_rsi": 42.0, "equity_time_stop_bars": 15},
+        {"relative_volume_exit": 1.5, "breakeven_trigger_pct": 4.0, "fund_time_stop_bars": 18},
     ]
     curated_idx = 0
     for buy_patch in curated_buy:
@@ -902,7 +925,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
             curated_idx += 1
             add(f"curated_combo_{curated_idx:03d}", buy_patch, sell_patch, {"enabled": False})
 
-    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "700"))
+    max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "900"))
     return out[:max_variants]
 
 
@@ -1039,6 +1062,11 @@ def _save_lab_payload(payload: dict, prefix: str = "strategy_lab") -> tuple[Path
 def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, sell_params: dict, rnn_params: dict | None = None, rnn_models: dict | None = None) -> BacktestResult:
     # avoid DB dependency in RULE_SET_7 market regime check
     at_utils.get_mmi_now = lambda: None
+
+    # Ensure AT_LAB_MODE is set for lab portfolio relaxation
+    lab_mode = os.getenv("AT_LAB_MODE", "1").strip().lower() in {"1", "true", "yes"}
+    if not os.getenv("AT_LAB_MODE"):
+        os.environ["AT_LAB_MODE"] = "1"
 
     old_r2 = dict(RULE_SET_2.CONFIG)
     old_r7 = dict(RULE_SET_7.CONFIG)
