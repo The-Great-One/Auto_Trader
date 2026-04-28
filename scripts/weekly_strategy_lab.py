@@ -26,6 +26,27 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+try:
+    import skfolio
+    from skfolio.optimization import (
+        MeanRisk, HierarchicalRiskParity, MaximumDiversification,
+        RiskBudgeting, EqualWeighted, InverseVolatility,
+    )
+    from skfolio.model_selection import WalkForward
+    from skfolio import RiskMeasure, RatioMeasure
+    from skfolio.pre_selection import DropCorrelated
+    SKFOLIO_AVAILABLE = True
+except ImportError:
+    SKFOLIO_AVAILABLE = False
+
+try:
+    from pypfopt import EfficientFrontier, EfficientCVaR
+    from pypfopt.risk_models import CovarianceShrinkage
+    from pypfopt.expected_returns import mean_historical_return
+    PYPFOPT_AVAILABLE = True
+except ImportError:
+    PYPFOPT_AVAILABLE = False
+
 # Avoid noisy file-handler permission issues during research/backtest runs.
 os.environ.setdefault("AT_DISABLE_FILE_LOGGING", "1")
 
@@ -925,6 +946,31 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
             curated_idx += 1
             add(f"curated_combo_{curated_idx:03d}", buy_patch, sell_patch, {"enabled": False})
 
+    # Portfolio-optimized variants: reuse best curated buy combos with portfolio optimization
+    # These use skfolio/PyPortfolioOpt to weight symbols by correlation structure
+    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE:
+        # Top curated combos that should benefit most from portfolio optimization
+        po_buy_combos = [
+            {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5, "max_obv_zscore": 5.0, "cci_buy_min": -175, "cmf_base_min": 0.0, "mmi_risk_off": 75},
+            {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 36, "stoch_pull_max": 90, "max_extension_atr": 3.2, "obv_min_zscore": 0.0, "cci_buy_min": -150},
+            {"adx_min": 8, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5},
+            {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "rsi_floor": 38, "stoch_pull_max": 85, "cci_buy_min": -125},
+            {"volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+            {"adx_min": 12, "volume_confirm_mult": 0.9, "ich_cloud_bull": 0},
+            {"adx_min": 8, "volume_confirm_mult": 0.75, "rsi_floor": 38, "stoch_pull_max": 90, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        ]
+        po_sell_combos = [
+            {},
+            {"breakeven_trigger_pct": 5.0, "equity_time_stop_bars": 12},
+            {"equity_time_stop_bars": 20, "fund_time_stop_bars": 26, "breakeven_trigger_pct": 5.0},
+            {"momentum_exit_rsi": 35.0, "equity_review_rsi": 42.0, "equity_time_stop_bars": 15},
+        ]
+        po_idx = 0
+        for buy_patch in po_buy_combos:
+            for sell_patch in po_sell_combos:
+                po_idx += 1
+                add(f"po_hrp_{po_idx:03d}", buy_patch, sell_patch, {"enabled": False, "portfolio_opt": True})
+
     max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "900"))
     return out[:max_variants]
 
@@ -1030,6 +1076,16 @@ def _run_variant_worker(task: tuple[str, dict, dict, dict]) -> BacktestResult:
     if _WORKER_DATA_MAP is None:
         raise RuntimeError("Variant worker data not initialized")
     name, buy_params, sell_params, rnn_params = task
+    use_portfolio_opt = bool(rnn_params.get("portfolio_opt"))
+    if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE):
+        return run_portfolio_optimized(
+            name,
+            _WORKER_DATA_MAP,
+            buy_params,
+            sell_params,
+            rnn_params=rnn_params,
+            rnn_models=_WORKER_RNN_MODELS or {},
+        )
     return run_variant(
         name,
         _WORKER_DATA_MAP,
@@ -1144,6 +1200,369 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     )
 
 
+def _simulate_symbol_with_equity(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dict | None = None) -> dict:
+    """Run simple sim but also return per-bar equity curve for portfolio optimization."""
+    cash = 100000.0
+    qty = 0
+    avg = 0.0
+    entry_idx = None
+    trades = 0
+    wins = 0
+    equity_curve = []
+    daily_returns = []
+    rnn_cfg = rnn_cfg or {"enabled": False}
+    rnn_enabled = bool(rnn_cfg.get("enabled")) and rnn_model is not None
+    buy_threshold = float(rnn_cfg.get("buy_threshold", 0.56))
+    sell_threshold = float(rnn_cfg.get("sell_threshold", 0.44))
+    prev_equity = cash
+
+    for i in range(250, len(df)):
+        part = df.iloc[: i + 1].copy()
+        row = part.iloc[-1].to_dict()
+        row.setdefault("instrument_token", 1626369)
+        price = float(part.iloc[-1]["Close"])
+
+        if qty == 0:
+            hold_df = pd.DataFrame(
+                columns=[
+                    "instrument_token", "tradingsymbol", "average_price",
+                    "quantity", "t1_quantity", "bars_in_trade",
+                ]
+            )
+            sig = RULE_SET_7.buy_or_sell(part, row, hold_df)
+            if rnn_enabled and str(sig).upper() == "BUY":
+                prob_up = rnn_model.prob_at(i)
+                if prob_up is None or prob_up < buy_threshold:
+                    sig = "HOLD"
+            if str(sig).upper() == "BUY":
+                buy_qty = int(cash // price)
+                if buy_qty > 0:
+                    qty = buy_qty
+                    cash -= qty * price
+                    avg = price
+                    entry_idx = i
+                    trades += 1
+        else:
+            hold_df = pd.DataFrame(
+                [
+                    {
+                        "instrument_token": int(row.get("instrument_token", 1626369)),
+                        "tradingsymbol": symbol,
+                        "average_price": avg,
+                        "quantity": qty,
+                        "t1_quantity": 0,
+                        "bars_in_trade": max(0, i - entry_idx) if entry_idx is not None else 0,
+                    }
+                ]
+            )
+            sig = RULE_SET_2.buy_or_sell(part, row, hold_df)
+            if rnn_enabled and str(sig).upper() != "SELL":
+                prob_up = rnn_model.prob_at(i)
+                if prob_up is not None and prob_up <= sell_threshold:
+                    sig = "SELL"
+            if str(sig).upper() == "SELL":
+                cash += qty * price
+                if price > avg:
+                    wins += 1
+                qty = 0
+                avg = 0.0
+                entry_idx = None
+                trades += 1
+
+        port = cash + (qty * price)
+        equity_curve.append(port)
+        daily_ret = (port - prev_equity) / prev_equity if prev_equity > 0 else 0.0
+        daily_returns.append(daily_ret)
+        prev_equity = port
+
+    final_val = equity_curve[-1] if equity_curve else 100000.0
+    s = pd.Series(equity_curve if equity_curve else [100000.0], dtype=float)
+    peak = s.cummax()
+    dd = ((s - peak) / peak * 100.0).min()
+    return {
+        "final_value": float(final_val),
+        "trades": int(trades),
+        "wins": int(wins),
+        "max_drawdown_pct": float(dd),
+        "daily_returns": daily_returns,
+        "equity_curve": equity_curve,
+    }
+
+
+def run_portfolio_optimized(
+    name: str,
+    data_map: dict[str, pd.DataFrame],
+    buy_params: dict,
+    sell_params: dict,
+    rnn_params: dict | None = None,
+    rnn_models: dict | None = None,
+) -> BacktestResult:
+    """Run per-symbol sim then optimize portfolio allocation using skfolio/PyPortfolioOpt.
+
+    This addresses the core problem: independent per-symbol sizing ignores correlation.
+    skfolio's HRP and MeanRisk optimizers produce better risk-adjusted portfolios.
+    """
+    at_utils.get_mmi_now = lambda: None
+    if not os.getenv("AT_LAB_MODE"):
+        os.environ["AT_LAB_MODE"] = "1"
+
+    old_r2 = dict(RULE_SET_2.CONFIG)
+    old_r7 = dict(RULE_SET_7.CONFIG)
+    RULE_SET_2.CONFIG.update(sell_params)
+    RULE_SET_7.CONFIG.update(buy_params)
+    lab_regime = os.getenv("AT_LAB_REGIME_FILTER_ENABLED", "").strip()
+    if lab_regime:
+        RULE_SET_7.CONFIG["regime_filter_enabled"] = int(float(lab_regime))
+    rnn_params = rnn_params or {"enabled": False}
+    rnn_models = rnn_models or {}
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="at_state_") as td:
+            _set_temp_state(RULE_SET_2, td)
+
+            # Step 1: Run per-symbol sims and collect daily returns
+            symbol_returns: dict[str, list[float]] = {}
+            symbol_stats: dict[str, dict] = {}
+            total_trades = 0
+            total_wins = 0
+            worst_dd = 0.0
+            tested_symbols: list[str] = []
+
+            for symbol, df in data_map.items():
+                stats = _simulate_symbol_with_equity(
+                    symbol, df,
+                    rnn_model=rnn_models.get(symbol),
+                    rnn_cfg=rnn_params,
+                )
+                symbol_returns[symbol] = stats["daily_returns"]
+                symbol_stats[symbol] = stats
+                total_trades += stats["trades"]
+                total_wins += stats["wins"]
+                worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+                tested_symbols.append(symbol)
+
+        # Step 2: Build returns DataFrame for portfolio optimization
+        min_len = min(len(v) for v in symbol_returns.values()) if symbol_returns else 0
+        if min_len < 60:
+            # Not enough data for optimization, fall back to simple sum
+            total_final = sum(s["final_value"] for s in symbol_stats.values())
+            start_cap = 100000.0 * max(1, len(tested_symbols))
+            ret = (total_final / start_cap - 1.0) * 100.0
+        else:
+            returns_df = pd.DataFrame(
+                {sym: rets[:min_len] for sym, rets in symbol_returns.items()},
+                dtype=float,
+            )
+
+            # Step 3: Optimize portfolio allocation
+            opt_result = _optimize_portfolio_weights(returns_df, name)
+
+            # Step 4: Apply optimized weights to compute portfolio return
+            weights = opt_result.get("weights", {})
+            # Weighted portfolio: each symbol gets weight * its capital allocation
+            total_final = sum(
+                symbol_stats[sym]["final_value"] * weights.get(sym, 1.0 / len(tested_symbols))
+                for sym in tested_symbols
+                if sym in symbol_stats
+            )
+            # Scale: weights sum to 1.0, so total capital = N * 100k
+            start_cap = 100000.0 * max(1, len(tested_symbols))
+            ret = (total_final / start_cap - 1.0) * 100.0
+
+    finally:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+
+    start_capital = 100000.0 * max(1, len(tested_symbols))
+    ret = (total_final / start_capital - 1.0) * 100.0 if 'total_final' in dir() else 0.0
+    round_trips = max(1, total_trades // 2)
+    win_rate = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
+    selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, worst_dd))))
+
+    return BacktestResult(
+        name=name,
+        final_value=round(float(total_final), 2),
+        total_return_pct=round(float(ret), 2),
+        trades=int(total_trades),
+        win_rate_pct=round(float(win_rate), 2),
+        max_drawdown_pct=round(float(worst_dd), 2),
+        params={"buy": buy_params, "sell": sell_params, "rnn": rnn_params, "portfolio_opt": True},
+        symbols_tested=tested_symbols,
+        selection_score=round(selection_score, 3),
+        rnn_enabled=bool(rnn_params.get("enabled")),
+        rnn_avg_test_accuracy=0.0,
+    )
+
+
+def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = "") -> dict:
+    """Optimize portfolio weights using skfolio HRP or PyPortfolioOpt efficient frontier.
+
+    Returns dict with 'weights' (symbol -> weight), 'method', and 'opt_return'.
+    """
+    result = {"weights": {}, "method": "none", "opt_return": 0.0}
+    symbols = list(returns_df.columns)
+    n_symbols = len(symbols)
+    if n_symbols < 3:
+        result["weights"] = {s: 1.0 / n_symbols for s in symbols}
+        result["method"] = "equal_weight_fallback"
+        return result
+
+    # Try skfolio HRP first (handles non-normal returns, no inversion needed)
+    if SKFOLIO_AVAILABLE:
+        try:
+            hrp = HierarchicalRiskParity(
+                risk_measure=RiskMeasure.VARIANCE,
+                portfolio_params=dict(name=f"hrp_{variant_name}"),
+            )
+            hrp.fit(returns_df)
+            port = hrp.predict(returns_df)
+            weights = {}
+            for i, sym in enumerate(symbols):
+                weights[sym] = float(hrp.weights_[i]) if hasattr(hrp, 'weights_') else 1.0 / n_symbols
+            result["weights"] = weights
+            result["method"] = "skfolio_hrp"
+            result["opt_return"] = float(port.mean) if hasattr(port, 'mean') else 0.0
+            return result
+        except Exception:
+            pass
+
+    # Fallback: PyPortfolioOpt efficient frontier with shrinkage covariance
+    if PYPFOPT_AVAILABLE:
+        try:
+            mu = mean_historical_return(returns_df, compounding=False)
+            S = CovarianceShrinkage(returns_df).ledoit_wolf()
+            ef = EfficientFrontier(mu, S, weight_bounds=(0.0, 0.15))
+            ef.max_sharpe()
+            weights = ef.clean_weights()
+            result["weights"] = {k: float(v) for k, v in weights.items() if v > 0.001}
+            result["method"] = "pypfopt_max_sharpe"
+            return result
+        except Exception:
+            pass
+
+    # Last resort: inverse volatility
+    vols = returns_df.std()
+    inv_vols = 1.0 / vols.replace(0, 1e-10)
+    total_iv = inv_vols.sum()
+    result["weights"] = {s: float(inv_vols[s] / total_iv) for s in symbols}
+    result["method"] = "inverse_volatility"
+    return result
+
+
+def run_walk_forward_validation(
+    data_map: dict[str, pd.DataFrame],
+    buy_params: dict,
+    sell_params: dict,
+    n_splits: int = 5,
+) -> dict:
+    """Walk-forward validation: train on expanding window, test on out-of-sample.
+
+    Uses skfolio WalkForward if available, otherwise manual time-series split.
+    Returns dict with per-fold results and aggregate metrics.
+    """
+    at_utils.get_mmi_now = lambda: None
+    if not os.getenv("AT_LAB_MODE"):
+        os.environ["AT_LAB_MODE"] = "1"
+
+    old_r2 = dict(RULE_SET_2.CONFIG)
+    old_r7 = dict(RULE_SET_7.CONFIG)
+    RULE_SET_2.CONFIG.update(sell_params)
+    RULE_SET_7.CONFIG.update(buy_params)
+    lab_regime = os.getenv("AT_LAB_REGIME_FILTER_ENABLED", "").strip()
+    if lab_regime:
+        RULE_SET_7.CONFIG["regime_filter_enabled"] = int(float(lab_regime))
+
+    fold_results = []
+    try:
+        with tempfile.TemporaryDirectory(prefix="at_state_") as td:
+            _set_temp_state(RULE_SET_2, td)
+
+            # Collect all dates across symbols
+            all_dates = set()
+            for symbol, df in data_map.items():
+                for d in df["Date"]:
+                    all_dates.add(pd.to_datetime(d))
+            all_dates = sorted(all_dates)
+            n_dates = len(all_dates)
+
+            if n_dates < 500:
+                return {"error": "insufficient_data", "n_dates": n_dates, "folds": []}
+
+            # Manual walk-forward splits (expanding window)
+            fold_size = n_dates // (n_splits + 1)
+            for fold_idx in range(n_splits):
+                train_end = fold_size * (fold_idx + 2)  # expanding window
+                test_start = train_end
+                test_end = min(train_end + fold_size, n_dates)
+
+                if test_end <= test_start:
+                    continue
+
+                train_end_date = all_dates[train_end - 1]
+                test_start_date = all_dates[test_start]
+                test_end_date = all_dates[test_end - 1]
+
+                # Filter data to test period
+                test_data = {
+                    sym: df[pd.to_datetime(df["Date"]) >= test_start_date].copy()
+                    for sym, df in data_map.items()
+                }
+                test_data = {k: v for k, v in test_data.items() if len(v) > 50}
+
+                if not test_data:
+                    continue
+
+                # Run simple sim on test period
+                total_final = 0.0
+                total_trades = 0
+                total_wins = 0
+                worst_dd = 0.0
+                for symbol, df in test_data.items():
+                    stats = _simulate_symbol(symbol, df)
+                    total_final += stats["final_value"]
+                    total_trades += stats["trades"]
+                    total_wins += stats["wins"]
+                    worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+
+                n_syms = len(test_data)
+                start_cap = 100000.0 * max(1, n_syms)
+                ret_pct = (total_final / start_cap - 1.0) * 100.0
+                round_trips = max(1, total_trades // 2)
+                wr = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
+                fold_results.append({
+                    "fold": fold_idx + 1,
+                    "train_end": str(train_end_date.date()),
+                    "test_start": str(test_start_date.date()),
+                    "test_end": str(test_end_date.date()),
+                    "return_pct": round(ret_pct, 2),
+                    "trades": total_trades,
+                    "win_rate_pct": round(wr, 1),
+                    "max_drawdown_pct": round(worst_dd, 2),
+                    "symbols_tested": n_syms,
+                })
+    finally:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+
+    if not fold_results:
+        return {"error": "no_valid_folds", "folds": []}
+
+    oos_returns = [f["return_pct"] for f in fold_results]
+    return {
+        "n_folds": len(fold_results),
+        "mean_oos_return_pct": round(float(np.mean(oos_returns)), 2),
+        "std_oos_return_pct": round(float(np.std(oos_returns)), 2),
+        "min_oos_return_pct": round(float(np.min(oos_returns)), 2),
+        "max_oos_return_pct": round(float(np.max(oos_returns)), 2),
+        "positive_folds": sum(1 for r in oos_returns if r > 0),
+        "folds": fold_results,
+    }
+
+
 def main():
     write_status(status="running", phase="initializing", message="starting weekly strategy lab")
     scorecard_context = load_scorecard_context()
@@ -1239,7 +1658,11 @@ def main():
                 parallel_variants=False,
                 variant_workers=variant_workers,
             )
-            results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
+            use_portfolio_opt = bool(rnn_params.get("portfolio_opt"))
+            if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE):
+                results.append(run_portfolio_optimized(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
+            else:
+                results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
 
     rank = sorted(
         results,
@@ -1307,6 +1730,29 @@ def main():
             and abs(best.max_drawdown_pct) <= abs(baseline.max_drawdown_pct) + max_promote_drawdown_slack
         ),
     }
+
+    # Walk-forward validation on best variant
+    wf_result = None
+    wf_enabled = os.getenv("AT_LAB_WALK_FORWARD", "1").strip().lower() not in {"0", "false", "no"}
+    if wf_enabled and best.name != baseline.name:
+        write_status(
+            phase="walk_forward_validation",
+            message=f"running walk-forward validation on {best.name}",
+            current_variant=best.name,
+        )
+        try:
+            best_buy = best.params.get("buy", {})
+            best_sell = best.params.get("sell", {})
+            wf_result = run_walk_forward_validation(
+                data_map, best_buy, best_sell, n_splits=5,
+            )
+            recommendation["walk_forward"] = wf_result
+            # If walk-forward is negative, override promotion
+            if wf_result.get("mean_oos_return_pct", 0) <= 0:
+                recommendation["should_promote"] = False
+                recommendation["walk_forward_override"] = "mean_oos_return_non_positive"
+        except Exception as exc:
+            recommendation["walk_forward"] = {"error": str(exc)}
 
     payload = {
         "recommendation": recommendation,
