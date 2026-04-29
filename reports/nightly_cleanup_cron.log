@@ -1,0 +1,83 @@
+Running nightly cleanup review...
+Cleanup review done in 4.2s
+Summary: {
+  "files_with_unused_imports": 35,
+  "large_files": 16,
+  "stale_reports": 56,
+  "secret_leaks": 0,
+  "dirty_files": 24
+}
+Running nightly cleanup review...
+Cleanup review done in 4.4s
+Summary: {
+  "files_with_unused_imports": 37,
+  "large_files": 15,
+  "stale_reports": 60,
+  "secret_leaks": 0,
+  "dirty_files": 38
+}
+Running nightly cleanup review...
+Cleanup review done in 5.5s
+Summary: {
+  "files_with_unused_imports": 44,
+  "large_files": 18,
+  "stale_reports": 64,
+  "secret_leaks": 0,
+  "dirty_files": 36
+}
+Running nightly cleanup review...
+Cleanup review done in 7.2s
+Summary: {
+  "files_with_unused_imports": 51,
+  "large_files": 19,
+  "stale_reports": 9,
+  "secret_leaks": 0,
+  "dirty_files": 55
+}
+{
+  "planned_families": 45,
+  "moved_count": 49,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}
+Running nightly cleanup review...
+Cleanup review done in 6.6s
+Summary: {
+  "files_with_unused_imports": 51,
+  "large_files": 19,
+  "stale_reports": 13,
+  "secret_leaks": 0,
+  "dirty_files": 99
+}
+{
+  "planned_families": 0,
+  "moved_count": 0,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}
+Running nightly cleanup review...
+Cleanup review done in 5.9s
+Summary: {
+  "files_with_unused_imports": 51,
+  "large_files": 19,
+  "stale_reports": 13,
+  "secret_leaks": 0,
+  "dirty_files": 100
+}
+{
+  "planned_families": 0,
+  "moved_count": 0,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}
+Running nightly cleanup review...
+Cleanup review done in 12.3s
+Summary: {
+  "files_with_unused_imports": 51,
+  "large_files": 16,
+  "stale_reports": 12,
+  "secret_leaks": 0,
+  "dirty_files": 102
+}
+{
+  "planned_families": 5,
+  "moved_count": 10,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}

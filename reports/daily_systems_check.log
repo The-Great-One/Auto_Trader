@@ -1,0 +1,295 @@
+[2026-04-24T22:30:05.598093+00:00] Daily systems check: HEALTHY — 11 checks, 0 failures
+{
+  "generated_at": "2026-04-24T22:30:05.598093+00:00",
+  "local": [
+    {
+      "name": "telegram_watcher",
+      "pid": "40836",
+      "alive": true
+    },
+    {
+      "name": "ops_dashboard",
+      "url": "http://127.0.0.1:8504/",
+      "alive": false
+    },
+    {
+      "name": "paper_shadow_equity",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_latest.json"
+    },
+    {
+      "name": "paper_shadow_options",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_options_latest.json"
+    },
+    {
+      "name": "openclaw_gateway",
+      "alive": false
+    }
+  ],
+  "oracle": [
+    {
+      "name": "oracle_auto_trade_service",
+      "active": false,
+      "status": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_paper_shadow_equity",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_paper_shadow_options",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_git_head",
+      "head": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_disk",
+      "info": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_crontab",
+      "entries": [
+        "ssh: connect to host  port 22: Connection refused"
+      ]
+    }
+  ]
+}
+[2026-04-25T22:30:02.239284+00:00] Daily systems check: HEALTHY — 11 checks, 0 failures
+{
+  "generated_at": "2026-04-25T22:30:02.239284+00:00",
+  "local": [
+    {
+      "name": "telegram_watcher",
+      "pid": "40836",
+      "alive": true
+    },
+    {
+      "name": "ops_dashboard",
+      "url": "http://127.0.0.1:8504/",
+      "alive": false
+    },
+    {
+      "name": "paper_shadow_equity",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_latest.json"
+    },
+    {
+      "name": "paper_shadow_options",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_options_latest.json"
+    },
+    {
+      "name": "openclaw_gateway",
+      "alive": false
+    }
+  ],
+  "oracle": [
+    {
+      "name": "oracle_auto_trade_service",
+      "active": false,
+      "status": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_paper_shadow_equity",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_paper_shadow_options",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_git_head",
+      "head": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_disk",
+      "info": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_crontab",
+      "entries": [
+        "ssh: connect to host  port 22: Connection refused"
+      ]
+    }
+  ]
+}
+[2026-04-26T22:30:05.579284+00:00] Daily systems check: HEALTHY — 11 checks, 0 failures
+{
+  "generated_at": "2026-04-26T22:30:05.579284+00:00",
+  "local": [
+    {
+      "name": "telegram_watcher",
+      "pid": "40836",
+      "alive": true
+    },
+    {
+      "name": "ops_dashboard",
+      "url": "http://127.0.0.1:8504/",
+      "alive": false
+    },
+    {
+      "name": "paper_shadow_equity",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_latest.json"
+    },
+    {
+      "name": "paper_shadow_options",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_options_latest.json"
+    },
+    {
+      "name": "openclaw_gateway",
+      "alive": false
+    }
+  ],
+  "oracle": [
+    {
+      "name": "oracle_auto_trade_service",
+      "active": false,
+      "status": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_paper_shadow_equity",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_paper_shadow_options",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_git_head",
+      "head": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_disk",
+      "info": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_crontab",
+      "entries": [
+        "ssh: connect to host  port 22: Connection refused"
+      ]
+    }
+  ]
+}
+[2026-04-27T22:30:05.205381+00:00] Daily systems check: HEALTHY — 11 checks, 0 failures
+{
+  "generated_at": "2026-04-27T22:30:05.205381+00:00",
+  "local": [
+    {
+      "name": "telegram_watcher",
+      "pid": "1087",
+      "alive": true
+    },
+    {
+      "name": "ops_dashboard",
+      "url": "http://127.0.0.1:8504/",
+      "alive": false
+    },
+    {
+      "name": "paper_shadow_equity",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_latest.json"
+    },
+    {
+      "name": "paper_shadow_options",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_options_latest.json"
+    },
+    {
+      "name": "openclaw_gateway",
+      "alive": false
+    }
+  ],
+  "oracle": [
+    {
+      "name": "oracle_auto_trade_service",
+      "active": false,
+      "status": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_paper_shadow_equity",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_paper_shadow_options",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_git_head",
+      "head": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_disk",
+      "info": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_crontab",
+      "entries": [
+        "ssh: connect to host  port 22: Connection refused"
+      ]
+    }
+  ]
+}
+[2026-04-28T22:30:00.365801+00:00] Daily systems check: HEALTHY — 11 checks, 0 failures
+{
+  "generated_at": "2026-04-28T22:30:00.365801+00:00",
+  "local": [
+    {
+      "name": "telegram_watcher",
+      "pid": "76558",
+      "alive": true
+    },
+    {
+      "name": "ops_dashboard",
+      "url": "http://127.0.0.1:8504/",
+      "alive": false
+    },
+    {
+      "name": "paper_shadow_equity",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_latest.json"
+    },
+    {
+      "name": "paper_shadow_options",
+      "fresh_today": false,
+      "path": "/Users/sahilgoel/Desktop/Stocks/reports/paper_shadow_options_latest.json"
+    },
+    {
+      "name": "openclaw_gateway",
+      "alive": false
+    }
+  ],
+  "oracle": [
+    {
+      "name": "oracle_auto_trade_service",
+      "active": false,
+      "status": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_paper_shadow_equity",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_paper_shadow_options",
+      "fresh_today": false
+    },
+    {
+      "name": "oracle_git_head",
+      "head": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_disk",
+      "info": "ssh: connect to host  port 22: Connection refused"
+    },
+    {
+      "name": "oracle_crontab",
+      "entries": [
+        "ssh: connect to host  port 22: Connection refused"
+      ]
+    }
+  ]
+}

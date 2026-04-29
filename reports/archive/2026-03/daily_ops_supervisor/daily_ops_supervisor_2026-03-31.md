@@ -1,0 +1,14 @@
+# Daily Ops Supervisor — 2026-03-31
+
+- Market open: **True** (NSE calendar)
+- Strategies tested: **11**
+- Baseline return %: **0.62**
+- Best return %: **0.62**
+- Improvement return %: **0.0**
+- Promote candidate: **False**
+
+## Paper trader check
+- Executed today: **True**
+- Self-healed: **True**
+- Decision: **SELL**
+- Reason: **self_heal_run**

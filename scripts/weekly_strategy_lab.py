@@ -54,6 +54,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# In research mode, Auto_Trader skips Kite/broker imports. The lab only needs
+# RULE_SET_2/7 and utils.fetch_prices_kite; it does NOT need a live Kite session.
+os.environ.setdefault("AT_RESEARCH_MODE", "1")
+
 from Auto_Trader import RULE_SET_2, RULE_SET_7, logger as at_logger
 from Auto_Trader import utils as at_utils
 

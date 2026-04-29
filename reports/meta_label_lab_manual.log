@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/Auto_Trader/scripts/meta_label_lab.py", line 12, in <module>
+    from sklearn.ensemble import HistGradientBoostingClassifier
+ModuleNotFoundError: No module named 'sklearn'

@@ -1,0 +1,57 @@
+[I 2026-04-29 02:23:28,133] Using an existing study with name 'equity_rs7_iter1_103sym' instead of creating a new one.
+[I 2026-04-29 02:24:14,936] Trial 1 finished with value: 11.732243621867882 and parameters: {'archetype': 'loose_quality', 'adx_min': 10, 'volume_confirm_mult': 0.8500000000000001, 'vwap_buy_above': 1, 'rsi_floor': 40, 'stoch_pull_max': 86, 'cci_buy_min': -175, 'max_extension_atr': 2.75, 'obv_min_zscore': 0.0, 'cmf_base_min': -0.02, 'sell_style': 'quick_cut', 'equity_time_stop_bars': 4, 'equity_review_rsi': 48.0, 'momentum_exit_rsi': 36.0, 'breakeven_trigger_pct': 1.5}. Best is trial 0 with value: 11.732243621867882.
+[I 2026-04-29 02:25:02,846] Trial 2 finished with value: 8.8974 and parameters: {'archetype': 'loose_quality', 'adx_min': 6, 'volume_confirm_mult': 0.65, 'vwap_buy_above': 0, 'rsi_floor': 38, 'stoch_pull_max': 88, 'cci_buy_min': -125, 'max_extension_atr': 3.25, 'obv_min_zscore': 0.0, 'cmf_base_min': 0.02, 'sell_style': 'long_hold', 'equity_time_stop_bars': 27, 'fund_time_stop_bars': 24, 'breakeven_trigger_pct': 4.0, 'momentum_exit_rsi': 36.0}. Best is trial 0 with value: 11.732243621867882.
+[W 2026-04-29 02:25:03,152] Trial 3 failed with parameters: {'archetype': 'trend_quality'} because of the following error: ValueError('CategoricalDistribution does not support dynamic value space.').
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/_optimize.py", line 206, in _run_trial
+    value_or_values = func(trial)
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 206, in objective
+    buy, sell = _sample_params(trial)
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 131, in _sample_params
+    "adx_min": trial.suggest_categorical("adx_min", [8, 10, 12, 14]),
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/trial/_trial.py", line 414, in suggest_categorical
+    return self._suggest(name, CategoricalDistribution(choices=choices))
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/trial/_trial.py", line 649, in _suggest
+    storage.set_trial_param(trial_id, name, param_value_in_internal_repr, distribution)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_cached_storage.py", line 167, in set_trial_param
+    self._backend._set_trial_param(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_rdb/storage.py", line 597, in _set_trial_param
+    self._set_trial_param_without_commit(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_rdb/storage.py", line 632, in _set_trial_param_without_commit
+    distributions.check_distribution_compatibility(previous_distribution, distribution)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/distributions.py", line 656, in check_distribution_compatibility
+    raise ValueError(
+ValueError: CategoricalDistribution does not support dynamic value space.
+[W 2026-04-29 02:25:03,156] Trial 3 failed with value None.
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 381, in <module>
+    main()
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 303, in main
+    study.optimize(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/study.py", line 490, in optimize
+    _optimize(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/_optimize.py", line 68, in _optimize
+    _optimize_sequential(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/_optimize.py", line 165, in _optimize_sequential
+    frozen_trial_id = _run_trial(study, func, catch)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/_optimize.py", line 263, in _run_trial
+    raise func_err
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/study/_optimize.py", line 206, in _run_trial
+    value_or_values = func(trial)
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 206, in objective
+    buy, sell = _sample_params(trial)
+  File "/Users/sahilgoel/Desktop/Stocks/scripts/optuna_strategy_hunt.py", line 131, in _sample_params
+    "adx_min": trial.suggest_categorical("adx_min", [8, 10, 12, 14]),
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/trial/_trial.py", line 414, in suggest_categorical
+    return self._suggest(name, CategoricalDistribution(choices=choices))
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/trial/_trial.py", line 649, in _suggest
+    storage.set_trial_param(trial_id, name, param_value_in_internal_repr, distribution)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_cached_storage.py", line 167, in set_trial_param
+    self._backend._set_trial_param(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_rdb/storage.py", line 597, in _set_trial_param
+    self._set_trial_param_without_commit(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/storages/_rdb/storage.py", line 632, in _set_trial_param_without_commit
+    distributions.check_distribution_compatibility(previous_distribution, distribution)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/optuna/distributions.py", line 656, in check_distribution_compatibility
+    raise ValueError(
+ValueError: CategoricalDistribution does not support dynamic value space.

@@ -4,11 +4,22 @@ import tempfile
 import traceback
 from logging.handlers import RotatingFileHandler
 
-from .Build_Master import create_master as create_master
-from .kite_ticker import run_ticker as run_ticker
-from .rt_compute import Apply_Rules as Apply_Rules
-from .updater import Updater as Updater
-from .utils import is_Market_Open as is_Market_Open
+# AT_RESEARCH_MODE=1 skips all Kite/broker imports so backtesting scripts can
+# run on machines without a live Kite session (e.g. dedicated backtesting servers).
+_AT_RESEARCH_MODE = os.getenv("AT_RESEARCH_MODE", "0").strip() in {"1", "true", "yes"}
+
+if not _AT_RESEARCH_MODE:
+    from .Build_Master import create_master as create_master
+    from .kite_ticker import run_ticker as run_ticker
+    from .rt_compute import Apply_Rules as Apply_Rules
+    from .updater import Updater as Updater
+    from .utils import is_Market_Open as is_Market_Open
+else:
+    create_master = None  # type: ignore[assignment]
+    run_ticker = None  # type: ignore[assignment]
+    Apply_Rules = None  # type: ignore[assignment]
+    Updater = None  # type: ignore[assignment]
+    is_Market_Open = None  # type: ignore[assignment]
 
 logger = logging.getLogger("Auto_Trade_Logger")
 logger.setLevel(logging.INFO)

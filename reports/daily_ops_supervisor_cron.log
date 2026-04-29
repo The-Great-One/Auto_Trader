@@ -901,3 +901,169 @@ Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-18.md
 }
 Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-19.json
 Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-19.md
+{
+  "generated_at": "2026-04-26T16:10:02.306151",
+  "trade_date": "2026-04-26",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": -15,
+    "stderr": "/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown\n  warnings.warn('resource_tracker: There appear to be %d '\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260423_214032.json",
+    "requested_variants": 320,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "baseline_trades": null,
+    "best_return_pct": null,
+    "best_trades": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": "2026-04-23T21:40:32.304677",
+    "stale_report": true,
+    "stale_reason": "latest_strategy_lab_report_not_from_trade_date"
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "options_file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json"
+  },
+  "weekly_universe_cagr": {
+    "enabled": true,
+    "report_week": "2026_W17",
+    "scheduled_weekday": 5,
+    "ok": false,
+    "ran": false,
+    "reason": "not_scheduled_day",
+    "file": null,
+    "cagr_pct": null,
+    "total_return_pct": null,
+    "coverage_pct": null,
+    "tested_symbols": 0,
+    "requested_symbols": 0
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "lab_failed",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  },
+  "iteration_plan": {
+    "enabled": true,
+    "asset_class": "equity",
+    "objective": "Improve equity trade density and robustness with fresh daily iteration.",
+    "items": [
+      {
+        "priority": "high",
+        "focus": "repair_equity_iteration_inputs",
+        "detail": "Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports."
+      }
+    ]
+  },
+  "portfolio": {
+    "total_value": null,
+    "total_cost": null,
+    "total_pnl": null,
+    "total_pnl_pct": null
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-26.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-26.md
+{
+  "generated_at": "2026-04-24T16:10:01.857893",
+  "trade_date": "2026-04-24",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": -15,
+    "stderr": "/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown\n  warnings.warn('resource_tracker: There appear to be %d '\n",
+    "stdout": "",
+    "file": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260423_214032.json",
+    "requested_variants": 120,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "baseline_trades": null,
+    "best_return_pct": null,
+    "best_trades": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": "2026-04-23T21:40:32.304677",
+    "stale_report": true,
+    "stale_reason": "latest_strategy_lab_report_not_from_trade_date"
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "failed_rc_0",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "options_file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json",
+    "error": "         \"breakout_ok\": false\n        },\n        \"metric_snapshot\": {\n          \"close\": 166.7,\n          \"prev_close\": 308.85,\n          \"ema5\": 220.908,\n          \"ema10\": 306.4289,\n          \"rsi\": 25.8152,\n          \"macd_hist\": null,\n          \"atr_pct\": 0.7127,\n          \"volume\": 1177605.0,\n          \"volume_sma20\": 130172.25,\n          \"oi\": 218790.0,\n          \"oi_sma5\": 89934.0,\n          \"oi_pct_change\": 42.5667,\n          \"underlying_close\": 23897.9492,\n          \"underlying_rsi\": 49.1905,\n          \"underlying_adx\": 19.9707,\n          \"underlying_macd_hist\": 110.2468\n        },\n        \"threshold_snapshot\": {\n          \"buy_score_min\": 6.0,\n          \"option_rsi_min\": 56.0,\n          \"volume_confirm_mult\": 1.1,\n          \"oi_sma_mult\": 1.02,\n          \"oi_change_min_pct\": 1.0,\n          \"atr_pct_min\": 0.03,\n          \"atr_pct_max\": 1.5,\n          \"underlying_rsi_bull_min\": 55.0,\n          \"underlying_rsi_bear_max\": 45.0,\n          \"underlying_adx_min\": 18.0\n        },\n        \"last_close\": 166.7,\n        \"volume\": 1177605.0,\n        \"oi\": 218790.0,\n        \"underlying_close\": 23897.94921875,\n        \"expiry\": \"2026-05-05\",\n        \"strike\": 23950.0\n      }\n    ]\n  }\n}\n"
+  },
+  "weekly_universe_cagr": {
+    "enabled": true,
+    "report_week": "2026_W17",
+    "scheduled_weekday": 5,
+    "ok": false,
+    "ran": false,
+    "reason": "market_open",
+    "file": null,
+    "cagr_pct": null,
+    "total_return_pct": null,
+    "coverage_pct": null,
+    "tested_symbols": 0,
+    "requested_symbols": 0
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  },
+  "iteration_plan": {
+    "enabled": true,
+    "asset_class": "equity",
+    "objective": "Improve equity trade density and robustness with fresh daily iteration.",
+    "items": [
+      {
+        "priority": "high",
+        "focus": "repair_equity_iteration_inputs",
+        "detail": "Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports."
+      },
+      {
+        "priority": "medium",
+        "focus": "add_equity_near_miss_diagnostics",
+        "detail": "Paper equity decision is HOLD. Add near-miss diagnostics so the daily loop can see which gates are preventing trades and tune them deliberately."
+      }
+    ]
+  },
+  "portfolio": {
+    "total_value": null,
+    "total_cost": null,
+    "total_pnl": null,
+    "total_pnl_pct": null
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-24.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-24.md
