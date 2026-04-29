@@ -63,13 +63,22 @@ class StrategyResult:
     per_symbol: dict = field(default_factory=dict)
 
 
-def _load_data() -> dict[str, pd.DataFrame]:
-    """Load all feather files with >260 rows of OHLCV data."""
+def _load_data(max_symbols: int = 0) -> dict[str, pd.DataFrame]:
+    """Load feather files with >260 rows. If max_symbols>0, limit to that many."""
     if not HIST_DIR.exists():
         return {}
+    # If AT_LAB_SYMBOLS is set, use those symbols (same universe as Optuna/lab)
+    env_symbols = os.getenv("AT_LAB_SYMBOLS", "").strip()
+    if env_symbols:
+        symbol_list = [s.strip().upper() for s in env_symbols.split(",") if s.strip()]
+    else:
+        symbol_list = None
     data = {}
     for f in sorted(HIST_DIR.glob("*.feather")):
         if f.stat().st_size < 1024:
+            continue
+        sym = f.stem.upper()
+        if symbol_list and sym not in symbol_list:
             continue
         try:
             df = pd.read_feather(f)
@@ -82,7 +91,9 @@ def _load_data() -> dict[str, pd.DataFrame]:
             df = df.dropna(subset=["Close", "Volume"])
             if len(df) < 260:
                 continue
-            data[f.stem.upper()] = df
+            data[sym] = df
+            if max_symbols > 0 and len(data) >= max_symbols:
+                break
         except Exception:
             continue
     return data
@@ -280,7 +291,7 @@ def _backtest_symbol(df: pd.DataFrame, entry_fn, exit_fn, name: str,
 
 # ─── Strategy 1: Pure EMA Crossover ────────────────────────────────────────────
 
-def strategy_ema_crossover(df_map: dict, fast: int = 20, slow: int = 50, atr_trail: float = 3.0) -> StrategyResult:
+def strategy_ema_crossover(df_map: dict, precomputed: dict, fast: int = 20, slow: int = 50, atr_trail: float = 3.0) -> StrategyResult:
     name = f"ema_crossover_{fast}_{slow}_atr{atr_trail}"
 
     def entry(df, i):
@@ -300,12 +311,12 @@ def strategy_ema_crossover(df_map: dict, fast: int = 20, slow: int = 50, atr_tra
         trail = ep + atr_trail * atr if atr > 0 else ep * 1.05
         return fast_ema < slow_ema or (df.iloc[i]["Close"] < trail and bars > 5)
 
-    return _run_multi(name, df_map, entry, exit, {"fast": fast, "slow": slow, "atr_trail": atr_trail})
+    return _run_multi(name, df_map, entry, exit, {"fast": fast, "slow": slow, "atr_trail": atr_trail}, precomputed)
 
 
 # ─── Strategy 2: RSI Mean Reversion ────────────────────────────────────────────
 
-def strategy_rsi_mean_reversion(df_map: dict, rsi_low: int = 25, rsi_high: int = 75,
+def strategy_rsi_mean_reversion(df_map: dict, precomputed: dict, rsi_low: int = 25, rsi_high: int = 75,
                                   bb_exit: float = 0.8, max_hold: int = 30) -> StrategyResult:
     name = f"rsi_mr_{rsi_low}_{rsi_high}_bb{bb_exit}_h{max_hold}"
 
@@ -323,12 +334,12 @@ def strategy_rsi_mean_reversion(df_map: dict, rsi_low: int = 25, rsi_high: int =
         return rsi > rsi_high or bb_pct > bb_exit or bars > max_hold
 
     return _run_multi(name, df_map, entry, exit, {"rsi_low": rsi_low, "rsi_high": rsi_high,
-                                                    "bb_exit": bb_exit, "max_hold": max_hold})
+                                                    "bb_exit": bb_exit, "max_hold": max_hold}, precomputed)
 
 
 # ─── Strategy 3: Supertrend Only ──────────────────────────────────────────────
 
-def strategy_supertrend(df_map: dict, atr_mult: float = 3.0, adx_filter: int = 0) -> StrategyResult:
+def strategy_supertrend(df_map: dict, precomputed: dict, atr_mult: float = 3.0, adx_filter: int = 0) -> StrategyResult:
     name = f"supertrend_{atr_mult}_adx{adx_filter}"
     st_col = f"ST_dir_{atr_mult}"
     st_price = f"ST_{atr_mult}"
@@ -349,12 +360,12 @@ def strategy_supertrend(df_map: dict, atr_mult: float = 3.0, adx_filter: int = 0
         prev_dir = df.iloc[i - 1].get(st_col, 0) if i > 0 else 0
         return direction == -1 and prev_dir == 1
 
-    return _run_multi(name, df_map, entry, exit, {"atr_mult": atr_mult, "adx_filter": adx_filter})
+    return _run_multi(name, df_map, entry, exit, {"atr_mult": atr_mult, "adx_filter": adx_filter}, precomputed)
 
 
 # ─── Strategy 4: Breakout + ATR Trail ──────────────────────────────────────────
 
-def strategy_breakout_atr(df_map: dict, lookback: int = 20, atr_trail: float = 2.5,
+def strategy_breakout_atr(df_map: dict, precomputed: dict, lookback: int = 20, atr_trail: float = 2.5,
                            vol_mult: float = 1.2) -> StrategyResult:
     name = f"breakout_{lookback}_atr{atr_trail}_vol{vol_mult}"
 
@@ -381,12 +392,12 @@ def strategy_breakout_atr(df_map: dict, lookback: int = 20, atr_trail: float = 2
             return close < trail and bars > 3
         return False
 
-    return _run_multi(name, df_map, entry, exit, {"lookback": lookback, "atr_trail": atr_trail, "vol_mult": vol_mult})
+    return _run_multi(name, df_map, entry, exit, {"lookback": lookback, "atr_trail": atr_trail, "vol_mult": vol_mult}, precomputed)
 
 
 # ─── Strategy 5: Volatility Squeeze Breakout ───────────────────────────────────
 
-def strategy_vol_squeeze(df_map: dict, bb_squeeze_periods: int = 5,
+def strategy_vol_squeeze(df_map: dict, precomputed: dict, bb_squeeze_periods: int = 5,
                           atr_trail: float = 3.0) -> StrategyResult:
     name = f"vol_squeeze_{bb_squeeze_periods}_atr{atr_trail}"
 
@@ -414,12 +425,12 @@ def strategy_vol_squeeze(df_map: dict, bb_squeeze_periods: int = 5,
             return close < trail and bars > 5
         return bars > 30
 
-    return _run_multi(name, df_map, entry, exit, {"bb_squeeze_periods": bb_squeeze_periods, "atr_trail": atr_trail})
+    return _run_multi(name, df_map, entry, exit, {"bb_squeeze_periods": bb_squeeze_periods, "atr_trail": atr_trail}, precomputed)
 
 
 # ─── Strategy 6: RSI Divergence ────────────────────────────────────────────────
 
-def strategy_rsi_divergence(df_map: dict, lookback: int = 20, rsi_oversold: int = 35,
+def strategy_rsi_divergence(df_map: dict, precomputed: dict, lookback: int = 20, rsi_oversold: int = 35,
                             rsi_overbought_exit: int = 65, max_hold: int = 25) -> StrategyResult:
     name = f"rsi_div_{lookback}_rsi{rsi_oversold}_{rsi_overbought_exit}"
 
@@ -445,12 +456,12 @@ def strategy_rsi_divergence(df_map: dict, lookback: int = 20, rsi_oversold: int 
         return rsi > rsi_overbought_exit or bars > max_hold
 
     return _run_multi(name, df_map, entry, exit, {"lookback": lookback, "rsi_oversold": rsi_oversold,
-                                                    "rsi_overbought_exit": rsi_overbought_exit, "max_hold": max_hold})
+                                                    "rsi_overbought_exit": rsi_overbought_exit, "max_hold": max_hold}, precomputed)
 
 
 # ─── Strategy 7: MACD Zero-Line Re-entry ──────────────────────────────────────
 
-def strategy_macd_zero(df_map: dict, adx_min: int = 20, atr_trail: float = 3.0) -> StrategyResult:
+def strategy_macd_zero(df_map: dict, precomputed: dict, adx_min: int = 20, atr_trail: float = 3.0) -> StrategyResult:
     name = f"macd_zero_adx{adx_min}_atr{atr_trail}"
 
     def entry(df, i):
@@ -475,12 +486,12 @@ def strategy_macd_zero(df_map: dict, adx_min: int = 20, atr_trail: float = 3.0) 
                 return True
         return macd < df.iloc[i]["MACD_Signal"] and bars > 5
 
-    return _run_multi(name, df_map, entry, exit, {"adx_min": adx_min, "atr_trail": atr_trail})
+    return _run_multi(name, df_map, entry, exit, {"adx_min": adx_min, "atr_trail": atr_trail}, precomputed)
 
 
 # ─── Strategy 8: Multi-timeframe EMA (trend + pullback) ───────────────────────
 
-def strategy_mtf_ema_pullback(df_map: dict, trend_ema: int = 150, pullback_ema: int = 20,
+def strategy_mtf_ema_pullback(df_map: dict, precomputed: dict, trend_ema: int = 150, pullback_ema: int = 20,
                                rsi_pull: int = 45, atr_trail: float = 3.0) -> StrategyResult:
     name = f"mtf_ema_{trend_ema}_{pullback_ema}_rsi{rsi_pull}"
 
@@ -512,16 +523,20 @@ def strategy_mtf_ema_pullback(df_map: dict, trend_ema: int = 150, pullback_ema: 
         return bars > 40
 
     return _run_multi(name, df_map, entry, exit, {"trend_ema": trend_ema, "pullback_ema": pullback_ema,
-                                                    "rsi_pull": rsi_pull, "atr_trail": atr_trail})
+                                                    "rsi_pull": rsi_pull, "atr_trail": atr_trail}, precomputed)
 
 
 # ─── Runner ───────────────────────────────────────────────────────────────────
 
-def _run_multi(name: str, df_map: dict, entry_fn, exit_fn, params: dict) -> StrategyResult:
+def _run_multi(name: str, df_map: dict, entry_fn, exit_fn, params: dict,
+               precomputed: dict | None = None) -> StrategyResult:
     per_symbol = {}
     for sym, df in df_map.items():
         try:
-            df_ind = _compute_indicators(df)
+            if precomputed and sym in precomputed:
+                df_ind = precomputed[sym]
+            else:
+                df_ind = _compute_indicators(df)
             res = _backtest_symbol(df_ind, entry_fn, exit_fn, name)
             per_symbol[sym] = res
         except Exception:
@@ -575,61 +590,90 @@ def _run_all_variations(df_map: dict) -> list[StrategyResult]:
 
     print(f"\n{'='*60}")
     print(f"EXPLORATION: {len(df_map)} symbols loaded")
+    print(f"Pre-computing indicators for all symbols...")
     print(f"{'='*60}\n")
 
+    # Pre-compute indicators once for all symbols (massive speedup)
+    precomputed = {}
+    for i, (sym, df) in enumerate(df_map.items()):
+        try:
+            precomputed[sym] = _compute_indicators(df)
+            if (i + 1) % 20 == 0 or i == len(df_map) - 1:
+                print(f"  Indicators: {i + 1}/{len(df_map)} symbols")
+                _write_status({"status": "running", "phase": "computing_indicators",
+                               "symbols_loaded": len(df_map), "indicators_done": i + 1})
+        except Exception:
+            continue
+    print(f"Indicators computed for {len(precomputed)}/{len(df_map)} symbols\n")
+
     # 1. EMA Crossover grid
+    print("Running EMA Crossover variants...")
     for fast in [9, 20]:
         for slow in [50, 100, 150]:
             for atr in [2.0, 3.0, 4.0]:
-                r = strategy_ema_crossover(df_map, fast, slow, atr)
+                r = strategy_ema_crossover(df_map, precomputed, fast, slow, atr)
                 results.append(r)
                 _print_result(r)
 
     # 2. RSI Mean Reversion grid
+    print("Running RSI Mean Reversion variants...")
     for rsi_low in [20, 25, 30]:
         for rsi_high in [65, 70, 75]:
             for max_hold in [20, 30, 40]:
-                r = strategy_rsi_mean_reversion(df_map, rsi_low, rsi_high, 0.8, max_hold)
+                r = strategy_rsi_mean_reversion(df_map, precomputed, rsi_low, rsi_high, 0.8, max_hold)
                 results.append(r)
+                _print_result(r)
 
     # 3. Supertrend grid
+    print("Running Supertrend variants...")
     for mult in [2.5, 3.0, 3.5]:
         for adx in [0, 15, 20, 25]:
-            r = strategy_supertrend(df_map, mult, adx)
+            r = strategy_supertrend(df_map, precomputed, mult, adx)
             results.append(r)
+            _print_result(r)
 
     # 4. Breakout + ATR Trail
+    print("Running Breakout + ATR Trail variants...")
     for lb in [10, 20, 30]:
         for atr in [2.0, 2.5, 3.0]:
             for vol in [1.0, 1.2, 1.5]:
-                r = strategy_breakout_atr(df_map, lb, atr, vol)
+                r = strategy_breakout_atr(df_map, precomputed, lb, atr, vol)
                 results.append(r)
+                _print_result(r)
 
     # 5. Vol Squeeze
+    print("Running Vol Squeeze variants...")
     for squeeze in [3, 5, 7]:
         for atr in [2.5, 3.0, 3.5]:
-            r = strategy_vol_squeeze(df_map, squeeze, atr)
+            r = strategy_vol_squeeze(df_map, precomputed, squeeze, atr)
             results.append(r)
+            _print_result(r)
 
     # 6. RSI Divergence
+    print("Running RSI Divergence variants...")
     for lb in [15, 20, 30]:
         for rsi_os in [30, 35]:
             for rsi_exit in [60, 65, 70]:
-                r = strategy_rsi_divergence(df_map, lb, rsi_os, rsi_exit, 25)
+                r = strategy_rsi_divergence(df_map, precomputed, lb, rsi_os, rsi_exit, 25)
                 results.append(r)
+                _print_result(r)
 
     # 7. MACD Zero-Line
+    print("Running MACD Zero-Line variants...")
     for adx in [15, 20, 25]:
         for atr in [2.5, 3.0, 4.0]:
-            r = strategy_macd_zero(df_map, adx, atr)
+            r = strategy_macd_zero(df_map, precomputed, adx, atr)
             results.append(r)
+            _print_result(r)
 
     # 8. Multi-timeframe EMA Pullback
+    print("Running Multi-TF EMA Pullback variants...")
     for trend in [100, 150, 200]:
         for pb in [20, 50]:
             for rsi in [40, 45, 50]:
-                r = strategy_mtf_ema_pullback(df_map, trend, pb, rsi, 3.0)
+                r = strategy_mtf_ema_pullback(df_map, precomputed, trend, pb, rsi, 3.0)
                 results.append(r)
+                _print_result(r)
 
     return results
 
@@ -648,7 +692,7 @@ def main():
         print("ERROR: No data loaded from feather files")
         return
 
-    _write_status({"status": "running", "phase": "computing_indicators", "symbols_loaded": len(df_map),
+    _write_status({"status": "running", "phase": "loading", "symbols_loaded": len(df_map),
                     "started_at": datetime.now().isoformat()})
 
     results = _run_all_variations(df_map)
