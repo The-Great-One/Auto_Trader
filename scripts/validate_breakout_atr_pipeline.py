@@ -355,6 +355,8 @@ def main() -> int:
     parser.add_argument("--max-hold", type=int, default=0, help="Optional max holding bars; 0 disables")
     parser.add_argument("--trend-filter", action="store_true", help="Require close>EMA150 and EMA50>=EMA150 at entry")
     parser.add_argument("--atr-pct-max", type=float, default=0.0, help="Optional ATR% cap; 0 disables")
+    parser.add_argument("--top-n", type=int, default=5, help="Top exploration breakout candidates to validate")
+    parser.add_argument("--risk-variants", choices=["minimal", "standard", "full"], default="standard", help="Risk-control variant breadth")
     args = parser.parse_args()
 
     data_map = ex._load_data()
@@ -374,16 +376,29 @@ def main() -> int:
         except Exception:
             pass
 
-    candidates = _load_exploration_candidates()
+    candidates = _load_exploration_candidates(top_n=args.top_n)
     validations: list[CandidateValidation] = []
-    for base in candidates:
-        # Test base plus risk-control variants. Keep search small and interpretable.
-        variants = [
-            {**base, "trend_filter": args.trend_filter, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
-            {**base, "trend_filter": True, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
-            {**base, "trend_filter": True, "atr_pct_max": 0.08, "max_hold": max_hold},
-            {**base, "trend_filter": True, "atr_pct_max": 0.06, "max_hold": max_hold},
-        ]
+    for base_idx, base in enumerate(candidates, start=1):
+        # Test base plus a small set of risk-control variants. Keep search interpretable.
+        if args.risk_variants == "minimal":
+            variants = [
+                {**base, "trend_filter": args.trend_filter, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+            ]
+        elif args.risk_variants == "full":
+            variants = [
+                {**base, "trend_filter": args.trend_filter, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": 0.08, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": 0.06, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": 0.08, "max_hold": 60},
+            ]
+        else:
+            variants = [
+                {**base, "trend_filter": args.trend_filter, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": atr_pct_max, "max_hold": max_hold},
+                {**base, "trend_filter": True, "atr_pct_max": 0.08, "max_hold": max_hold},
+            ]
         seen = set()
         for params in variants:
             key = json.dumps(params, sort_keys=True)
@@ -407,6 +422,12 @@ def main() -> int:
             recent = _run_period("recent", data_map, precomputed, params, recent_start, end, tf, apm, mh)
             verdict, reasons, score = _verdict(full, train, test, recent)
             validations.append(CandidateValidation(name, run_params, full, train, test, recent, verdict, reasons, score))
+            print(
+                f"[{base_idx}/{len(candidates)}] {name}: verdict={verdict} "
+                f"test_cagr={test.cagr_pct:.2f}% test_dd={test.max_drawdown_pct:.2f}% "
+                f"recent_cagr={recent.cagr_pct:.2f}% trades={test.trades}",
+                flush=True,
+            )
 
     validations.sort(key=lambda v: (v.verdict == "promote_to_structural_optuna", v.promotion_score, v.test.cagr_pct), reverse=True)
     best = validations[0] if validations else None
