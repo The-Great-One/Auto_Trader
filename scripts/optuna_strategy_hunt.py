@@ -48,6 +48,7 @@ REPORT_DIR = REPO / "reports"
 STATUS_PATH = REPO / "intermediary_files" / "lab_status" / "optuna_strategy_hunt_status.json"
 DB_PATH = REPO / "intermediary_files" / "optuna" / "strategy_hunt.sqlite3"
 TRIALS_JSONL = REPO / "reports" / "optuna_strategy_hunt_trials.jsonl"
+HIST_DIR = REPO / "intermediary_files" / "Hist_Data"
 
 # Same 103-symbol universe from the completed 2026-04-28 lab, so Iteration 1 is comparable.
 SEED_REPORT = REPORT_DIR / "strategy_lab_20260428_235524.json"
@@ -248,14 +249,41 @@ def _objective_factory(data_map: dict[str, Any], baseline_return: float, min_tra
     return objective
 
 
+def _cached_symbols_from_feather() -> list[str]:
+    """Return symbol names that have cached feather files in Hist_Data."""
+    if not HIST_DIR.exists():
+        return []
+    return sorted(
+        f.stem.upper()
+        for f in HIST_DIR.glob("*.feather")
+        if f.stat().st_size > 1024  # skip stubs
+    )
+
+
 def main() -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     seed_symbols = _seed_symbols_from_report()
-    if seed_symbols and not os.getenv("AT_LAB_SYMBOLS"):
-        os.environ["AT_LAB_SYMBOLS"] = ",".join(seed_symbols)
+    cached_symbols = _cached_symbols_from_feather()
+
+    if os.getenv("AT_LAB_SYMBOLS", "").strip():
+        pass  # explicit override — use it as-is
+    elif seed_symbols:
+        # Only use seed symbols that exist in the feather cache on this machine.
+        available = [s for s in seed_symbols if s in cached_symbols]
+        if available:
+            os.environ["AT_LAB_SYMBOLS"] = ",".join(available)
+            os.environ["AT_LAB_USE_APPROVED_UNIVERSE"] = "0"
+            print(f"Using {len(available)}/{len(seed_symbols)} seed symbols available in feather cache")
+        else:
+            print(f"WARNING: 0/{len(seed_symbols)} seed symbols in cache; falling back to cached symbols")
+            os.environ["AT_LAB_SYMBOLS"] = ",".join(cached_symbols[:120])
+            os.environ["AT_LAB_USE_APPROVED_UNIVERSE"] = "0"
+    elif cached_symbols:
+        os.environ["AT_LAB_SYMBOLS"] = ",".join(cached_symbols[:120])
         os.environ["AT_LAB_USE_APPROVED_UNIVERSE"] = "0"
+        print(f"Using {min(120, len(cached_symbols))} symbols from feather cache")
 
     n_trials = int(os.getenv("AT_OPTUNA_TRIALS", "160"))
     study_name = os.getenv("AT_OPTUNA_STUDY", "equity_rs7_iter1_103sym")
