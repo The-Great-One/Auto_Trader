@@ -395,7 +395,9 @@ def main() -> int:
     try:
         import subprocess, os
         ssh_key = os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key"))
-        oracle = os.getenv("AT_SERVER_HOST", "ubuntu@168.138.114.147")
+        oracle = os.getenv("AT_SERVER_HOST")
+        if not oracle:
+            return {"error": "AT_SERVER_HOST env var not set"}
         cmd = [
             "ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", oracle,
             '/home/ubuntu/Auto_Trader/venv/bin/python -c "'
