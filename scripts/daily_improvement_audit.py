@@ -71,6 +71,7 @@ def main():
     paper_options_path = REPORTS / "paper_shadow_options_latest.json"
     equity_lab_path = _latest("strategy_lab_*.json")
     options_lab_path = _latest("options_strategy_lab_*.json")
+    breakout_candidate_path = REPORTS / "breakout_atr_pipeline_candidate_latest.json"
 
     scorecard = _load_json(scorecard_path) or {}
     ops = _load_json(ops_path) or {}
@@ -79,6 +80,7 @@ def main():
     paper_options = _load_json(paper_options_path) or {}
     equity_lab = _load_json(equity_lab_path) or {}
     options_lab = _load_json(options_lab_path) or {}
+    breakout_candidate = _load_json(breakout_candidate_path) or {}
 
     issues = []
     improvements = []
@@ -133,6 +135,13 @@ def main():
     if options_top and options_top.get("decision") != "BUY":
         add_improvement("medium", "Explain options near-misses better", f"Current top options candidate is HOLD with score {options_top.get('score')}. Add gate-by-gate miss diagnostics so near-buy setups are easier to tune.")
 
+    breakout_decision = breakout_candidate.get("pipeline_decision")
+    breakout_best = breakout_candidate.get("best") or {}
+    if breakout_decision == "promote_to_structural_optuna":
+        add_improvement("high", "Promote breakout ATR structural candidate", f"Candidate {breakout_best.get('name')} passed validation. Add it to the next structural Optuna/risk-tuning sweep before any live consideration.")
+    elif breakout_decision == "needs_risk_tuning":
+        add_improvement("medium", "Risk-tune breakout ATR candidate", f"Candidate {breakout_best.get('name')} has positive OOS edge but failed risk gates. Tune regime/ATR/trailing risk controls.")
+
     opt_rec = options_lab.get("recommendation") or {}
     if opt_rec:
         tested = int(opt_rec.get("tested_variants", 0) or 0)
@@ -164,6 +173,7 @@ def main():
             "paper_shadow_options": str(paper_options_path),
             "equity_lab": str(equity_lab_path) if equity_lab_path else None,
             "options_lab": str(options_lab_path) if options_lab_path else None,
+            "breakout_atr_candidate": str(breakout_candidate_path) if breakout_candidate_path.exists() else None,
         },
         "issues": issues,
         "improvement_areas": improvements,
@@ -185,6 +195,12 @@ def main():
                 "paper_stale": options_paper.get("stale_report"),
                 "lab_ok": options_lab_run.get("ok"),
                 "lab_stale": options_lab_run.get("stale_report"),
+            },
+            "breakout_atr_candidate": {
+                "decision": breakout_decision,
+                "best_name": breakout_best.get("name"),
+                "test_cagr_pct": ((breakout_best.get("test") or {}).get("cagr_pct") if breakout_best else None),
+                "test_max_drawdown_pct": ((breakout_best.get("test") or {}).get("max_drawdown_pct") if breakout_best else None),
             },
         },
         "daily_iteration": daily_iteration,
