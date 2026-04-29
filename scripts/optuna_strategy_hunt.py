@@ -94,107 +94,114 @@ def _sample_params(trial: optuna.Trial) -> tuple[dict[str, Any], dict[str, Any]]
     - keeping density high enough,
     - cutting drawdown / whipsaw exits,
     - testing slightly tighter trend-quality gates around the ultra-loose winners.
+
+    NOTE: Parameter names are prefixed with the archetype to avoid Optuna's
+    "CategoricalDistribution does not support dynamic value space" error.
+    The archetype prefix is stripped before passing to the backtest.
     """
     archetype = trial.suggest_categorical(
         "archetype",
         ["ultra_loose", "loose_quality", "mean_reversion", "trend_quality", "hold_winners"],
     )
+    a = archetype  # shorthand for prefix
 
     if archetype == "ultra_loose":
         buy = {
-            "adx_min": trial.suggest_categorical("adx_min", [4, 5, 6, 7, 8]),
-            "volume_confirm_mult": trial.suggest_float("volume_confirm_mult", 0.55, 0.82, step=0.05),
+            "adx_min": trial.suggest_categorical(f"{a}_adx_min", [4, 5, 6, 7, 8]),
+            "volume_confirm_mult": trial.suggest_float(f"{a}_volume_confirm_mult", 0.55, 0.82, step=0.05),
             "ich_cloud_bull": 0,
-            "vwap_buy_above": trial.suggest_categorical("vwap_buy_above", [0, 0, 1]),
-            "rsi_floor": trial.suggest_int("rsi_floor", 28, 38, step=2),
-            "stoch_pull_max": trial.suggest_int("stoch_pull_max", 88, 100, step=2),
-            "max_extension_atr": trial.suggest_float("max_extension_atr", 3.0, 5.0, step=0.25),
-            "max_obv_zscore": trial.suggest_float("max_obv_zscore", 4.0, 7.0, step=0.5),
-            "cci_buy_min": trial.suggest_int("cci_buy_min", -225, -100, step=25),
-            "cmf_base_min": trial.suggest_categorical("cmf_base_min", [-0.05, -0.02, 0.0, 0.02]),
-            "mmi_risk_off": trial.suggest_categorical("mmi_risk_off", [70, 75, 80, 85]),
+            "vwap_buy_above": trial.suggest_categorical(f"{a}_vwap_buy_above", [0, 0, 1]),
+            "rsi_floor": trial.suggest_int(f"{a}_rsi_floor", 28, 38, step=2),
+            "stoch_pull_max": trial.suggest_int(f"{a}_stoch_pull_max", 88, 100, step=2),
+            "max_extension_atr": trial.suggest_float(f"{a}_max_extension_atr", 3.0, 5.0, step=0.25),
+            "max_obv_zscore": trial.suggest_float(f"{a}_max_obv_zscore", 4.0, 7.0, step=0.5),
+            "cci_buy_min": trial.suggest_int(f"{a}_cci_buy_min", -225, -100, step=25),
+            "cmf_base_min": trial.suggest_categorical(f"{a}_cmf_base_min", [-0.05, -0.02, 0.0, 0.02]),
+            "mmi_risk_off": trial.suggest_categorical(f"{a}_mmi_risk_off", [70, 75, 80, 85]),
         }
     elif archetype == "mean_reversion":
         buy = {
-            "adx_min": trial.suggest_categorical("adx_min", [4, 6, 8, 10]),
-            "volume_confirm_mult": trial.suggest_float("volume_confirm_mult", 0.55, 0.9, step=0.05),
+            "adx_min": trial.suggest_categorical(f"{a}_adx_min", [4, 6, 8, 10]),
+            "volume_confirm_mult": trial.suggest_float(f"{a}_volume_confirm_mult", 0.55, 0.9, step=0.05),
             "ich_cloud_bull": 0,
             "vwap_buy_above": 0,
-            "rsi_floor": trial.suggest_int("rsi_floor", 26, 36, step=2),
-            "stoch_pull_max": trial.suggest_int("stoch_pull_max", 90, 100, step=2),
-            "cci_buy_min": trial.suggest_int("cci_buy_min", -250, -125, step=25),
-            "max_extension_atr": trial.suggest_float("max_extension_atr", 2.5, 4.5, step=0.25),
-            "obv_min_zscore": trial.suggest_categorical("obv_min_zscore", [-0.5, -0.25, 0.0, 0.25]),
-            "cmf_base_min": trial.suggest_categorical("cmf_base_min", [-0.08, -0.05, -0.02, 0.0]),
+            "rsi_floor": trial.suggest_int(f"{a}_rsi_floor", 26, 36, step=2),
+            "stoch_pull_max": trial.suggest_int(f"{a}_stoch_pull_max", 90, 100, step=2),
+            "cci_buy_min": trial.suggest_int(f"{a}_cci_buy_min", -250, -125, step=25),
+            "max_extension_atr": trial.suggest_float(f"{a}_max_extension_atr", 2.5, 4.5, step=0.25),
+            "obv_min_zscore": trial.suggest_categorical(f"{a}_obv_min_zscore", [-0.5, -0.25, 0.0, 0.25]),
+            "cmf_base_min": trial.suggest_categorical(f"{a}_cmf_base_min", [-0.08, -0.05, -0.02, 0.0]),
         }
     elif archetype == "trend_quality":
         buy = {
-            "adx_min": trial.suggest_categorical("adx_min", [8, 10, 12, 14]),
-            "adx_strong_min": trial.suggest_categorical("adx_strong_min", [16, 18, 20, 22]),
-            "volume_confirm_mult": trial.suggest_float("volume_confirm_mult", 0.75, 1.15, step=0.05),
-            "ich_cloud_bull": trial.suggest_categorical("ich_cloud_bull", [0, 1]),
-            "vwap_buy_above": trial.suggest_categorical("vwap_buy_above", [0, 1]),
-            "rsi_floor": trial.suggest_int("rsi_floor", 36, 46, step=2),
-            "stoch_pull_max": trial.suggest_int("stoch_pull_max", 78, 94, step=2),
-            "cci_buy_min": trial.suggest_int("cci_buy_min", -150, -50, step=25),
-            "max_extension_atr": trial.suggest_float("max_extension_atr", 2.0, 3.5, step=0.25),
+            "adx_min": trial.suggest_categorical(f"{a}_adx_min", [8, 10, 12, 14]),
+            "adx_strong_min": trial.suggest_categorical(f"{a}_adx_strong_min", [16, 18, 20, 22]),
+            "volume_confirm_mult": trial.suggest_float(f"{a}_volume_confirm_mult", 0.75, 1.15, step=0.05),
+            "ich_cloud_bull": trial.suggest_categorical(f"{a}_ich_cloud_bull", [0, 1]),
+            "vwap_buy_above": trial.suggest_categorical(f"{a}_vwap_buy_above", [0, 1]),
+            "rsi_floor": trial.suggest_int(f"{a}_rsi_floor", 36, 46, step=2),
+            "stoch_pull_max": trial.suggest_int(f"{a}_stoch_pull_max", 78, 94, step=2),
+            "cci_buy_min": trial.suggest_int(f"{a}_cci_buy_min", -150, -50, step=25),
+            "max_extension_atr": trial.suggest_float(f"{a}_max_extension_atr", 2.0, 3.5, step=0.25),
         }
     elif archetype == "hold_winners":
         buy = {
-            "adx_min": trial.suggest_categorical("adx_min", [5, 6, 8, 10]),
-            "volume_confirm_mult": trial.suggest_float("volume_confirm_mult", 0.6, 0.9, step=0.05),
+            "adx_min": trial.suggest_categorical(f"{a}_adx_min", [5, 6, 8, 10]),
+            "volume_confirm_mult": trial.suggest_float(f"{a}_volume_confirm_mult", 0.6, 0.9, step=0.05),
             "ich_cloud_bull": 0,
-            "vwap_buy_above": trial.suggest_categorical("vwap_buy_above", [0, 0, 1]),
-            "rsi_floor": trial.suggest_int("rsi_floor", 32, 40, step=2),
-            "stoch_pull_max": trial.suggest_int("stoch_pull_max", 86, 98, step=2),
-            "cci_buy_min": trial.suggest_int("cci_buy_min", -200, -100, step=25),
-            "max_extension_atr": trial.suggest_float("max_extension_atr", 3.0, 4.5, step=0.25),
-            "max_obv_zscore": trial.suggest_float("max_obv_zscore", 4.0, 6.0, step=0.5),
+            "vwap_buy_above": trial.suggest_categorical(f"{a}_vwap_buy_above", [0, 0, 1]),
+            "rsi_floor": trial.suggest_int(f"{a}_rsi_floor", 32, 40, step=2),
+            "stoch_pull_max": trial.suggest_int(f"{a}_stoch_pull_max", 86, 98, step=2),
+            "cci_buy_min": trial.suggest_int(f"{a}_cci_buy_min", -200, -100, step=25),
+            "max_extension_atr": trial.suggest_float(f"{a}_max_extension_atr", 3.0, 4.5, step=0.25),
+            "max_obv_zscore": trial.suggest_float(f"{a}_max_obv_zscore", 4.0, 6.0, step=0.5),
         }
     else:  # loose_quality
         buy = {
-            "adx_min": trial.suggest_categorical("adx_min", [6, 8, 10, 12]),
-            "volume_confirm_mult": trial.suggest_float("volume_confirm_mult", 0.65, 0.95, step=0.05),
+            "adx_min": trial.suggest_categorical(f"{a}_adx_min", [6, 8, 10, 12]),
+            "volume_confirm_mult": trial.suggest_float(f"{a}_volume_confirm_mult", 0.65, 0.95, step=0.05),
             "ich_cloud_bull": 0,
-            "vwap_buy_above": trial.suggest_categorical("vwap_buy_above", [0, 1]),
-            "rsi_floor": trial.suggest_int("rsi_floor", 32, 42, step=2),
-            "stoch_pull_max": trial.suggest_int("stoch_pull_max", 84, 98, step=2),
-            "cci_buy_min": trial.suggest_int("cci_buy_min", -200, -75, step=25),
-            "max_extension_atr": trial.suggest_float("max_extension_atr", 2.5, 4.0, step=0.25),
-            "obv_min_zscore": trial.suggest_categorical("obv_min_zscore", [-0.25, 0.0, 0.25, 0.5]),
-            "cmf_base_min": trial.suggest_categorical("cmf_base_min", [-0.02, 0.0, 0.02, 0.05]),
+            "vwap_buy_above": trial.suggest_categorical(f"{a}_vwap_buy_above", [0, 1]),
+            "rsi_floor": trial.suggest_int(f"{a}_rsi_floor", 32, 42, step=2),
+            "stoch_pull_max": trial.suggest_int(f"{a}_stoch_pull_max", 84, 98, step=2),
+            "cci_buy_min": trial.suggest_int(f"{a}_cci_buy_min", -200, -75, step=25),
+            "max_extension_atr": trial.suggest_float(f"{a}_max_extension_atr", 2.5, 4.0, step=0.25),
+            "obv_min_zscore": trial.suggest_categorical(f"{a}_obv_min_zscore", [-0.25, 0.0, 0.25, 0.5]),
+            "cmf_base_min": trial.suggest_categorical(f"{a}_cmf_base_min", [-0.02, 0.0, 0.02, 0.05]),
         }
 
     sell_style = trial.suggest_categorical(
         "sell_style",
         ["baseline", "quick_cut", "wide_breakeven", "long_hold", "momentum_capture"],
     )
+    s = sell_style  # shorthand for prefix
+
     if sell_style == "quick_cut":
         sell = {
-            "equity_time_stop_bars": trial.suggest_int("equity_time_stop_bars", 4, 10, step=1),
-            "equity_review_rsi": trial.suggest_float("equity_review_rsi", 42, 52, step=2),
-            "momentum_exit_rsi": trial.suggest_float("momentum_exit_rsi", 35, 44, step=1),
-            "breakeven_trigger_pct": trial.suggest_float("breakeven_trigger_pct", 1.5, 3.5, step=0.5),
+            "equity_time_stop_bars": trial.suggest_int(f"{s}_equity_time_stop_bars", 4, 10, step=1),
+            "equity_review_rsi": trial.suggest_float(f"{s}_equity_review_rsi", 42, 52, step=2),
+            "momentum_exit_rsi": trial.suggest_float(f"{s}_momentum_exit_rsi", 35, 44, step=1),
+            "breakeven_trigger_pct": trial.suggest_float(f"{s}_breakeven_trigger_pct", 1.5, 3.5, step=0.5),
         }
     elif sell_style == "wide_breakeven":
         sell = {
-            "breakeven_trigger_pct": trial.suggest_float("breakeven_trigger_pct", 4.0, 7.0, step=0.5),
-            "equity_review_rsi": trial.suggest_float("equity_review_rsi", 38, 46, step=2),
-            "fund_time_stop_min_profit_pct": trial.suggest_float("fund_time_stop_min_profit_pct", 0.3, 1.5, step=0.3),
+            "breakeven_trigger_pct": trial.suggest_float(f"{s}_breakeven_trigger_pct", 4.0, 7.0, step=0.5),
+            "equity_review_rsi": trial.suggest_float(f"{s}_equity_review_rsi", 38, 46, step=2),
+            "fund_time_stop_min_profit_pct": trial.suggest_float(f"{s}_fund_time_stop_min_profit_pct", 0.3, 1.5, step=0.3),
         }
     elif sell_style == "long_hold":
         sell = {
-            "equity_time_stop_bars": trial.suggest_int("equity_time_stop_bars", 12, 30, step=3),
-            "fund_time_stop_bars": trial.suggest_int("fund_time_stop_bars", 18, 36, step=3),
-            "breakeven_trigger_pct": trial.suggest_float("breakeven_trigger_pct", 3.5, 6.0, step=0.5),
-            "momentum_exit_rsi": trial.suggest_float("momentum_exit_rsi", 32, 40, step=1),
+            "equity_time_stop_bars": trial.suggest_int(f"{s}_equity_time_stop_bars", 12, 30, step=3),
+            "fund_time_stop_bars": trial.suggest_int(f"{s}_fund_time_stop_bars", 18, 36, step=3),
+            "breakeven_trigger_pct": trial.suggest_float(f"{s}_breakeven_trigger_pct", 3.5, 6.0, step=0.5),
+            "momentum_exit_rsi": trial.suggest_float(f"{s}_momentum_exit_rsi", 32, 40, step=1),
         }
     elif sell_style == "momentum_capture":
         sell = {
-            "relative_volume_exit": trial.suggest_float("relative_volume_exit", 1.2, 2.0, step=0.1),
-            "momentum_exit_rsi": trial.suggest_float("momentum_exit_rsi", 32, 42, step=1),
-            "equity_review_rsi": trial.suggest_float("equity_review_rsi", 38, 46, step=2),
-            "equity_time_stop_bars": trial.suggest_int("equity_time_stop_bars", 10, 24, step=2),
+            "relative_volume_exit": trial.suggest_float(f"{s}_relative_volume_exit", 1.2, 2.0, step=0.1),
+            "momentum_exit_rsi": trial.suggest_float(f"{s}_momentum_exit_rsi", 32, 42, step=1),
+            "equity_review_rsi": trial.suggest_float(f"{s}_equity_review_rsi", 38, 46, step=2),
+            "equity_time_stop_bars": trial.suggest_int(f"{s}_equity_time_stop_bars", 10, 24, step=2),
         }
     else:
         sell = {}
