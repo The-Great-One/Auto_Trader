@@ -21,6 +21,12 @@ tests/
 log/
 log/reports/
 reports/archive/
+reports/daily_*.md
+reports/options_research_supervisor_*.md
+reports/strategy_lab_*.md
+reports/weekly_universe_cagr_*.md
+reports/breakout_atr_validation_*.md
+!reports/equity_lab_audit_*.md
 memory/
 scripts/test_mumbai_vpn.py
 scripts/test_kite_login.py
