@@ -282,6 +282,12 @@ def _load_symbol_history(symbol: str, *, persist_download: bool = True) -> pd.Da
         except Exception:
             pass
 
+    cache_only = os.getenv("AT_LAB_CACHE_ONLY", "0").strip().lower() in {"1", "true", "yes"}
+    # On secondary/research runs we must not silently fall back to yfinance:
+    # Kite cached feather data is the live-parity source of truth.
+    if cache_only:
+        return None
+
     out = _download_symbol_history(symbol)
     if out is not None and not out.empty and persist_download:
         try:
