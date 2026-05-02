@@ -183,6 +183,12 @@ def evaluate_signal(df, row, holdings):
     rsi_slope_up = rsi >= prev_rsi
     overbought_guard = np.isfinite(z) and z >= 2.0 and rsi >= 75
     stoch_k = latest.get("Stochastic_%K", np.nan)
+    bb_pctb = latest.get("BB_PercentB", np.nan)
+    if not np.isfinite(bb_pctb):
+        upper_band = latest.get("UpperBand", latest.get("BB_Upper", np.nan))
+        lower_band = latest.get("LowerBand", latest.get("BB_Lower", np.nan))
+        if np.isfinite(upper_band) and np.isfinite(lower_band):
+            bb_pctb = (close - float(lower_band)) / max(1e-9, float(upper_band) - float(lower_band))
     supertrend_dir = bool(latest.get("Supertrend_Direction", True))
     supertrend = latest.get("Supertrend", np.nan)
     weekly_sma_20 = latest.get("Weekly_SMA_20", np.nan)
@@ -276,7 +282,6 @@ def evaluate_signal(df, row, holdings):
     # --- Mean-reversion entry mode ---
     # Buys oversold bounces in sideways/choppy markets
     # Conditions: low RSI, price near lower BB, low ADX (non-trending), oversold CCI
-    bb_pctb = (close - lb) / max(1e-9, ub - lb) if have_bb and np.isfinite(ub) and np.isfinite(lb) else np.nan
     meanrev_rsi_oversold = np.isfinite(rsi) and rsi <= CONFIG["meanrev_rsi_oversold"]
     meanrev_rsi_max = np.isfinite(rsi) and rsi <= CONFIG["meanrev_rsi_max"]
     meanrev_bb_bounce = np.isfinite(bb_pctb) and bb_pctb <= CONFIG["meanrev_bb_pctb_max"] and rsi_slope_up
@@ -289,12 +294,13 @@ def evaluate_signal(df, row, holdings):
         "adx_low": bool(meanrev_adx_low),
         "cci_oversold": bool(meanrev_cci_oversold),
         "stoch_oversold": bool(meanrev_stoch_oversold),
+        "rsi_max": bool(meanrev_rsi_max),
         "rsi_slope_up": bool(rsi_slope_up),
     }
 
     pullback_mode = all(pullback_checks.values())
     breakout_mode = all(breakout_checks.values())
-    # Mean-reversion: at least 4 of 6 conditions (allows some flexibility)
+    # Mean-reversion: at least 4 of 7 conditions (allows some flexibility)
     meanrev_score = sum(meanrev_checks.values())
     meanrev_mode = CONFIG["meanrev_enabled"] >= 1 and meanrev_score >= 4 and meanrev_checks.get("rsi_oversold") and meanrev_checks.get("rsi_slope_up")
     pullback_missing = [name for name, ok in pullback_checks.items() if not ok]
@@ -312,7 +318,7 @@ def evaluate_signal(df, row, holdings):
     hard_blocks = []
     if obv_overextended:
         hard_blocks.append("obv_overextended")
-    if not rsi_floor_ok:
+    if not rsi_floor_ok and not meanrev_mode:
         hard_blocks.append("rsi_floor")
     if overbought_guard:
         hard_blocks.append("overbought_guard")
@@ -320,27 +326,27 @@ def evaluate_signal(df, row, holdings):
         hard_blocks.append("atr_band")
     if not extension_ok:
         hard_blocks.append("extension_atr")
-    if not supertrend_price_ok:
+    if not supertrend_price_ok and not meanrev_mode:
         hard_blocks.append("supertrend_price")
-    if not supertrend_dir:
+    if not supertrend_dir and not meanrev_mode:
         hard_blocks.append("supertrend_direction")
-    if not weekly_trend_ok:
+    if not weekly_trend_ok and not meanrev_mode:
         hard_blocks.append("weekly_trend")
-    if not macd_signal_ok:
+    if not macd_signal_ok and not meanrev_mode:
         hard_blocks.append("macd_signal_cross")
     if not mmi_ok:
         hard_blocks.append("mmi_risk_off")
-    if not vwap_ok:
+    if not vwap_ok and not meanrev_mode:
         hard_blocks.append("vwap")
-    if not ich_cloud_ok:
+    if not ich_cloud_ok and not meanrev_mode:
         hard_blocks.append("ich_cloud")
-    if not sar_ok:
+    if not sar_ok and not meanrev_mode:
         hard_blocks.append("sar")
-    if not cci_ok:
+    if not cci_ok and not meanrev_mode:
         hard_blocks.append("cci")
-    if not di_cross_ok:
+    if not di_cross_ok and not meanrev_mode:
         hard_blocks.append("di_cross")
-    if not di_plus_ok:
+    if not di_plus_ok and not meanrev_mode:
         hard_blocks.append("di_plus")
 
     decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode or meanrev_mode)) else "HOLD"
@@ -372,6 +378,11 @@ def evaluate_signal(df, row, holdings):
         "di_plus_ok": bool(di_plus_ok),
         "stoch_pull_ok": bool(stoch_pull_ok),
         "stoch_momo_ok": bool(stoch_momo_ok),
+        "meanrev_rsi_oversold": bool(meanrev_rsi_oversold),
+        "meanrev_bb_bounce": bool(meanrev_bb_bounce),
+        "meanrev_adx_low": bool(meanrev_adx_low),
+        "meanrev_cci_oversold": bool(meanrev_cci_oversold),
+        "meanrev_stoch_oversold": bool(meanrev_stoch_oversold),
         "rsi_pullback_trigger": bool(rsi_pullback_trigger),
         "rsi_momo_trigger": bool(rsi_momo_trigger),
         "prior_high_break": bool(prior_high_break),
@@ -419,6 +430,7 @@ def evaluate_signal(df, row, holdings):
         "obv_ema20": _safe_metric(obv_ema20, 2),
         "obv_zscore20": _safe_metric(z),
         "rsi": _safe_metric(rsi),
+        "bb_percent_b": _safe_metric(bb_pctb),
         "stochastic_k": _safe_metric(stoch_k),
         "atr": _safe_metric(atr),
         "atr_pct": _safe_metric(atr_pct),
@@ -459,6 +471,13 @@ def evaluate_signal(df, row, holdings):
         "sar_buy_enabled": CONFIG["sar_buy_enabled"],
         "di_plus_min": CONFIG["di_plus_min"],
         "di_cross_enabled": CONFIG["di_cross_enabled"],
+        "meanrev_enabled": CONFIG["meanrev_enabled"],
+        "meanrev_rsi_oversold": CONFIG["meanrev_rsi_oversold"],
+        "meanrev_rsi_max": CONFIG["meanrev_rsi_max"],
+        "meanrev_bb_pctb_max": CONFIG["meanrev_bb_pctb_max"],
+        "meanrev_adx_max": CONFIG["meanrev_adx_max"],
+        "meanrev_cci_min": CONFIG["meanrev_cci_min"],
+        "meanrev_stoch_k_max": CONFIG["meanrev_stoch_k_max"],
         "rsi_pull_gate": rsi_pull_gate,
         "rsi_momo_gate": rsi_momo_gate,
     }

@@ -10,6 +10,7 @@ Strategy lab:
 from __future__ import annotations
 
 import atexit
+import contextlib
 import json
 import multiprocessing as mp
 import os
@@ -834,6 +835,32 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     add("baseline_current", {}, {}, {"enabled": False})
 
+    # High-priority structural candidates: ensure small AT_LAB_MAX_VARIANTS runs
+    # actually test sideways-market mean-reversion before broad one-factor sweeps.
+    priority_meanrev_buy = [
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 35, "meanrev_adx_max": 25, "meanrev_bb_pctb_max": 0.3, "rsi_floor": 45, "adx_min": 10},
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 40, "meanrev_adx_max": 28, "meanrev_bb_pctb_max": 0.35, "meanrev_cci_min": -100, "meanrev_stoch_k_max": 35, "rsi_floor": 45, "adx_min": 10},
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 30, "meanrev_adx_max": 22, "meanrev_bb_pctb_max": 0.2, "meanrev_stoch_k_max": 25, "rsi_floor": 45, "adx_min": 10},
+    ]
+    priority_meanrev_sell = [
+        {"meanrev_exit_rsi": 60, "meanrev_exit_bb_pctb": 0.8, "meanrev_exit_bars": 5, "equity_time_stop_bars": 20},
+        {"meanrev_exit_rsi": 55, "meanrev_exit_bb_pctb": 0.7, "meanrev_exit_bars": 8, "equity_time_stop_bars": 20},
+    ]
+    priority_idx = 0
+    for buy_patch in priority_meanrev_buy:
+        for sell_patch in priority_meanrev_sell:
+            priority_idx += 1
+            add(f"priority_meanrev_{priority_idx:03d}", buy_patch, sell_patch, {"enabled": False})
+    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE:
+        for buy_patch in priority_meanrev_buy[:2]:
+            priority_idx += 1
+            add(
+                f"priority_po_meanrev_{priority_idx:03d}",
+                buy_patch,
+                {"meanrev_exit_rsi": 60, "meanrev_exit_bb_pctb": 0.8, "meanrev_exit_bars": 5, "equity_time_stop_bars": 20},
+                {"enabled": False, "portfolio_opt": True},
+            )
+
     if base_rnn_cfg.enabled:
         add(
             "baseline_with_rnn",
@@ -1141,6 +1168,24 @@ def _variant_mp_context():
         return mp.get_context(default_method)
 
 
+@contextlib.contextmanager
+def _temporary_env(overrides: dict[str, str | None]):
+    old = {k: os.environ.get(k) for k in overrides}
+    try:
+        for k, v in overrides.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = str(v)
+        yield
+    finally:
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def _save_lab_payload(payload: dict, prefix: str = "strategy_lab") -> tuple[Path, Path]:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_json = OUT_DIR / f"{prefix}_{ts}.json"
@@ -1217,7 +1262,8 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     ret = (total_final_value / start_capital - 1.0) * 100.0
     round_trips = max(1, total_trades // 2)
     win_rate = (total_wins / round_trips) * 100.0
-    selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, worst_dd))))
+    trade_bonus = min(5.0, 0.003 * float(total_trades))
+    selection_score = float(ret + trade_bonus + (0.05 * float(win_rate)) - (0.75 * abs(min(0.0, worst_dd))))
     if rnn_params.get("enabled"):
         selection_score += 0.05 * float(np.mean(rnn_accuracies) if rnn_accuracies else 0.0)
 
@@ -1380,9 +1426,11 @@ def run_portfolio_optimized(
         # Step 2: Build returns DataFrame for portfolio optimization
         min_len = min(len(v) for v in symbol_returns.values()) if symbol_returns else 0
         if min_len < 60:
-            # Not enough data for optimization, fall back to simple sum
-            total_final = sum(s["final_value"] for s in symbol_stats.values())
-            start_cap = 100000.0 * max(1, len(tested_symbols))
+            # Not enough data for optimization; fall back to average per-symbol equity.
+            # Keep capital base at 100k because optimized portfolios are weighted allocations,
+            # not N independent 100k accounts.
+            total_final = float(np.mean([s["final_value"] for s in symbol_stats.values()])) if symbol_stats else 100000.0
+            start_cap = 100000.0
             ret = (total_final / start_cap - 1.0) * 100.0
         else:
             returns_df = pd.DataFrame(
@@ -1395,14 +1443,15 @@ def run_portfolio_optimized(
 
             # Step 4: Apply optimized weights to compute portfolio return
             weights = opt_result.get("weights", {})
-            # Weighted portfolio: each symbol gets weight * its capital allocation
+            # Weighted portfolio: final_value is the ending value of a 100k allocation.
+            # Weighting those ending values gives the ending value of one 100k portfolio.
+            fallback_weight = 1.0 / max(1, len(tested_symbols))
             total_final = sum(
-                symbol_stats[sym]["final_value"] * weights.get(sym, 1.0 / len(tested_symbols))
+                symbol_stats[sym]["final_value"] * weights.get(sym, fallback_weight)
                 for sym in tested_symbols
                 if sym in symbol_stats
             )
-            # Scale: weights sum to 1.0, so total capital = N * 100k
-            start_cap = 100000.0 * max(1, len(tested_symbols))
+            start_cap = 100000.0
             ret = (total_final / start_cap - 1.0) * 100.0
 
     finally:
@@ -1411,11 +1460,13 @@ def run_portfolio_optimized(
         RULE_SET_7.CONFIG.clear()
         RULE_SET_7.CONFIG.update(old_r7)
 
-    start_capital = 100000.0 * max(1, len(tested_symbols))
-    ret = (total_final / start_capital - 1.0) * 100.0 if 'total_final' in dir() else 0.0
+    start_capital = 100000.0
+    total_final = float(total_final) if 'total_final' in dir() else start_capital
+    ret = (total_final / start_capital - 1.0) * 100.0
     round_trips = max(1, total_trades // 2)
     win_rate = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
-    selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, worst_dd))))
+    trade_bonus = min(5.0, 0.003 * float(total_trades))
+    selection_score = float(ret + trade_bonus + (0.05 * float(win_rate)) - (0.75 * abs(min(0.0, worst_dd))))
 
     return BacktestResult(
         name=name,
@@ -1540,33 +1591,32 @@ def run_walk_forward_validation(
                 test_start_date = all_dates[test_start]
                 test_end_date = all_dates[test_end - 1]
 
-                # Filter data to test period
+                # Keep warmup/training history through test_end, but do not allow
+                # signals before test_start. This avoids the old bug where OOS slices
+                # lost 250 warmup bars and produced artificial zero-trade folds.
                 test_data = {
-                    sym: df[pd.to_datetime(df["Date"]) >= test_start_date].copy()
+                    sym: df[pd.to_datetime(df["Date"]) <= test_end_date].copy()
                     for sym, df in data_map.items()
                 }
-                test_data = {k: v for k, v in test_data.items() if len(v) > 50}
+                test_data = {k: v for k, v in test_data.items() if len(v) > 260}
 
                 if not test_data:
                     continue
 
-                # Run simple sim on test period
-                total_final = 0.0
-                total_trades = 0
-                total_wins = 0
-                worst_dd = 0.0
-                for symbol, df in test_data.items():
-                    stats = _simulate_symbol(symbol, df)
-                    total_final += stats["final_value"]
-                    total_trades += stats["trades"]
-                    total_wins += stats["wins"]
-                    worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+                from scripts import weekly_universe_cagr_check as parity_pack
 
-                n_syms = len(test_data)
-                start_cap = 100000.0 * max(1, n_syms)
-                ret_pct = (total_final / start_cap - 1.0) * 100.0
+                with _temporary_env({
+                    "AT_BACKTEST_SIGNAL_START_DATE": str(test_start_date.date()),
+                    "AT_BACKTEST_SIGNAL_END_DATE": str(test_end_date.date()),
+                    "AT_BACKTEST_STARTING_CAPITAL": os.getenv("AT_BACKTEST_STARTING_CAPITAL", "100000"),
+                }):
+                    result, details, sim_meta = parity_pack.run_baseline_detailed(test_data)
+
+                total_trades = int(result.trades)
                 round_trips = max(1, total_trades // 2)
-                wr = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
+                ret_pct = float(result.total_return_pct)
+                wr = float(result.win_rate_pct)
+                worst_dd = float(result.max_drawdown_pct)
                 fold_results.append({
                     "fold": fold_idx + 1,
                     "train_end": str(train_end_date.date()),
@@ -1576,7 +1626,7 @@ def run_walk_forward_validation(
                     "trades": total_trades,
                     "win_rate_pct": round(wr, 1),
                     "max_drawdown_pct": round(worst_dd, 2),
-                    "symbols_tested": n_syms,
+                    "symbols_tested": len(getattr(result, "symbols_tested", []) or test_data),
                 })
     finally:
         RULE_SET_2.CONFIG.clear()
@@ -1862,9 +1912,8 @@ def _signal_handler(signum: int, frame) -> None:
     os.kill(os.getpid(), signum)
 
 
-atexit.register(_cleanup_children)
-signal.signal(signal.SIGTERM, _signal_handler)
-signal.signal(signal.SIGINT, _signal_handler)
+# Signal handlers are registered only in the __main__ guard below. Registering
+# them at import time breaks multiprocessing spawn workers on Python 3.10+.
 
 # Patch ProcessPoolExecutor to track child PIDs
 _OriginalProcessPoolExecutor = ProcessPoolExecutor
@@ -1898,6 +1947,9 @@ ProcessPoolExecutor = _TrackedProcessPoolExecutor
 # --- End process cleanup guard ---
 
 if __name__ == "__main__":
+    atexit.register(_cleanup_children)
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
     try:
         main()
     except Exception as exc:

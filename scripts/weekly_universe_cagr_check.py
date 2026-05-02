@@ -497,12 +497,27 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
 
     all_dates = sorted(date_to_symbols.keys())
 
+    def _parse_env_date(name: str):
+        raw = os.getenv(name, "").strip()
+        if not raw:
+            return None
+        try:
+            return pd.to_datetime(raw)
+        except Exception:
+            return None
+
+    signal_start_date = _parse_env_date("AT_BACKTEST_SIGNAL_START_DATE")
+    signal_end_date = _parse_env_date("AT_BACKTEST_SIGNAL_END_DATE") or _parse_env_date("AT_BACKTEST_END_DATE")
+
     try:
         with tempfile.TemporaryDirectory(prefix="at_state_") as td:
             lab._set_temp_state(lab.RULE_SET_2, td)
             total = max(1, len(all_dates))
             for day_idx, date in enumerate(all_dates, start=1):
+                if signal_end_date is not None and date > signal_end_date:
+                    break
                 symbols_today = sorted(date_to_symbols.get(date, []))
+                signal_window_open = signal_start_date is None or date >= signal_start_date
                 regime_state = _regime_state_for_date(regime_df, date, regime_cfg)
                 regime_stats["last_state"] = regime_state
                 for symbol in symbols_today:
@@ -513,6 +528,9 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                     i = int(idx_matches[-1])
                     row_now = df.iloc[i]
                     last_prices[symbol] = float(row_now["Close"])
+
+                    if not signal_window_open:
+                        continue
 
                     pending = pending_orders.get(symbol)
                     if pending and pd.to_datetime(pending.get("exec_date")) == date:
@@ -610,8 +628,9 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
                             else:
                                 regime_stats["blocked_buy_signals"] += 1
 
-                portfolio_value = _portfolio_value(cash, positions, last_prices)
-                equity_points.append({"Date": date, "Equity": float(portfolio_value), "Cash": float(cash), "OpenPositions": int(len(positions))})
+                if signal_window_open:
+                    portfolio_value = _portfolio_value(cash, positions, last_prices)
+                    equity_points.append({"Date": date, "Equity": float(portfolio_value), "Cash": float(cash), "OpenPositions": int(len(positions))})
     finally:
         lab.RULE_SET_2.CONFIG.clear()
         lab.RULE_SET_2.CONFIG.update(old_r2)
@@ -652,7 +671,8 @@ def run_baseline_detailed(data_map: dict[str, pd.DataFrame], universe_df: pd.Dat
     max_dd = _compute_drawdown_pct(portfolio_equity)
     round_trips = max(1, len(trade_rows))
     win_rate = (total_wins / round_trips) * 100.0
-    selection_score = float(ret + (0.02 * total_trades) - (0.15 * abs(min(0.0, max_dd))))
+    trade_bonus = min(5.0, 0.003 * float(total_trades))
+    selection_score = float(ret + trade_bonus + (0.05 * float(win_rate)) - (0.75 * abs(min(0.0, max_dd))))
 
     result = lab.BacktestResult(
         name="baseline_current",
