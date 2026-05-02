@@ -944,6 +944,38 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         {"momentum_exit_rsi": 35.0, "equity_review_rsi": 42.0, "equity_time_stop_bars": 15},
         {"relative_volume_exit": 1.5, "breakeven_trigger_pct": 4.0, "fund_time_stop_bars": 18},
     ]
+    # --- Mean-reversion entry variants ---
+    # These enable the meanrev entry mode and tune its parameters
+    meanrev_buy_combos = [
+        # Basic meanrev: oversold bounce
+        {"meanrev_enabled": 1, "rsi_floor": 45, "adx_min": 10},
+        # Mean-reversion with low ADX threshold
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 35, "meanrev_adx_max": 25, "meanrev_bb_pctb_max": 0.3, "rsi_floor": 45, "adx_min": 10},
+        # Aggressive meanrev: catch deeper oversold
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 30, "meanrev_adx_max": 22, "meanrev_bb_pctb_max": 0.2, "meanrev_stoch_k_max": 25, "rsi_floor": 45, "adx_min": 10},
+        # Wide meanrev: more signals with relaxed thresholds
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 40, "meanrev_adx_max": 28, "meanrev_bb_pctb_max": 0.35, "meanrev_cci_min": -100, "meanrev_stoch_k_max": 35, "rsi_floor": 45, "adx_min": 10},
+        # Conservative meanrev: only high-confidence reversals
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 25, "meanrev_adx_max": 20, "meanrev_bb_pctb_max": 0.15, "meanrev_cci_min": -200, "meanrev_stoch_k_max": 20, "rsi_floor": 45, "adx_min": 10},
+        # Meanrev + trend pullback hybrid (both modes can trigger)
+        {"meanrev_enabled": 1, "meanrev_rsi_oversold": 35, "meanrev_adx_max": 25, "rsi_floor": 40, "adx_min": 8, "volume_confirm_mult": 0.8},
+    ]
+    meanrev_sell_combos = [
+        # Quick mean-reversion exit: take profit fast, cut losses fast
+        {"meanrev_exit_rsi": 60, "meanrev_exit_bb_pctb": 0.8, "meanrev_exit_bars": 5},
+        # Slower meanrev exit: let the reversal develop
+        {"meanrev_exit_rsi": 55, "meanrev_exit_bb_pctb": 0.7, "meanrev_exit_bars": 8, "equity_time_stop_bars": 20},
+        # Aggressive meanrev exit: very quick
+        {"meanrev_exit_rsi": 65, "meanrev_exit_bb_pctb": 0.85, "meanrev_exit_bars": 3},
+        # Patient meanrev exit: hold longer for bigger reversal
+        {"meanrev_exit_rsi": 55, "meanrev_exit_bb_pctb": 0.75, "meanrev_exit_bars": 10, "breakeven_trigger_pct": 3.0},
+    ]
+    meanrev_idx = 0
+    for buy_patch in meanrev_buy_combos:
+        for sell_patch in meanrev_sell_combos:
+            meanrev_idx += 1
+            add(f"meanrev_{meanrev_idx:03d}", buy_patch, sell_patch, {"enabled": False})
+
     curated_idx = 0
     for buy_patch in curated_buy:
         for sell_patch in curated_sell:

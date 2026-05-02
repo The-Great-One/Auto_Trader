@@ -25,7 +25,7 @@ CONFIG = {
     "relative_volume_exit": float(os.getenv("AT_SELL_RELATIVE_VOLUME_EXIT", "1.3")),  # exits that need RVOL
     "time_stop_bars": 20,  # legacy fallback if asset-specific settings are unavailable
     "time_stop_min_profit_pct": 3.0,
-    "equity_time_stop_bars": int(os.getenv("AT_EQUITY_TIME_STOP_BARS", "8")),
+    "equity_time_stop_bars": int(os.getenv("AT_EQUITY_TIME_STOP_BARS", "20")),
     "equity_time_stop_min_profit_pct": float(os.getenv("AT_EQUITY_TIME_STOP_MIN_PROFIT_PCT", "1.5")),
     "fund_time_stop_bars": int(os.getenv("AT_FUND_TIME_STOP_BARS", "14")),
     "fund_time_stop_min_profit_pct": float(os.getenv("AT_FUND_TIME_STOP_MIN_PROFIT_PCT", "1.0")),
@@ -38,6 +38,10 @@ CONFIG = {
     "breakeven_trigger_pct": float(os.getenv("AT_SELL_BREAKEVEN_TRIGGER_PCT", "4.0")),  # once crossed, SL should protect principal
     "breakeven_buffer_pct": 0.2,  # lock at least +0.2% above avg after trigger
     "momentum_exit_rsi": float(os.getenv("AT_SELL_MOMENTUM_EXIT_RSI", "42.0")),
+    # --- Mean-reversion exit rules ---
+    "meanrev_exit_rsi": float(os.getenv("AT_SELL_MEANREV_EXIT_RSI", "60")),
+    "meanrev_exit_bb_pctb": float(os.getenv("AT_SELL_MEANREV_EXIT_BB_PCTB", "0.8")),
+    "meanrev_exit_bars": int(os.getenv("AT_SELL_MEANREV_EXIT_BARS", "5")),
     "profit_ladder": [  # (profit% threshold, trail = max(last - k*ATR, entry*floor_mult))
         (30, {"k": 0.25, "floor_mult": 1.18}),
         (20, {"k": 0.40, "floor_mult": 1.12}),
@@ -622,7 +626,21 @@ def buy_or_sell(df, row, holdings):
             if below_ema10 and weak_rsi:
                 new_sl = max(new_sl, last_price - 0.75 * last_atr)
 
-        # 4) TIME STOP (mostly for chop)
+        # 4) MEAN-REVERSION QUICK EXIT
+        # For trades that entered via mean-reversion mode, exit quickly at profit target
+        # RSI > 60 or price near upper BB or held too long
+        meanrev_rsi_exit = have_rsi and last_rsi >= CONFIG["meanrev_exit_rsi"]
+        meanrev_bb_exit = have_bb and np.isfinite(curr_b) and curr_b >= CONFIG["meanrev_exit_bb_pctb"]
+        meanrev_time_exit = np.isfinite(bars_in_trade) and bars_in_trade >= CONFIG["meanrev_exit_bars"]
+        if meanrev_rsi_exit or meanrev_bb_exit or meanrev_time_exit:
+            if profit_pct > 0:
+                # Take profit on mean-reversion exit signal
+                return _maybe_sell()
+            elif meanrev_time_exit and profit_pct < 0:
+                # Mean-reversion trade failed — time to cut
+                return _maybe_sell()
+
+        # 5) TIME STOP (mostly for chop)
         if is_etf_like:
             time_stop_bars = CONFIG["fund_time_stop_bars"]
             time_stop_min_profit_pct = CONFIG["fund_time_stop_min_profit_pct"]

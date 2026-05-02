@@ -32,6 +32,14 @@ CONFIG = {
     "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),
     "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),
     "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")),
+    # --- Mean-reversion entry mode ---
+    "meanrev_enabled": float(os.getenv("AT_BUY_MEANREV_ENABLED", "1")),
+    "meanrev_rsi_oversold": float(os.getenv("AT_BUY_MEANREV_RSI_OVERSOLD", "35")),
+    "meanrev_rsi_max": float(os.getenv("AT_BUY_MEANREV_RSI_MAX", "50")),
+    "meanrev_bb_pctb_max": float(os.getenv("AT_BUY_MEANREV_BB_PCTB_MAX", "0.3")),
+    "meanrev_adx_max": float(os.getenv("AT_BUY_MEANREV_ADX_MAX", "25")),
+    "meanrev_cci_min": float(os.getenv("AT_BUY_MEANREV_CCI_MIN", "-150")),
+    "meanrev_stoch_k_max": float(os.getenv("AT_BUY_MEANREV_STOCH_K_MAX", "30")),
 }
 
 
@@ -265,17 +273,41 @@ def evaluate_signal(df, row, holdings):
         "stoch_momo_ok": bool(stoch_momo_ok),
         "breakout_trigger": bool(rsi_momo_trigger or highN_break or prior_high_break),
     }
+    # --- Mean-reversion entry mode ---
+    # Buys oversold bounces in sideways/choppy markets
+    # Conditions: low RSI, price near lower BB, low ADX (non-trending), oversold CCI
+    bb_pctb = (close - lb) / max(1e-9, ub - lb) if have_bb and np.isfinite(ub) and np.isfinite(lb) else np.nan
+    meanrev_rsi_oversold = np.isfinite(rsi) and rsi <= CONFIG["meanrev_rsi_oversold"]
+    meanrev_rsi_max = np.isfinite(rsi) and rsi <= CONFIG["meanrev_rsi_max"]
+    meanrev_bb_bounce = np.isfinite(bb_pctb) and bb_pctb <= CONFIG["meanrev_bb_pctb_max"] and rsi_slope_up
+    meanrev_adx_low = adx <= CONFIG["meanrev_adx_max"]
+    meanrev_cci_oversold = not np.isfinite(cci) or cci <= CONFIG["meanrev_cci_min"]
+    meanrev_stoch_oversold = not np.isfinite(stoch_k) or stoch_k <= CONFIG["meanrev_stoch_k_max"]
+    meanrev_checks = {
+        "rsi_oversold": bool(meanrev_rsi_oversold),
+        "bb_bounce": bool(meanrev_bb_bounce),
+        "adx_low": bool(meanrev_adx_low),
+        "cci_oversold": bool(meanrev_cci_oversold),
+        "stoch_oversold": bool(meanrev_stoch_oversold),
+        "rsi_slope_up": bool(rsi_slope_up),
+    }
 
     pullback_mode = all(pullback_checks.values())
     breakout_mode = all(breakout_checks.values())
+    # Mean-reversion: at least 4 of 6 conditions (allows some flexibility)
+    meanrev_score = sum(meanrev_checks.values())
+    meanrev_mode = CONFIG["meanrev_enabled"] >= 1 and meanrev_score >= 4 and meanrev_checks.get("rsi_oversold") and meanrev_checks.get("rsi_slope_up")
     pullback_missing = [name for name, ok in pullback_checks.items() if not ok]
     breakout_missing = [name for name, ok in breakout_checks.items() if not ok]
-    if len(pullback_missing) <= len(breakout_missing):
-        nearest_mode = "pullback"
-        nearest_mode_missing = pullback_missing
-    else:
-        nearest_mode = "breakout"
-        nearest_mode_missing = breakout_missing
+    meanrev_missing = [name for name, ok in meanrev_checks.items() if not ok]
+    # Pick nearest mode
+    candidates = [
+        ("pullback", pullback_missing),
+        ("breakout", breakout_missing),
+    ]
+    if CONFIG["meanrev_enabled"] >= 1:
+        candidates.append(("meanrev", meanrev_missing))
+    nearest_mode, nearest_mode_missing = min(candidates, key=lambda x: len(x[1]))
 
     hard_blocks = []
     if obv_overextended:
@@ -311,7 +343,7 @@ def evaluate_signal(df, row, holdings):
     if not di_plus_ok:
         hard_blocks.append("di_plus")
 
-    decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode)) else "HOLD"
+    decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode or meanrev_mode)) else "HOLD"
     entry_gate_failures = _uniq(hard_blocks + nearest_mode_missing)
 
     gate_status = {
@@ -346,6 +378,7 @@ def evaluate_signal(df, row, holdings):
         "highN_break": bool(highN_break),
         "pullback_mode": bool(pullback_mode),
         "breakout_mode": bool(breakout_mode),
+        "meanrev_mode": bool(meanrev_mode),
     }
 
     passed_core_gates = sum(1 for name in core_gate_names if gate_status.get(name))
@@ -436,6 +469,8 @@ def evaluate_signal(df, row, holdings):
             reason.append("pullback_mode")
         if breakout_mode:
             reason.append("breakout_mode")
+        if meanrev_mode:
+            reason.append("meanrev_mode")
     else:
         if hard_blocks:
             reason.extend(hard_blocks)
@@ -459,6 +494,7 @@ def evaluate_signal(df, row, holdings):
         "mode_diagnostics": {
             "pullback_missing": pullback_missing,
             "breakout_missing": breakout_missing,
+            "meanrev_missing": meanrev_missing,
         },
         "reason": reason,
     }
