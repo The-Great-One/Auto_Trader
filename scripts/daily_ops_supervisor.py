@@ -267,11 +267,34 @@ def build_equity_iteration_plan(strategy: dict, weekly_universe_cagr: dict, pape
 
 def run_strategy_lab(trade_date: str, max_variants: int | None = None) -> dict:
     requested_variants = int(max_variants or resolve_strategy_lab_max_variants())
+    # Reset stale lab status file so we don't inherit "running" from a zombie
+    lab_status_dir = ROOT / "intermediary_files" / "lab_status"
+    lab_status_file = lab_status_dir / "weekly_strategy_lab_status.json"
+    if lab_status_file.exists():
+        try:
+            import json as _json
+            _ls = _json.loads(lab_status_file.read_text())
+            if _ls.get("status") == "running":
+                lab_status_file.write_text(_json.dumps({"status": "idle", "phase": "reset", "message": "stale running status cleared by daily_ops_supervisor", "updated_at": datetime.now().isoformat()}), encoding="utf-8")
+        except Exception:
+            pass
+    # Kill any leftover zombie lab workers before starting a fresh run
+    try:
+        subprocess.run(["pkill", "--older", "600", "-f", "weekly_strategy_lab"],
+                       capture_output=True, text=True, timeout=10)
+    except Exception:
+        pass
+    try:
+        subprocess.run(["pkill", "--older", "600", "-f", "spawn_main"],
+                       capture_output=True, text=True, timeout=10)
+    except Exception:
+        pass
     env = os.environ.copy()
+    env.update(_read_env_exports())  # inject .autotrader_env exports for lab
     env["AT_LAB_MAX_VARIANTS"] = str(requested_variants)
-    # Timeout: strategy lab should finish within 30 min; kill if it hangs
+    env["AT_RESEARCH_MODE"] = "1"  # skip Kite imports in lab subprocess
     # (prevents orphan multiprocessing workers from accumulating and causing OOM)
-    _lab_timeout = int(os.getenv("AT_DAILY_OPS_LAB_TIMEOUT", "1800"))
+    _lab_timeout = int(os.getenv("AT_DAILY_OPS_LAB_TIMEOUT", "7200"))
     cmd = ["/home/ubuntu/Auto_Trader/venv/bin/python", str(SCRIPTS / "weekly_strategy_lab.py")]
     try:
         proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env, timeout=_lab_timeout)
