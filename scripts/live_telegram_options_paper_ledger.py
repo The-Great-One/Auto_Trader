@@ -484,16 +484,18 @@ def summarize_history() -> dict[str, Any]:
     df = pd.DataFrame(rows)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
-    s = df.set_index('timestamp')['equity'].astype(float)
-    weekly = s.resample('W-FRI').last().pct_change().dropna()
-    monthly = s.resample('ME').last().pct_change().dropna()
+    s = df.set_index('timestamp')['equity'].astype(float).sort_index()
+    weekly_equity = s.resample('W-FRI').last().dropna()
+    monthly_equity = s.resample('ME').last().dropna()
+    weekly = weekly_equity.pct_change().dropna()
+    monthly = monthly_equity.pct_change().dropna()
     return {
         'weekly_returns': [
-            {'period': idx.strftime('%Y-%m-%d'), 'return_pct': round(float(val * 100.0), 2), 'ending_equity': round(float(s.loc[idx]), 2)}
+            {'period': idx.strftime('%Y-%m-%d'), 'return_pct': round(float(val * 100.0), 2), 'ending_equity': round(float(weekly_equity.loc[idx]), 2)}
             for idx, val in weekly.items()
         ],
         'monthly_returns': [
-            {'period': idx.strftime('%Y-%m-%d'), 'return_pct': round(float(val * 100.0), 2), 'ending_equity': round(float(s.loc[idx]), 2)}
+            {'period': idx.strftime('%Y-%m-%d'), 'return_pct': round(float(val * 100.0), 2), 'ending_equity': round(float(monthly_equity.loc[idx]), 2)}
             for idx, val in monthly.items()
         ],
     }

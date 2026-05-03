@@ -1,20 +1,24 @@
 # Live Telegram Options Paper Ledger
 
-- Updated: `2026-04-21T10:23:56.866067+00:00`
+- Updated: `2026-05-03T10:55:21.725786+00:00`
 - Starting capital: `100000.0`
-- Cash: `80125.0`
-- Equity: `103412.5`
+- Cash: `100000.0`
+- Equity: `100000.0`
 - Realized PnL: `0.0`
-- Unrealized PnL: `3412.5`
+- Unrealized PnL: `0.0`
 
 ## Open positions
-- SBILIFE `SBILIFE26APR1920CE` entry 26.5 last 31.05 mtm 3412.5 (17.17%), targets hit [], SL 18.0
+- none
 
 ## Closed positions
 - none
 
+## Unresolved / not opened
+- INDIGO PE 4600.0 status skipped, reason channel_low_confidence
+
 ## Weekly returns
-- none
+- 2026-05-01: -3.3% (equity 100000.0)
+- 2026-05-08: 0.0% (equity 100000.0)
 
 ## Monthly returns
-- none
+- 2026-05-31: 0.0% (equity 100000.0)
