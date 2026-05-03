@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import secrets
 import subprocess
 import time
 from datetime import datetime, timezone, timedelta
@@ -15,6 +16,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, dcc, html, dash_table, no_update
 from dash.exceptions import PreventUpdate
+from flask import Response, request
 
 from mf_dash_utils import fetch_nav_history, fetch_scheme_list, filter_nav_timeframe, normalize_nav
 
@@ -2791,6 +2793,34 @@ def table_payload(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str
 app = Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Auto Trader Ops"
 app.config.suppress_callback_exceptions = True
+
+
+def _dashboard_auth_enabled() -> bool:
+    return bool(os.getenv("DASH_AUTH_PASSWORD", "").strip())
+
+
+def _dashboard_check_auth(username: str | None, password: str | None) -> bool:
+    expected_user = os.getenv("DASH_AUTH_USERNAME", "sahil").strip() or "sahil"
+    expected_password = os.getenv("DASH_AUTH_PASSWORD", "")
+    return (
+        bool(expected_password)
+        and secrets.compare_digest(username or "", expected_user)
+        and secrets.compare_digest(password or "", expected_password)
+    )
+
+
+@app.server.before_request
+def require_dashboard_auth():
+    if not _dashboard_auth_enabled():
+        return None
+    auth = request.authorization
+    if auth and _dashboard_check_auth(auth.username, auth.password):
+        return None
+    return Response(
+        "Authentication required",
+        401,
+        {"WWW-Authenticate": 'Basic realm="TraderOps Dashboard"'},
+    )
 app.index_string = """<!DOCTYPE html>
 <html>
     <head>
