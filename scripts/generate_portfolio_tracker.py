@@ -903,26 +903,44 @@ def main() -> int:
     holdings_data: dict[str, Any] = {"holdings": [], "mf_holdings": []}
 
     try:
-        import subprocess, os
-        ssh_key = os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key"))
-        oracle = os.getenv("AT_SERVER_HOST")
-        if not oracle:
-            return {"error": "AT_SERVER_HOST env var not set"}
-        oracle_target = oracle if "@" in oracle else f"ubuntu@{oracle}"
-        cmd = [
-            "ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", oracle_target,
-            '/home/ubuntu/Auto_Trader/venv/bin/python -c "'
-            'import json,sys; sys.path.insert(0,\\"/home/ubuntu/Auto_Trader\\");'
-            'from Auto_Trader.utils import get_kite_client;'
-            'kite=get_kite_client();'
-            'print(json.dumps({\\"holdings\\":kite.holdings(),\\"mf_holdings\\":kite.mf_holdings(),\\"mf_orders\\":kite.mf_orders()}, default=str))"'
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode == 0 and result.stdout.strip():
-            holdings_data = json.loads(result.stdout.strip())
-            print(f"Fetched {len(holdings_data.get('holdings',[]))} equity + {len(holdings_data.get('mf_holdings',[]))} MF + {len(holdings_data.get('mf_orders',[]))} MF orders from Kite")
-    except Exception as e:
-        print(f"Kite fetch failed: {e}, using local fallback")
+        # If this script is already running on the broker/server host, fetch
+        # directly. Otherwise fall through to SSH-based local orchestration.
+        if ROOT.exists() and str(ROOT).startswith("/home/ubuntu/Auto_Trader"):
+            from Auto_Trader.utils import get_kite_client
+            kite = get_kite_client()
+            holdings_data = {
+                "holdings": kite.holdings(),
+                "mf_holdings": kite.mf_holdings(),
+                "mf_orders": kite.mf_orders(),
+            }
+            print(f"Fetched {len(holdings_data.get('holdings',[]))} equity + {len(holdings_data.get('mf_holdings',[]))} MF + {len(holdings_data.get('mf_orders',[]))} MF orders from local Kite")
+        else:
+            raise RuntimeError("not running on broker host")
+    except Exception:
+        pass
+
+    if not holdings_data.get("mf_holdings"):
+        try:
+            import subprocess, os
+            ssh_key = os.getenv("AT_SERVER_KEY", os.path.expanduser("~/.openclaw/credentials/oracle_ssh_key"))
+            oracle = os.getenv("AT_SERVER_HOST")
+            if not oracle:
+                raise RuntimeError("AT_SERVER_HOST env var not set")
+            oracle_target = oracle if "@" in oracle else f"ubuntu@{oracle}"
+            cmd = [
+                "ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", oracle_target,
+                '/home/ubuntu/Auto_Trader/venv/bin/python -c "'
+                'import json,sys; sys.path.insert(0,\\"/home/ubuntu/Auto_Trader\\");'
+                'from Auto_Trader.utils import get_kite_client;'
+                'kite=get_kite_client();'
+                'print(json.dumps({\\"holdings\\":kite.holdings(),\\"mf_holdings\\":kite.mf_holdings(),\\"mf_orders\\":kite.mf_orders()}, default=str))"'
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and result.stdout.strip():
+                holdings_data = json.loads(result.stdout.strip())
+                print(f"Fetched {len(holdings_data.get('holdings',[]))} equity + {len(holdings_data.get('mf_holdings',[]))} MF + {len(holdings_data.get('mf_orders',[]))} MF orders from Kite")
+        except Exception as e:
+            print(f"Kite fetch failed: {e}, using local fallback")
 
     # Fallback: load from local Holdings.feather + cached MF data
     if not holdings_data.get("holdings"):
