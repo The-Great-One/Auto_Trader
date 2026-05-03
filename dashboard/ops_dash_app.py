@@ -305,6 +305,58 @@ def safe_num(v: Any) -> float | None:
         return None
 
 
+
+def mf_sleeve_pct(holding: dict[str, Any], mf_value: Any) -> float:
+    value = safe_num(holding.get("current_value")) or 0.0
+    total = safe_num(mf_value) or 0.0
+    return (value / total * 100.0) if total > 0 else 0.0
+
+
+def mf_xirr_booster_rows(tracker: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Return dashboard rows for current-holding MF XIRR booster actions.
+
+    Prefer the portfolio tracker's persisted plan. If an older tracker is loaded,
+    build a lightweight fallback so the dashboard still gives guidance.
+    """
+    plan = tracker.get("mf_xirr_boosters") or {}
+    rows = list(plan.get("actions") or [])
+    if rows:
+        return rows, plan
+
+    psum = tracker.get("portfolio_summary") or {}
+    mf_value = safe_num(psum.get("mf_value")) or 0.0
+    mf_holdings = tracker.get("mf_holdings") or []
+    fallback_rows: list[dict[str, Any]] = []
+    category_totals: dict[str, float] = {}
+    for h in mf_holdings:
+        cat = str(h.get("category") or "Unknown")
+        category_totals[cat] = category_totals.get(cat, 0.0) + (safe_num(h.get("current_value")) or 0.0)
+    category_pct = {k: round((v / mf_value * 100.0), 2) for k, v in category_totals.items()} if mf_value > 0 else {}
+    elss_pct = sum(v for k, v in category_pct.items() if "ELSS" in k.upper())
+    intl_pct = sum(v for k, v in category_pct.items() if any(tok in k.upper() for tok in ["NASDAQ", "TAIWAN", "INTERNATIONAL"]))
+
+    for h in sorted(mf_holdings, key=lambda x: safe_num(x.get("gain_pct")) or 0.0)[:5]:
+        fund = str(h.get("fund") or h.get("tradingsymbol") or "?")
+        cat = str(h.get("category") or "")
+        gain = safe_num(h.get("gain_pct")) or 0.0
+        pct = mf_sleeve_pct(h, mf_value)
+        if str(h.get("recommendation") or "").lower() == "buy" and pct < 12:
+            fallback_rows.append({
+                "priority": "high" if gain < 0 else "medium",
+                "action": "top_up",
+                "fund": fund[:72],
+                "current_value": safe_num(h.get("current_value")) or 0.0,
+                "mf_sleeve_pct": round(pct, 2),
+                "gain_pct": round(gain, 2),
+                "xirr_logic": f"Underweight {cat}; fresh SIP here has better XIRR impact than adding to crowded winners.",
+                "suggested_route": "Use staggered SIP/top-up; avoid lump-sum chasing.",
+            })
+    return fallback_rows[:8], {
+        "method": "fallback dashboard heuristics; regenerate portfolio tracker for full plan",
+        "diagnostics": {"elss_pct_of_mf": elss_pct, "international_pct_of_mf": intl_pct},
+        "category_pct": category_pct,
+    }
+
 def normalize_price_history(df: pd.DataFrame | None) -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
@@ -1194,6 +1246,17 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
         )
         children.append(section("Portfolio tracker (equity + MF)", [tracker_cards], "Live holdings from Kite with buy/sell/hold recommendations."))
 
+        xirr_rows, xirr_plan = mf_xirr_booster_rows(tracker)
+        if xirr_rows:
+            diag = xirr_plan.get("diagnostics") or {}
+            xirr_df = pd.DataFrame(xirr_rows)
+            show_cols = [c for c in ["priority", "action", "fund", "current_value", "mf_sleeve_pct", "gain_pct", "xirr_logic", "suggested_route"] if c in xirr_df.columns]
+            children.append(section(
+                "MF XIRR booster actions",
+                [table_from_df(xirr_df[show_cols], "mf-xirr-booster-table", page_size=8)],
+                f"Uses your current MF holdings. ELSS {friendly(diag.get('elss_pct_of_mf'))}% of MF sleeve · sector/thematic {friendly(diag.get('sector_thematic_pct_of_mf'))}% · international {friendly(diag.get('international_pct_of_mf'))}%.",
+            ))
+
     # Category allocation table
     cat_breakdown = tracker.get("category_breakdown") or {}
     if cat_breakdown:
@@ -1216,6 +1279,7 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
                 "risk": m.get("risk_level", "?"),
                 "value_inr": m.get("current_value", 0),
                 "weight_pct": m.get("weight_pct", 0),
+                "mf_sleeve_pct": m.get("mf_sleeve_pct", mf_sleeve_pct(m, psum.get("mf_value"))),
                 "gain_pct": m.get("gain_pct", 0),
                 "rationale": (m.get("rationale") or "")[:80],
             })
@@ -2565,6 +2629,30 @@ def build_mf_tab(data: dict[str, Any]) -> list[Any]:
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("MF command deck", [cards], "Dash-native MF entrypoint inside TraderOps."))
+
+    xirr_rows, xirr_plan = mf_xirr_booster_rows(tracker)
+    if xirr_rows:
+        diag = xirr_plan.get("diagnostics") or {}
+        cat_pct = xirr_plan.get("category_pct") or {}
+        xirr_df = pd.DataFrame(xirr_rows)
+        show_cols = [c for c in ["priority", "action", "fund", "current_value", "mf_sleeve_pct", "gain_pct", "xirr_logic", "suggested_route"] if c in xirr_df.columns]
+        diag_cards = html.Div(
+            [
+                metric_card("ELSS concentration", friendly(diag.get("elss_pct_of_mf")), "% of MF sleeve"),
+                metric_card("Sector/thematic", friendly(diag.get("sector_thematic_pct_of_mf")), "% of MF sleeve"),
+                metric_card("International", friendly(diag.get("international_pct_of_mf")), "% of MF sleeve"),
+                metric_card("Flexi/focused core", friendly(diag.get("flexi_focused_pct_of_mf")), "% of MF sleeve"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "marginBottom": "12px"},
+        )
+        children.append(section(
+            "MF XIRR booster cockpit",
+            [diag_cards, table_from_df(xirr_df[show_cols], "mf-xirr-booster-mf-tab-table", page_size=12)],
+            "No orders are placed here. This ranks where fresh SIPs/top-ups/pauses could improve future XIRR using only your current holdings and concentration.",
+        ))
+        if cat_pct:
+            cat_df = pd.DataFrame([{"category": k, "mf_sleeve_pct": v} for k, v in sorted(cat_pct.items(), key=lambda x: -x[1])])
+            children.append(section("MF sleeve category weights", [table_from_df(cat_df, "mf-category-xirr-table", page_size=12)]))
 
     explorer = html.Div(
         [

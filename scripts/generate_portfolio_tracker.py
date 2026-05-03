@@ -82,6 +82,174 @@ CATEGORY_OUTLOOK: dict[str, str] = {
 }
 
 
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
+def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: dict[str, Any]) -> dict[str, Any]:
+    """Build actionable, current-holding based MF XIRR improvement ideas.
+
+    This is intentionally a decision-support layer, not an execution engine. It
+    does not assume exact investor-level XIRR because Kite holdings expose NAV,
+    average cost, and quantity but not the full dated cash-flow ledger needed for
+    true XIRR. The dashboard therefore labels this as an XIRR booster plan and
+    uses current gain, sleeve weight, risk, category concentration, and tax/ELSS
+    constraints to route future SIP/top-up/redeem decisions.
+    """
+    mf_value = max(1e-9, _safe_float(portfolio_summary.get("mf_value")))
+    total_value = max(1e-9, _safe_float(portfolio_summary.get("total_value")))
+    mf_weight_pct = _safe_float(portfolio_summary.get("mf_weight_pct"))
+
+    enriched: list[dict[str, Any]] = []
+    category_values: dict[str, float] = {}
+    risk_values: dict[str, float] = {}
+    for m in mf_entries:
+        row = dict(m)
+        value = _safe_float(row.get("current_value"))
+        cat = str(row.get("category") or "Unknown")
+        risk = str(row.get("risk_level") or "moderate")
+        row["mf_sleeve_pct"] = round(value / mf_value * 100.0, 2) if mf_value > 0 else 0.0
+        enriched.append(row)
+        category_values[cat] = category_values.get(cat, 0.0) + value
+        risk_values[risk] = risk_values.get(risk, 0.0) + value
+
+    category_pct = {k: round(v / mf_value * 100.0, 2) for k, v in category_values.items()}
+    risk_pct = {k: round(v / mf_value * 100.0, 2) for k, v in risk_values.items()}
+    elss_pct = sum(v for k, v in category_pct.items() if "ELSS" in k.upper())
+    sector_pct = sum(v for k, v in category_pct.items() if any(tok in k.upper() for tok in ["SECTOR", "BANK", "INFRA"]) )
+    small_pct = sum(v for k, v in category_pct.items() if "SMALL" in k.upper())
+    intl_pct = sum(v for k, v in category_pct.items() if any(tok in k.upper() for tok in ["NASDAQ", "INTERNATIONAL", "TAIWAN"]) )
+    flexi_core_pct = sum(v for k, v in category_pct.items() if any(tok in k.upper() for tok in ["FLEXI", "FOCUSED"]) )
+
+    rows: list[dict[str, Any]] = []
+
+    def add(priority: str, action: str, fund: str, current_value: float, mf_pct: float, gain_pct: float, why: str, route: str) -> None:
+        rows.append({
+            "priority": priority,
+            "action": action,
+            "fund": fund[:72],
+            "current_value": round(current_value, 2),
+            "mf_sleeve_pct": round(mf_pct, 2),
+            "gain_pct": round(gain_pct, 2),
+            "xirr_logic": why,
+            "suggested_route": route,
+        })
+
+    # 1) Put new money where current holdings are underweight and either in drawdown
+    # or still small enough to move the portfolio XIRR meaningfully.
+    topup_candidates = []
+    for m in enriched:
+        cat = str(m.get("category") or "")
+        risk = str(m.get("risk_level") or "")
+        gain = _safe_float(m.get("gain_pct"))
+        mf_pct = _safe_float(m.get("mf_sleeve_pct"))
+        value = _safe_float(m.get("current_value"))
+        rec = str(m.get("recommendation") or "").lower()
+        if rec == "buy" and mf_pct < 12 and risk in {"moderate", "high", "low_moderate"}:
+            score = (12 - mf_pct) + max(0.0, -gain) * 1.5 + (2.0 if any(x in cat for x in ["Flexi", "Focused", "Mid", "NASDAQ"]) else 0.0)
+            topup_candidates.append((score, m))
+    for _, m in sorted(topup_candidates, key=lambda x: -x[0])[:5]:
+        cat = str(m.get("category") or "")
+        gain = _safe_float(m.get("gain_pct"))
+        route = "Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase."
+        if gain < 0:
+            why = f"Underweight {cat} holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds."
+        else:
+            why = f"Underweight {cat} holding with buy signal; fresh money has more XIRR impact here than adding to already-heavy winners."
+        add("high", "top_up", m.get("fund") or m.get("tradingsymbol") or "?", _safe_float(m.get("current_value")), _safe_float(m.get("mf_sleeve_pct")), gain, why, route)
+
+    # 2) Stop new money into buckets that are already too large; this boosts future
+    # XIRR by avoiding concentration drag and stale locked capital.
+    if elss_pct > 30:
+        for m in sorted([x for x in enriched if "ELSS" in str(x.get("category", "")).upper()], key=lambda x: -_safe_float(x.get("current_value")))[:3]:
+            add(
+                "high",
+                "pause_fresh_sip",
+                m.get("fund") or m.get("tradingsymbol") or "?",
+                _safe_float(m.get("current_value")),
+                _safe_float(m.get("mf_sleeve_pct")),
+                _safe_float(m.get("gain_pct")),
+                f"ELSS is {elss_pct:.1f}% of the MF sleeve; extra money here reduces flexibility and can trap future rebalancing behind lock-ins.",
+                "Keep existing locked units; route new tax-saving only up to 80C need, otherwise redirect SIP to flexible core/international.",
+            )
+
+    if sector_pct > 15:
+        for m in sorted([x for x in enriched if any(tok in str(x.get("category", "")).upper() for tok in ["SECTOR", "BANK", "INFRA"])], key=lambda x: -_safe_float(x.get("current_value")))[:3]:
+            action = "trim_on_strength" if _safe_float(m.get("gain_pct")) > 3 else "cap_fresh_sip"
+            add(
+                "medium",
+                action,
+                m.get("fund") or m.get("tradingsymbol") or "?",
+                _safe_float(m.get("current_value")),
+                _safe_float(m.get("mf_sleeve_pct")),
+                _safe_float(m.get("gain_pct")),
+                f"Sector/thematic funds are {sector_pct:.1f}% of MF sleeve; cyclic concentration can hurt XIRR in sideways regimes.",
+                "Do not add fresh SIP until sleeve falls below ~12–15%; harvest gains only after exit-load/tax checks.",
+            )
+
+    # 3) Improve diversification using current holdings rather than new fund sprawl.
+    if intl_pct < 5:
+        nasdaq = [x for x in enriched if "NASDAQ" in str(x.get("category", "")).upper()]
+        for m in nasdaq[:1]:
+            add(
+                "medium",
+                "increase_global_diversifier",
+                m.get("fund") or m.get("tradingsymbol") or "?",
+                _safe_float(m.get("current_value")),
+                _safe_float(m.get("mf_sleeve_pct")),
+                _safe_float(m.get("gain_pct")),
+                f"International exposure is only {intl_pct:.1f}% of MF sleeve; a small global sleeve can smooth India-only drawdowns and help risk-adjusted XIRR.",
+                "Build gradually toward ~5–8% MF sleeve; avoid Taiwan concentration unless explicitly desired.",
+            )
+
+    # 4) Tiny satellite cleanup: small positions rarely move XIRR but add tracking
+    # noise. Keep only if they have a deliberate role.
+    for m in sorted([x for x in enriched if _safe_float(x.get("mf_sleeve_pct")) < 1.0], key=lambda x: _safe_float(x.get("mf_sleeve_pct")))[:4]:
+        add(
+            "low",
+            "consolidate_or_scale",
+            m.get("fund") or m.get("tradingsymbol") or "?",
+            _safe_float(m.get("current_value")),
+            _safe_float(m.get("mf_sleeve_pct")),
+            _safe_float(m.get("gain_pct")),
+            "Tiny satellite position has too little capital to materially lift portfolio XIRR unless scaled with conviction.",
+            "Either scale to at least ~3–5% MF sleeve over time or fold future money into the core winners.",
+        )
+
+    # De-duplicate by fund/action while preserving priority order.
+    priority_rank = {"high": 0, "medium": 1, "low": 2}
+    seen: set[tuple[str, str]] = set()
+    deduped = []
+    for row in sorted(rows, key=lambda r: (priority_rank.get(str(r["priority"]), 9), -abs(_safe_float(r.get("gain_pct"))))):
+        key = (str(row["action"]), str(row["fund"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+
+    return {
+        "method": "XIRR booster heuristics from current holdings; true XIRR needs dated cash-flow lots.",
+        "mf_value": round(mf_value, 2),
+        "mf_weight_pct": round(mf_weight_pct, 2),
+        "mf_vs_total_pct": round(mf_value / total_value * 100.0, 2),
+        "category_pct": category_pct,
+        "risk_pct": risk_pct,
+        "diagnostics": {
+            "elss_pct_of_mf": round(elss_pct, 2),
+            "sector_thematic_pct_of_mf": round(sector_pct, 2),
+            "smallcap_pct_of_mf": round(small_pct, 2),
+            "international_pct_of_mf": round(intl_pct, 2),
+            "flexi_focused_pct_of_mf": round(flexi_core_pct, 2),
+        },
+        "actions": deduped[:12],
+    }
+
 def compute_recommendation(entry: dict[str, Any], portfolio_context: dict[str, Any]) -> dict[str, str]:
     """Generate buy/sell/hold + rationale for a single holding."""
     symbol = entry.get("tradingsymbol", "?")
@@ -257,6 +425,7 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
         m["cost_value"] = round(avg_price * qty, 2)
         m["gain_pct"] = round(gain_pct, 2)
         m["weight_pct"] = round((last_price * qty) / total_value * 100, 2) if total_value > 0 else 0.0
+        m["mf_sleeve_pct"] = round((last_price * qty) / mf_value * 100, 2) if mf_value > 0 else 0.0
         rec = compute_recommendation(m, portfolio_context)
         m["recommendation"] = rec["action"]
         m["rationale"] = rec["rationale"]
@@ -297,6 +466,12 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
             category_breakdown[cat]["value"] += h.get("current_value", 0)
             category_breakdown[cat]["cost"] += h.get("cost_value", 0)
 
+    mf_xirr_boosters = build_mf_xirr_boosters(mf_entries, {
+        "total_value": round(total_value, 2),
+        "mf_value": round(mf_value, 2),
+        "mf_weight_pct": round(mf_weight_pct, 2),
+    })
+
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "portfolio_summary": {
@@ -314,6 +489,7 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
         "equity_holdings": eq_entries,
         "mf_holdings": mf_entries,
         "category_breakdown": category_breakdown,
+        "mf_xirr_boosters": mf_xirr_boosters,
     }
 
     return report
@@ -353,6 +529,17 @@ def format_md(report: dict[str, Any]) -> str:
             lines.append(f"  - Value: ₹{h['current_value']:,.0f} | Cost: ₹{h['cost_value']:,.0f} | Gain: {h['gain_pct']:+.2f}% | Weight: {h['weight_pct']:.1f}%")
             lines.append(f"  - _{h['rationale']}_")
             lines.append("")
+
+    # MF XIRR booster plan
+    xirr_plan = report.get("mf_xirr_boosters") or {}
+    if xirr_plan.get("actions"):
+        lines.append("## 🚀 MF XIRR Booster Plan")
+        lines.append("")
+        diag = xirr_plan.get("diagnostics") or {}
+        lines.append(f"- ELSS: {diag.get('elss_pct_of_mf', 0):.1f}% of MF sleeve | Sector/thematic: {diag.get('sector_thematic_pct_of_mf', 0):.1f}% | International: {diag.get('international_pct_of_mf', 0):.1f}%")
+        for a in xirr_plan.get("actions", [])[:8]:
+            lines.append(f"- **{a.get('priority', '').upper()} / {a.get('action', '')}:** {a.get('fund')} — {a.get('xirr_logic')} _{a.get('suggested_route')}_")
+        lines.append("")
 
     # MF holdings
     if report["mf_holdings"]:
@@ -398,8 +585,9 @@ def main() -> int:
         oracle = os.getenv("AT_SERVER_HOST")
         if not oracle:
             return {"error": "AT_SERVER_HOST env var not set"}
+        oracle_target = oracle if "@" in oracle else f"ubuntu@{oracle}"
         cmd = [
-            "ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", oracle,
+            "ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", oracle_target,
             '/home/ubuntu/Auto_Trader/venv/bin/python -c "'
             'import json,sys; sys.path.insert(0,\\"/home/ubuntu/Auto_Trader\\");'
             'from Auto_Trader.utils import get_kite_client;'
