@@ -1,6 +1,6 @@
 # 📊 Portfolio Tracker
 
-_Updated: 2026-05-03T10:44:32.181871+00:00_
+_Updated: 2026-05-03T10:51:28.589182+00:00_
 
 ## Summary
 - **Total Value:** ₹549,748
@@ -34,6 +34,23 @@ _Updated: 2026-05-03T10:44:32.181871+00:00_
 - **HIGH / top_up:** JIOBLACKROCK FLEXI CAP FUND - DIRECT PLAN — Underweight Flexi Cap holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **HIGH / top_up:** HDFC FLEXI CAP FUND - DIRECT PLAN — Underweight Flexi Cap holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **MEDIUM / increase_global_diversifier:** ICICI PRUDENTIAL NASDAQ 100 INDEX FUND - DIRECT PLAN — International exposure is only 0.9% of MF sleeve; a small global sleeve can smooth India-only drawdowns and help risk-adjusted XIRR. _Build gradually toward ~5–8% MF sleeve; avoid Taiwan concentration unless explicitly desired._
+
+## 🎯 Recommended MF Portfolio
+
+- Current portfolio XIRR: 7.79%
+- Current predicted forward return: 17.87%
+- Recommended predicted XIRR/return: 21.17%
+- Predicted uplift: 3.3pp
+- 20.0% — **Parag Parikh Flexi Cap Fund - Direct Plan - Growth** | predicted 15.41% | core diversified equity allocator
+- 12.5% — **HDFC Flexi Cap Fund - Growth Option - Direct Plan** | predicted 17.13% | large/flexi core with long NAV history
+- 7.5% — **ICICI Prudential Focused Equity Fund - Direct Plan - Growth** | predicted 18.18% | focused alpha sleeve replacement candidate
+- 15.0% — **Edelweiss Mid Cap Fund - Direct Plan - Growth Option** | predicted 23.16% | best current midcap replacement score
+- 10.0% — **HDFC Mid Cap Fund - Growth Option - Direct Plan** | predicted 21.73% | second midcap diversifier
+- 7.5% — **BANDHAN SMALL CAP FUND - DIRECT PLAN GROWTH** | predicted 27.36% | small-cap sleeve with stronger 3Y score than current weak smallcap
+- 7.5% — **Nippon India Small Cap Fund - Direct Plan Growth Plan - Growth Option** | predicted 20.81% | retain best existing small-cap exposure
+- 7.5% — **ICICI Prudential Equity & Debt Fund - Direct Plan - Growth** | predicted 16.61% | drawdown stabilizer
+- 7.5% — **ICICI Prudential NASDAQ 100 Index Fund - Direct Plan - Growth** | predicted 39.0% | global diversifier / non-India growth
+- 5.0% — **HDFC Infrastructure Fund - Growth Option - Direct Plan** | predicted 23.04% | cap thematic exposure; replace oversized infra/banking sleeve
 
 ## 🔁 MF Replacement Shortlist
 

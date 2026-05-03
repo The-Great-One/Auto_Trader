@@ -346,6 +346,106 @@ def _nav_metric_for_query(query: str) -> dict[str, Any] | None:
         return None
 
 
+
+TARGET_PORTFOLIO_QUERIES: list[dict[str, Any]] = [
+    {"sleeve": "Core Flexi", "query": "Parag Parikh Flexi Cap Fund Direct Growth", "target_weight_pct": 20.0, "why": "core diversified equity allocator"},
+    {"sleeve": "Core Flexi", "query": "HDFC Flexi Cap Fund Direct Growth", "target_weight_pct": 12.5, "why": "large/flexi core with long NAV history"},
+    {"sleeve": "Focused", "query": "ICICI Prudential Focused Equity Fund Direct Growth", "target_weight_pct": 7.5, "why": "focused alpha sleeve replacement candidate"},
+    {"sleeve": "Mid Cap", "query": "Edelweiss Mid Cap Fund Direct Growth", "target_weight_pct": 15.0, "why": "best current midcap replacement score"},
+    {"sleeve": "Mid Cap", "query": "HDFC Mid-Cap Opportunities Fund Direct Growth", "target_weight_pct": 10.0, "why": "second midcap diversifier"},
+    {"sleeve": "Small Cap", "query": "Bandhan Small Cap Fund Direct Growth", "target_weight_pct": 7.5, "why": "small-cap sleeve with stronger 3Y score than current weak smallcap"},
+    {"sleeve": "Small Cap", "query": "Nippon India Small Cap Fund Direct Growth", "target_weight_pct": 7.5, "why": "retain best existing small-cap exposure"},
+    {"sleeve": "Hybrid", "query": "ICICI Prudential Equity & Debt Fund Direct Growth", "target_weight_pct": 7.5, "why": "drawdown stabilizer"},
+    {"sleeve": "Global", "query": "ICICI Prudential Nasdaq 100 Index Fund Direct Growth", "target_weight_pct": 7.5, "why": "global diversifier / non-India growth"},
+    {"sleeve": "Sector Satellite", "query": "HDFC Infrastructure Fund Direct Growth", "target_weight_pct": 5.0, "why": "cap thematic exposure; replace oversized infra/banking sleeve"},
+]
+
+
+def _expected_return_from_metric(metric: dict[str, Any] | None) -> float | None:
+    if not metric:
+        return None
+    vals = []
+    if metric.get("return_3y_cagr_pct") is not None:
+        vals.append((_safe_float(metric.get("return_3y_cagr_pct")), 0.55))
+    if metric.get("return_5y_cagr_pct") is not None:
+        vals.append((_safe_float(metric.get("return_5y_cagr_pct")), 0.30))
+    if metric.get("return_1y_pct") is not None:
+        vals.append((_safe_float(metric.get("return_1y_pct")), 0.15))
+    if not vals:
+        return None
+    den = sum(w for _, w in vals)
+    return sum(v * w for v, w in vals) / den
+
+
+def build_recommended_mf_portfolio(mf_entries: list[dict[str, Any]], portfolio_summary: dict[str, Any]) -> dict[str, Any]:
+    """Recommended target MF portfolio with predicted forward XIRR proxy.
+
+    Predicted XIRR is a forward return proxy built from NAV history, not a
+    guaranteed investor XIRR. It uses weighted 3Y/5Y/1Y returns and current MF
+    sleeve value to create an implementable target allocation.
+    """
+    mf_value = _safe_float(portfolio_summary.get("mf_value"))
+    current_pred_parts: list[tuple[float, float]] = []
+    current_rows = []
+    for m in mf_entries:
+        metric = _nav_metric_for_query(str(m.get("fund") or m.get("tradingsymbol") or ""))
+        exp = _expected_return_from_metric(metric)
+        weight = (_safe_float(m.get("current_value")) / mf_value * 100.0) if mf_value > 0 else 0.0
+        if exp is not None:
+            current_pred_parts.append((weight, exp))
+        current_rows.append({
+            "fund": (m.get("fund") or m.get("tradingsymbol") or "?")[:72],
+            "current_weight_pct": round(weight, 2),
+            "current_value": round(_safe_float(m.get("current_value")), 2),
+            "xirr_pct": m.get("xirr_pct"),
+            "predicted_return_pct": round(exp, 2) if exp is not None else None,
+        })
+
+    target_rows: list[dict[str, Any]] = []
+    pred_parts: list[tuple[float, float]] = []
+    for target in TARGET_PORTFOLIO_QUERIES:
+        metric = _nav_metric_for_query(target["query"])
+        exp = _expected_return_from_metric(metric)
+        weight = _safe_float(target.get("target_weight_pct"))
+        if exp is not None:
+            pred_parts.append((weight, exp))
+        target_rows.append({
+            "sleeve": target.get("sleeve"),
+            "fund": (metric or {}).get("matched_name") or target["query"],
+            "target_weight_pct": round(weight, 2),
+            "target_value": round(mf_value * weight / 100.0, 2) if mf_value > 0 else 0.0,
+            "predicted_return_pct": round(exp, 2) if exp is not None else None,
+            "return_1y_pct": (metric or {}).get("return_1y_pct"),
+            "return_3y_cagr_pct": (metric or {}).get("return_3y_cagr_pct"),
+            "return_5y_cagr_pct": (metric or {}).get("return_5y_cagr_pct"),
+            "vol_3y_pct": (metric or {}).get("vol_3y_pct"),
+            "why": target.get("why"),
+        })
+
+    def weighted(parts: list[tuple[float, float]]) -> float | None:
+        den = sum(w for w, v in parts if v is not None)
+        if den <= 0:
+            return None
+        return sum(w * v for w, v in parts if v is not None) / den
+
+    current_pred = weighted(current_pred_parts)
+    target_pred = weighted(pred_parts)
+    return {
+        "method": "Predicted XIRR is a forward CAGR proxy from NAV history: 55% 3Y CAGR + 30% 5Y CAGR + 15% 1Y return, weighted by target allocation. Not guaranteed; taxes/exit-loads ignored.",
+        "current_portfolio_xirr_pct": portfolio_summary.get("mf_xirr_pct"),
+        "current_predicted_return_pct": round(current_pred, 2) if current_pred is not None else None,
+        "recommended_predicted_xirr_pct": round(target_pred, 2) if target_pred is not None else None,
+        "predicted_uplift_pct": round(target_pred - current_pred, 2) if target_pred is not None and current_pred is not None else None,
+        "mf_value": round(mf_value, 2),
+        "target_allocations": target_rows,
+        "current_allocations": sorted(current_rows, key=lambda r: -_safe_float(r.get("current_weight_pct"))),
+        "implementation_notes": [
+            "Do not auto-switch ELSS locked units; route only unlocked/fresh money first.",
+            "Switch weak funds in tranches after checking exit load and LTCG/STCG.",
+            "Cap sector/thematic exposure near 5%; keep global sleeve around 7.5% initially.",
+        ],
+    }
+
 def build_mf_replacement_plan(mf_entries: list[dict[str, Any]]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     evaluated = 0
@@ -776,7 +876,14 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
         "mf_value": round(mf_value, 2),
         "mf_weight_pct": round(mf_weight_pct, 2),
     })
+    portfolio_summary_for_models = {
+        "total_value": round(total_value, 2),
+        "mf_value": round(mf_value, 2),
+        "mf_weight_pct": round(mf_weight_pct, 2),
+        "mf_xirr_pct": mf_xirr_summary.get("portfolio_xirr_pct"),
+    }
     mf_replacement_plan = build_mf_replacement_plan(mf_entries)
+    recommended_mf_portfolio = build_recommended_mf_portfolio(mf_entries, portfolio_summary_for_models)
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -799,6 +906,7 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
         "mf_xirr_summary": mf_xirr_summary,
         "mf_xirr_boosters": mf_xirr_boosters,
         "mf_replacement_plan": mf_replacement_plan,
+        "recommended_mf_portfolio": recommended_mf_portfolio,
     }
 
     return report
@@ -850,6 +958,19 @@ def format_md(report: dict[str, Any]) -> str:
         lines.append(f"- ELSS: {diag.get('elss_pct_of_mf', 0):.1f}% of MF sleeve | Sector/thematic: {diag.get('sector_thematic_pct_of_mf', 0):.1f}% | International: {diag.get('international_pct_of_mf', 0):.1f}%")
         for a in xirr_plan.get("actions", [])[:8]:
             lines.append(f"- **{a.get('priority', '').upper()} / {a.get('action', '')}:** {a.get('fund')} — {a.get('xirr_logic')} _{a.get('suggested_route')}_")
+        lines.append("")
+
+    # Recommended MF portfolio
+    rec_port = report.get("recommended_mf_portfolio") or {}
+    if rec_port.get("target_allocations"):
+        lines.append("## 🎯 Recommended MF Portfolio")
+        lines.append("")
+        lines.append(f"- Current portfolio XIRR: {rec_port.get('current_portfolio_xirr_pct', '-')}%")
+        lines.append(f"- Current predicted forward return: {rec_port.get('current_predicted_return_pct', '-')}%")
+        lines.append(f"- Recommended predicted XIRR/return: {rec_port.get('recommended_predicted_xirr_pct', '-')}%")
+        lines.append(f"- Predicted uplift: {rec_port.get('predicted_uplift_pct', '-')}pp")
+        for row in rec_port.get("target_allocations", [])[:12]:
+            lines.append(f"- {row.get('target_weight_pct', 0):.1f}% — **{row.get('fund')}** | predicted {row.get('predicted_return_pct', '-')}% | {row.get('why')}")
         lines.append("")
 
     # MF replacement plan

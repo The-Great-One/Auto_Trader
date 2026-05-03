@@ -365,6 +365,10 @@ def mf_replacement_rows(tracker: dict[str, Any]) -> list[dict[str, Any]]:
     rows = list(plan.get("actions") or [])
     return rows
 
+
+def recommended_mf_portfolio(tracker: dict[str, Any]) -> dict[str, Any]:
+    return tracker.get("recommended_mf_portfolio") or {}
+
 def normalize_price_history(df: pd.DataFrame | None) -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
@@ -1263,6 +1267,25 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
                 "MF XIRR booster actions",
                 [table_from_df(xirr_df[show_cols], "mf-xirr-booster-table", page_size=8)],
                 f"Uses your current MF holdings. ELSS {friendly(diag.get('elss_pct_of_mf'))}% of MF sleeve · sector/thematic {friendly(diag.get('sector_thematic_pct_of_mf'))}% · international {friendly(diag.get('international_pct_of_mf'))}%.",
+            ))
+
+        rec_port = recommended_mf_portfolio(tracker)
+        if rec_port.get("target_allocations"):
+            rec_cards = html.Div(
+                [
+                    metric_card("Current XIRR", friendly(rec_port.get("current_portfolio_xirr_pct")), "%"),
+                    metric_card("Current predicted", friendly(rec_port.get("current_predicted_return_pct")), "% forward"),
+                    metric_card("Recommended predicted", friendly(rec_port.get("recommended_predicted_xirr_pct")), "% forward"),
+                    metric_card("Predicted uplift", friendly(rec_port.get("predicted_uplift_pct")), "percentage points"),
+                ],
+                style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "marginBottom": "12px"},
+            )
+            rec_df = pd.DataFrame(rec_port.get("target_allocations") or [])
+            rec_cols = [c for c in ["sleeve", "fund", "target_weight_pct", "target_value", "predicted_return_pct", "return_3y_cagr_pct", "return_5y_cagr_pct", "vol_3y_pct", "why"] if c in rec_df.columns]
+            children.append(section(
+                "Recommended MF portfolio + predicted XIRR",
+                [rec_cards, table_from_df(rec_df[rec_cols], "recommended-mf-portfolio-table", page_size=12)],
+                rec_port.get("method", "Predicted XIRR is a forward return estimate from NAV history, not guaranteed."),
             ))
 
         repl_rows = mf_replacement_rows(tracker)
@@ -2673,6 +2696,25 @@ def build_mf_tab(data: dict[str, Any]) -> list[Any]:
         if cat_pct:
             cat_df = pd.DataFrame([{"category": k, "mf_sleeve_pct": v} for k, v in sorted(cat_pct.items(), key=lambda x: -x[1])])
             children.append(section("MF sleeve category weights", [table_from_df(cat_df, "mf-category-xirr-table", page_size=12)]))
+
+    rec_port = recommended_mf_portfolio(tracker)
+    if rec_port.get("target_allocations"):
+        rec_cards = html.Div(
+            [
+                metric_card("Portfolio XIRR", friendly(rec_port.get("current_portfolio_xirr_pct")), "% actual/estimated"),
+                metric_card("Current predicted", friendly(rec_port.get("current_predicted_return_pct")), "% forward"),
+                metric_card("Recommended predicted", friendly(rec_port.get("recommended_predicted_xirr_pct")), "% forward"),
+                metric_card("Uplift", friendly(rec_port.get("predicted_uplift_pct")), "percentage points"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap", "marginBottom": "12px"},
+        )
+        rec_df = pd.DataFrame(rec_port.get("target_allocations") or [])
+        rec_cols = [c for c in ["sleeve", "fund", "target_weight_pct", "target_value", "predicted_return_pct", "return_1y_pct", "return_3y_cagr_pct", "return_5y_cagr_pct", "vol_3y_pct", "why"] if c in rec_df.columns]
+        children.append(section(
+            "Recommended portfolio with predicted XIRR",
+            [rec_cards, table_from_df(rec_df[rec_cols], "recommended-mf-portfolio-mf-tab-table", page_size=12)],
+            "Target weights across current MF value. Predicted XIRR is a forward return proxy from NAV history; taxes/exit-loads/lock-ins are not deducted.",
+        ))
 
     repl_rows = mf_replacement_rows(tracker)
     if repl_rows:
