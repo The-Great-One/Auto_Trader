@@ -461,14 +461,24 @@ def validate_top_candidates(rank: list[BacktestResult], data_map: dict[str, pd.D
             "robust_score": robust_score,
             "validation_pass": bool(test.trades >= 2 and test.total_return_pct > 0),
         })
-    rows.sort(key=lambda r: (r["robust_score"], r["test"]["total_return_pct"], -abs(r["test"]["max_drawdown_pct"])), reverse=True)
+    rows.sort(
+        key=lambda r: (
+            bool(r.get("validation_pass")),
+            r["robust_score"],
+            r["test"]["total_return_pct"],
+            -abs(r["test"]["max_drawdown_pct"]),
+        ),
+        reverse=True,
+    )
+    passing = [r for r in rows if r.get("validation_pass")]
     return {
         "enabled": True,
         "split_pct": split_pct,
         "train_symbols": len(train_map),
         "test_symbols": len(test_map),
         "validated_top_n": len(rows),
-        "best_validated": rows[0] if rows else None,
+        "passing_candidates": len(passing),
+        "best_validated": passing[0] if passing else None,
         "ranked_validated": rows,
     }
 
