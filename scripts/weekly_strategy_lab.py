@@ -48,6 +48,24 @@ try:
 except ImportError:
     PYPFOPT_AVAILABLE = False
 
+try:
+    import riskfolio as rp
+    RISKFOLIO_AVAILABLE = True
+except ImportError:
+    RISKFOLIO_AVAILABLE = False
+
+try:
+    import empyrical as empyrical
+    EMPYRICAL_AVAILABLE = True
+except ImportError:
+    EMPYRICAL_AVAILABLE = False
+
+try:
+    import quantstats as qs
+    QUANTSTATS_AVAILABLE = True
+except ImportError:
+    QUANTSTATS_AVAILABLE = False
+
 # Avoid noisy file-handler permission issues during research/backtest runs.
 os.environ.setdefault("AT_DISABLE_FILE_LOGGING", "1")
 
@@ -108,6 +126,77 @@ def configured_variant_workers() -> int:
         return max(1, int(os.getenv("AT_LAB_MAX_WORKERS", str(default))))
     except Exception:
         return int(default)
+
+def _portfolio_weight_cap() -> float:
+    try:
+        return min(1.0, max(0.01, float(os.getenv("AT_LAB_PORTFOLIO_MAX_WEIGHT", "0.15"))))
+    except Exception:
+        return 0.15
+
+
+def _normalize_weight_map(weights: dict[str, float], symbols: list[str], *, cap: float | None = None) -> dict[str, float]:
+    cap = _portfolio_weight_cap() if cap is None else float(cap)
+    clean = {s: max(0.0, float(weights.get(s, 0.0) or 0.0)) for s in symbols}
+    if not clean or sum(clean.values()) <= 0:
+        return {s: 1.0 / max(1, len(symbols)) for s in symbols}
+    clean = {s: min(cap, w) for s, w in clean.items()}
+    total = sum(clean.values())
+    if total <= 0:
+        return {s: 1.0 / max(1, len(symbols)) for s in symbols}
+    return {s: float(w / total) for s, w in clean.items() if w > 1e-8}
+
+
+def _compute_return_metrics(returns: pd.Series | list[float], *, periods_per_year: int = 252) -> dict:
+    ser = pd.Series(returns, dtype=float).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    if ser.empty:
+        return {}
+    equity = (1.0 + ser).cumprod()
+    max_dd = float(((equity / equity.cummax()) - 1.0).min())
+    total_return = float(equity.iloc[-1] - 1.0)
+    years = max(len(ser) / float(periods_per_year), 1.0 / float(periods_per_year))
+    cagr = float(equity.iloc[-1] ** (1.0 / years) - 1.0) if equity.iloc[-1] > 0 else -1.0
+    vol = float(ser.std(ddof=0) * np.sqrt(periods_per_year))
+    sharpe = float((ser.mean() / ser.std(ddof=0)) * np.sqrt(periods_per_year)) if ser.std(ddof=0) > 0 else 0.0
+    downside = ser[ser < 0].std(ddof=0)
+    sortino = float((ser.mean() / downside) * np.sqrt(periods_per_year)) if downside and downside > 0 else 0.0
+    calmar = float(cagr / abs(max_dd)) if max_dd < 0 else 0.0
+    metrics = {
+        "total_return_pct": round(total_return * 100.0, 3),
+        "cagr_pct": round(cagr * 100.0, 3),
+        "max_drawdown_pct": round(max_dd * 100.0, 3),
+        "annual_volatility_pct": round(vol * 100.0, 3),
+        "sharpe": round(sharpe, 4),
+        "sortino": round(sortino, 4),
+        "calmar": round(calmar, 4),
+    }
+    if EMPYRICAL_AVAILABLE:
+        try:
+            metrics.update({
+                "empyrical_annual_return_pct": round(float(empyrical.annual_return(ser)) * 100.0, 3),
+                "empyrical_max_drawdown_pct": round(float(empyrical.max_drawdown(ser)) * 100.0, 3),
+                "empyrical_sharpe": round(float(empyrical.sharpe_ratio(ser)), 4),
+            })
+        except Exception as exc:
+            metrics["empyrical_error"] = str(exc)[:160]
+    if QUANTSTATS_AVAILABLE:
+        try:
+            metrics["quantstats_sharpe"] = round(float(qs.stats.sharpe(ser)), 4)
+            metrics["quantstats_sortino"] = round(float(qs.stats.sortino(ser)), 4)
+            metrics["quantstats_calmar"] = round(float(qs.stats.calmar(ser)), 4)
+        except Exception as exc:
+            metrics["quantstats_error"] = str(exc)[:160]
+    return metrics
+
+
+def _score_from_metrics(total_return_pct: float, trades: int, win_rate_pct: float, max_drawdown_pct: float, metrics: dict | None = None) -> float:
+    metrics = metrics or {}
+    trade_bonus = min(5.0, 0.003 * float(trades))
+    score = float(total_return_pct + trade_bonus + (0.05 * float(win_rate_pct)) - (0.75 * abs(min(0.0, max_drawdown_pct))))
+    if metrics:
+        score += 0.35 * float(metrics.get("calmar", 0.0) or 0.0)
+        score += 0.20 * float(metrics.get("sortino", 0.0) or 0.0)
+        score += 0.15 * float(metrics.get("sharpe", 0.0) or 0.0)
+    return score
 
 
 def configured_variant_batch() -> tuple[int, int | None]:
@@ -196,6 +285,7 @@ class BacktestResult:
     selection_score: float
     rnn_enabled: bool = False
     rnn_avg_test_accuracy: float = 0.0
+    risk_metrics: dict | None = None
 
 
 def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
@@ -857,15 +947,16 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         for sell_patch in priority_meanrev_sell:
             priority_idx += 1
             add(f"priority_meanrev_{priority_idx:03d}", buy_patch, sell_patch, {"enabled": False})
-    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE:
+    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE:
         for buy_patch in priority_meanrev_buy[:2]:
             priority_idx += 1
-            add(
-                f"priority_po_meanrev_{priority_idx:03d}",
-                buy_patch,
-                {"meanrev_exit_rsi": 60, "meanrev_exit_bb_pctb": 0.8, "meanrev_exit_bars": 5, "equity_time_stop_bars": 20},
-                {"enabled": False, "portfolio_opt": True},
-            )
+            for method in ["skfolio_hrp", "riskfolio_hrp_mv", "riskfolio_min_cvar", "riskfolio_cvar_sharpe", "inverse_volatility"]:
+                add(
+                    f"priority_po_{method}_{priority_idx:03d}",
+                    buy_patch,
+                    {"meanrev_exit_rsi": 60, "meanrev_exit_bb_pctb": 0.8, "meanrev_exit_bars": 5, "equity_time_stop_bars": 20},
+                    {"enabled": False, "portfolio_opt": True, "portfolio_method": method},
+                )
 
     if base_rnn_cfg.enabled:
         add(
@@ -1017,7 +1108,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     # Portfolio-optimized variants: reuse best curated buy combos with portfolio optimization
     # These use skfolio/PyPortfolioOpt to weight symbols by correlation structure
-    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE:
+    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE:
         # Top curated combos that should benefit most from portfolio optimization
         po_buy_combos = [
             {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5, "max_obv_zscore": 5.0, "cci_buy_min": -175, "cmf_base_min": 0.0, "mmi_risk_off": 75},
@@ -1038,7 +1129,8 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         for buy_patch in po_buy_combos:
             for sell_patch in po_sell_combos:
                 po_idx += 1
-                add(f"po_hrp_{po_idx:03d}", buy_patch, sell_patch, {"enabled": False, "portfolio_opt": True})
+                for method in ["skfolio_hrp", "riskfolio_hrp_mv", "riskfolio_min_cvar", "riskfolio_cvar_sharpe", "pypfopt_max_sharpe", "inverse_volatility"]:
+                    add(f"po_{method}_{po_idx:03d}", buy_patch, sell_patch, {"enabled": False, "portfolio_opt": True, "portfolio_method": method})
 
     max_variants = int(os.getenv("AT_LAB_MAX_VARIANTS", "900"))
     return out[:max_variants]
@@ -1146,7 +1238,7 @@ def _run_variant_worker(task: tuple[str, dict, dict, dict]) -> BacktestResult:
         raise RuntimeError("Variant worker data not initialized")
     name, buy_params, sell_params, rnn_params = task
     use_portfolio_opt = bool(rnn_params.get("portfolio_opt"))
-    if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE):
+    if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE):
         return run_portfolio_optimized(
             name,
             _WORKER_DATA_MAP,
@@ -1268,8 +1360,15 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
     ret = (total_final_value / start_capital - 1.0) * 100.0
     round_trips = max(1, total_trades // 2)
     win_rate = (total_wins / round_trips) * 100.0
-    trade_bonus = min(5.0, 0.003 * float(total_trades))
-    selection_score = float(ret + trade_bonus + (0.05 * float(win_rate)) - (0.75 * abs(min(0.0, worst_dd))))
+    portfolio_metrics = locals().get("portfolio_metrics", {})
+    if not portfolio_metrics and 'symbol_returns' in locals() and symbol_returns:
+        try:
+            min_len_for_metrics = min(len(v) for v in symbol_returns.values())
+            eq_weight_returns = pd.DataFrame({sym: rets[:min_len_for_metrics] for sym, rets in symbol_returns.items()}, dtype=float).mean(axis=1)
+            portfolio_metrics = _compute_return_metrics(eq_weight_returns)
+        except Exception:
+            portfolio_metrics = {}
+    selection_score = _score_from_metrics(ret, total_trades, win_rate, worst_dd, portfolio_metrics)
     if rnn_params.get("enabled"):
         selection_score += 0.05 * float(np.mean(rnn_accuracies) if rnn_accuracies else 0.0)
 
@@ -1285,6 +1384,7 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
         selection_score=round(selection_score, 3),
         rnn_enabled=bool(rnn_params.get("enabled")),
         rnn_avg_test_accuracy=round(float(np.mean(rnn_accuracies) if rnn_accuracies else 0.0), 4),
+        risk_metrics={},
     )
 
 
@@ -1445,18 +1545,18 @@ def run_portfolio_optimized(
             )
 
             # Step 3: Optimize portfolio allocation
-            opt_result = _optimize_portfolio_weights(returns_df, name)
+            opt_result = _optimize_portfolio_weights(returns_df, name, method=str(rnn_params.get("portfolio_method", "auto")))
 
-            # Step 4: Apply optimized weights to compute portfolio return
+            # Step 4: Apply optimized weights to the aligned daily return matrix.
             weights = opt_result.get("weights", {})
-            # Weighted portfolio: final_value is the ending value of a 100k allocation.
-            # Weighting those ending values gives the ending value of one 100k portfolio.
             fallback_weight = 1.0 / max(1, len(tested_symbols))
-            total_final = sum(
-                symbol_stats[sym]["final_value"] * weights.get(sym, fallback_weight)
-                for sym in tested_symbols
-                if sym in symbol_stats
-            )
+            weight_vec = pd.Series({sym: weights.get(sym, fallback_weight) for sym in returns_df.columns}, dtype=float)
+            weight_vec = weight_vec / weight_vec.sum() if weight_vec.sum() > 0 else pd.Series(1.0 / len(returns_df.columns), index=returns_df.columns)
+            portfolio_returns = returns_df.mul(weight_vec, axis=1).sum(axis=1)
+            portfolio_equity = 100000.0 * (1.0 + portfolio_returns).cumprod()
+            total_final = float(portfolio_equity.iloc[-1]) if not portfolio_equity.empty else 100000.0
+            portfolio_metrics = _compute_return_metrics(portfolio_returns)
+            worst_dd = float(portfolio_metrics.get("max_drawdown_pct", worst_dd))
             start_cap = 100000.0
             ret = (total_final / start_cap - 1.0) * 100.0
 
@@ -1471,8 +1571,15 @@ def run_portfolio_optimized(
     ret = (total_final / start_capital - 1.0) * 100.0
     round_trips = max(1, total_trades // 2)
     win_rate = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
-    trade_bonus = min(5.0, 0.003 * float(total_trades))
-    selection_score = float(ret + trade_bonus + (0.05 * float(win_rate)) - (0.75 * abs(min(0.0, worst_dd))))
+    portfolio_metrics = locals().get("portfolio_metrics", {})
+    if not portfolio_metrics and 'symbol_returns' in locals() and symbol_returns:
+        try:
+            min_len_for_metrics = min(len(v) for v in symbol_returns.values())
+            eq_weight_returns = pd.DataFrame({sym: rets[:min_len_for_metrics] for sym, rets in symbol_returns.items()}, dtype=float).mean(axis=1)
+            portfolio_metrics = _compute_return_metrics(eq_weight_returns)
+        except Exception:
+            portfolio_metrics = {}
+    selection_score = _score_from_metrics(ret, total_trades, win_rate, worst_dd, portfolio_metrics)
 
     return BacktestResult(
         name=name,
@@ -1481,15 +1588,23 @@ def run_portfolio_optimized(
         trades=int(total_trades),
         win_rate_pct=round(float(win_rate), 2),
         max_drawdown_pct=round(float(worst_dd), 2),
-        params={"buy": buy_params, "sell": sell_params, "rnn": rnn_params, "portfolio_opt": True},
+        params={
+            "buy": buy_params,
+            "sell": sell_params,
+            "rnn": rnn_params,
+            "portfolio_opt": True,
+            "portfolio_method": str(rnn_params.get("portfolio_method", locals().get("opt_result", {}).get("method", "auto"))),
+            "portfolio_optimizer_used": locals().get("opt_result", {}).get("method", "none"),
+        },
         symbols_tested=tested_symbols,
         selection_score=round(selection_score, 3),
         rnn_enabled=bool(rnn_params.get("enabled")),
         rnn_avg_test_accuracy=0.0,
+        risk_metrics=portfolio_metrics or {},
     )
 
 
-def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = "") -> dict:
+def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = "", method: str = "auto") -> dict:
     """Optimize portfolio weights using skfolio HRP or PyPortfolioOpt efficient frontier.
 
     Returns dict with 'weights' (symbol -> weight), 'method', and 'opt_return'.
@@ -1502,8 +1617,45 @@ def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = ""
         result["method"] = "equal_weight_fallback"
         return result
 
+    requested_method = (method or "auto").strip().lower()
+    cap = _portfolio_weight_cap()
+
+    if requested_method in {"equal", "equal_weight"}:
+        result["weights"] = {s: 1.0 / n_symbols for s in symbols}
+        result["method"] = "equal_weight"
+        return result
+
+    if requested_method in {"inverse_vol", "inverse_volatility"}:
+        vols = returns_df.std()
+        inv_vols = 1.0 / vols.replace(0, np.nan)
+        raw = (inv_vols / inv_vols.sum()).fillna(1.0 / n_symbols).to_dict()
+        result["weights"] = _normalize_weight_map(raw, symbols, cap=cap)
+        result["method"] = "inverse_volatility"
+        return result
+
+    if RISKFOLIO_AVAILABLE and requested_method in {"auto", "riskfolio_hrp_mv", "riskfolio_hrp", "riskfolio_min_cvar", "riskfolio_cvar_sharpe"}:
+        try:
+            clean_returns = returns_df.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+            if requested_method in {"auto", "riskfolio_hrp_mv", "riskfolio_hrp"}:
+                port = rp.HCPortfolio(returns=clean_returns)
+                w = port.optimization(model="HRP", codependence="pearson", rm="MV", linkage="single", leaf_order=True)
+                raw = w.iloc[:, 0].astype(float).to_dict() if hasattr(w, "iloc") else dict(w)
+                result["weights"] = _normalize_weight_map(raw, symbols, cap=cap)
+                result["method"] = "riskfolio_hrp_mv"
+                return result
+            port = rp.Portfolio(returns=clean_returns)
+            port.assets_stats(method_mu="hist", method_cov="hist")
+            obj = "Sharpe" if requested_method == "riskfolio_cvar_sharpe" else "MinRisk"
+            w = port.optimization(model="Classic", rm="CVaR", obj=obj, rf=0, l=0, hist=True)
+            raw = w.iloc[:, 0].astype(float).to_dict() if hasattr(w, "iloc") else dict(w)
+            result["weights"] = _normalize_weight_map(raw, symbols, cap=cap)
+            result["method"] = requested_method
+            return result
+        except Exception as exc:
+            result["riskfolio_error"] = str(exc)[:200]
+
     # Try skfolio HRP first (handles non-normal returns, no inversion needed)
-    if SKFOLIO_AVAILABLE:
+    if SKFOLIO_AVAILABLE and requested_method in {"auto", "skfolio_hrp"}:
         try:
             hrp = HierarchicalRiskParity(
                 risk_measure=RiskMeasure.VARIANCE,
@@ -1514,7 +1666,7 @@ def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = ""
             weights = {}
             for i, sym in enumerate(symbols):
                 weights[sym] = float(hrp.weights_[i]) if hasattr(hrp, 'weights_') else 1.0 / n_symbols
-            result["weights"] = weights
+            result["weights"] = _normalize_weight_map(weights, symbols, cap=cap)
             result["method"] = "skfolio_hrp"
             result["opt_return"] = float(port.mean) if hasattr(port, 'mean') else 0.0
             return result
@@ -1522,14 +1674,14 @@ def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = ""
             pass
 
     # Fallback: PyPortfolioOpt efficient frontier with shrinkage covariance
-    if PYPFOPT_AVAILABLE:
+    if PYPFOPT_AVAILABLE and requested_method in {"auto", "pypfopt_max_sharpe"}:
         try:
             mu = mean_historical_return(returns_df, compounding=False)
             S = CovarianceShrinkage(returns_df).ledoit_wolf()
             ef = EfficientFrontier(mu, S, weight_bounds=(0.0, 0.15))
             ef.max_sharpe()
             weights = ef.clean_weights()
-            result["weights"] = {k: float(v) for k, v in weights.items() if v > 0.001}
+            result["weights"] = _normalize_weight_map({k: float(v) for k, v in weights.items() if v > 0.001}, symbols, cap=cap)
             result["method"] = "pypfopt_max_sharpe"
             return result
         except Exception:
@@ -1539,7 +1691,7 @@ def _optimize_portfolio_weights(returns_df: pd.DataFrame, variant_name: str = ""
     vols = returns_df.std()
     inv_vols = 1.0 / vols.replace(0, 1e-10)
     total_iv = inv_vols.sum()
-    result["weights"] = {s: float(inv_vols[s] / total_iv) for s in symbols}
+    result["weights"] = _normalize_weight_map({s: float(inv_vols[s] / total_iv) for s in symbols}, symbols, cap=cap)
     result["method"] = "inverse_volatility"
     return result
 
@@ -1751,7 +1903,7 @@ def main():
                 variant_workers=variant_workers,
             )
             use_portfolio_opt = bool(rnn_params.get("portfolio_opt"))
-            if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE):
+            if use_portfolio_opt and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE):
                 results.append(run_portfolio_optimized(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))
             else:
                 results.append(run_variant(name, data_map, b, s, rnn_params=rnn_params, rnn_models=rnn_models))

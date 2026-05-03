@@ -1,0 +1,11 @@
+# Optional research/lab libraries. Keep separate from production requirements.
+# Use on the secondary research host or an isolated venv; final results still
+# must be validated through Auto_Trader's Kite/live-parity lab engine.
+riskfolio-lib==7.2.1
+quantstats==0.0.81
+empyrical-reloaded==0.5.12
+ffn==1.1.5
+alphalens-reloaded==0.4.6
+arch==8.0.0
+pyod==3.2.1
+stumpy>=1.14.0
