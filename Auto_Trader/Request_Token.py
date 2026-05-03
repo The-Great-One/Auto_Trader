@@ -6,7 +6,6 @@ from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY, PASS, TOTP_KEY, USER_NAME
 import sys
 import logging
-import time
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -60,15 +59,25 @@ def get_request_token(credentials: dict | None = None) -> str:
         data=login_payload,
         timeout=10,
     )
+    login_payload_json = {}
     try:
-        login_data = login_response.json().get("data", {})
+        login_payload_json = login_response.json()
+        login_data = login_payload_json.get("data", {}) or {}
     except ValueError:
         login_data = {}
 
-    # Check if login was successful
+    # Check if login was successful. Kite sometimes returns a CAPTCHA challenge
+    # before TOTP, which is not a credential or TOTP failure and needs manual
+    # request-token recovery rather than repeated automated retries.
     if login_response.status_code != 200 or "request_id" not in login_data:
-        logger.error("Login failed, please check your credentials.")
-        time.sleep(60)
+        error_message = str(login_payload_json.get("message") or "").strip()
+        login_data_keys = set(login_data.keys()) if isinstance(login_data, dict) else set()
+        if "captcha" in error_message.lower() or "captcha" in login_data_keys:
+            logger.error("Kite login blocked by CAPTCHA challenge before TOTP.")
+        elif error_message:
+            logger.error("Kite login failed before TOTP: %s", error_message)
+        else:
+            logger.error("Kite login failed before TOTP; no request_id returned.")
         sys.exit(1)
 
     # TOTP POST request
