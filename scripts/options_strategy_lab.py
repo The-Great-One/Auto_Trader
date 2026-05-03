@@ -441,11 +441,15 @@ def validate_top_candidates(rank: list[BacktestResult], data_map: dict[str, pd.D
         params = dict((cand.params or {}).get("options", {}) or {})
         train = run_variant(cand.name, train_map, params)
         test = run_variant(cand.name, test_map, params)
+        no_test_trade_penalty = 100.0 if test.trades < 2 else 0.0
+        non_positive_test_penalty = 25.0 if test.total_return_pct <= 0 else 0.0
         robust_score = round(
             (0.65 * test.selection_score)
             + (0.25 * train.selection_score)
             + (0.10 * cand.selection_score)
-            - (0.20 * max(0.0, abs(test.max_drawdown_pct) - abs(train.max_drawdown_pct))),
+            - (0.20 * max(0.0, abs(test.max_drawdown_pct) - abs(train.max_drawdown_pct)))
+            - no_test_trade_penalty
+            - non_positive_test_penalty,
             3,
         )
         rows.append({
@@ -455,6 +459,7 @@ def validate_top_candidates(rank: list[BacktestResult], data_map: dict[str, pd.D
             "train": asdict(train),
             "test": asdict(test),
             "robust_score": robust_score,
+            "validation_pass": bool(test.trades >= 2 and test.total_return_pct > 0),
         })
     rows.sort(key=lambda r: (r["robust_score"], r["test"]["total_return_pct"], -abs(r["test"]["max_drawdown_pct"])), reverse=True)
     return {
