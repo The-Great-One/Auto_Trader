@@ -663,6 +663,13 @@ def load_scorecard_context() -> dict:
 
 
 def load_fundamental_context() -> dict:
+    if os.getenv("AT_LAB_SKIP_FUNDAMENTALS", "0").strip().lower() in {"1", "true", "yes"} or os.getenv("AT_LAB_SYMBOLS", "").strip():
+        return {
+            "fundamentals_found": False,
+            "code_findings": ["fundamental_screener_skipped_for_cache_lab"],
+            "approved_equities": [],
+            "approved_etfs": [],
+        }
     try:
         from Auto_Trader.StrongFundamentalsStockList import goodStocks
 
