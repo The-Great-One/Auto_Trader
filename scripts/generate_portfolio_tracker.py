@@ -18,7 +18,9 @@ from __future__ import annotations
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,9 @@ if str(ROOT) not in sys.path:
 REPORTS_DIR = ROOT / "reports"
 OUTPUT_JSON = REPORTS_DIR / "portfolio_tracker_latest.json"
 OUTPUT_MD = REPORTS_DIR / "portfolio_tracker_latest.md"
+DASHBOARD_DIR = ROOT / "dashboard"
+if str(DASHBOARD_DIR) not in sys.path:
+    sys.path.insert(0, str(DASHBOARD_DIR))
 
 
 # ── Category & risk metadata ──────────────────────────────────────────
@@ -91,6 +96,305 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     except Exception:
         return default
 
+
+
+def _parse_dt(value: Any) -> datetime | None:
+    if value in (None, "", "None"):
+        return None
+    try:
+        if isinstance(value, datetime):
+            return value.replace(tzinfo=None)
+        # pandas handles date/datetime strings and date objects cleanly.
+        import pandas as pd
+        ts = pd.to_datetime(value, errors="coerce")
+        if pd.isna(ts):
+            return None
+        return ts.to_pydatetime().replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _xnpv(rate: float, cashflows: list[tuple[datetime, float]]) -> float:
+    if not cashflows:
+        return 0.0
+    t0 = min(d for d, _ in cashflows)
+    total = 0.0
+    for d, amount in cashflows:
+        years = max(0.0, (d - t0).days / 365.0)
+        total += amount / ((1.0 + rate) ** years)
+    return total
+
+
+def _xirr(cashflows: list[tuple[datetime, float]]) -> float | None:
+    flows = [(d, float(v)) for d, v in cashflows if d is not None and abs(float(v)) > 1e-9]
+    if len(flows) < 2 or not any(v < 0 for _, v in flows) or not any(v > 0 for _, v in flows):
+        return None
+    # Bisection is slower than Newton but much more stable for short MF cashflows.
+    low, high = -0.95, 5.0
+    f_low, f_high = _xnpv(low, flows), _xnpv(high, flows)
+    expand = 0
+    while f_low * f_high > 0 and expand < 8:
+        high *= 2
+        f_high = _xnpv(high, flows)
+        expand += 1
+    if f_low * f_high > 0:
+        return None
+    for _ in range(100):
+        mid = (low + high) / 2.0
+        f_mid = _xnpv(mid, flows)
+        if abs(f_mid) < 1e-5:
+            return mid
+        if f_low * f_mid <= 0:
+            high = mid
+            f_high = f_mid
+        else:
+            low = mid
+            f_low = f_mid
+    return (low + high) / 2.0
+
+
+def _order_cashflow_amount(order: dict[str, Any]) -> float:
+    amount = _safe_float(order.get("amount"))
+    if amount > 0:
+        return amount
+    qty = _safe_float(order.get("quantity"))
+    price = _safe_float(order.get("average_price")) or _safe_float(order.get("price"))
+    return qty * price
+
+
+def _build_mf_cashflows_by_symbol(mf_orders: list[dict[str, Any]], mf_entries: list[dict[str, Any]]) -> tuple[dict[str, list[tuple[datetime, float]]], dict[str, Any]]:
+    today = datetime.now().replace(tzinfo=None)
+    flows: dict[str, list[tuple[datetime, float]]] = {}
+    completed_orders = 0
+    skipped_orders = 0
+    for order in mf_orders or []:
+        status = str(order.get("status") or "").upper()
+        if status not in {"COMPLETE", "COMPLETED"}:
+            skipped_orders += 1
+            continue
+        symbol = str(order.get("tradingsymbol") or "").strip().upper()
+        if not symbol:
+            continue
+        dt = _parse_dt(order.get("exchange_timestamp") or order.get("order_timestamp"))
+        amount = _order_cashflow_amount(order)
+        if not dt or amount <= 0:
+            skipped_orders += 1
+            continue
+        tx = str(order.get("transaction_type") or "BUY").upper()
+        sign = -1.0 if tx == "BUY" else 1.0
+        flows.setdefault(symbol, []).append((dt, sign * amount))
+        completed_orders += 1
+
+    total_terminal = 0.0
+    for m in mf_entries:
+        symbol = str(m.get("tradingsymbol") or "").strip().upper()
+        value = _safe_float(m.get("current_value"))
+        if symbol and value > 0:
+            flows.setdefault(symbol, []).append((today, value))
+            total_terminal += value
+    meta = {
+        "completed_orders_used": completed_orders,
+        "orders_skipped": skipped_orders,
+        "terminal_value": round(total_terminal, 2),
+        "as_of": today.isoformat(timespec="seconds"),
+    }
+    return flows, meta
+
+
+def enrich_mf_xirr(mf_entries: list[dict[str, Any]], mf_orders: list[dict[str, Any]]) -> dict[str, Any]:
+    flows_by_symbol, meta = _build_mf_cashflows_by_symbol(mf_orders, mf_entries)
+    today = datetime.now().replace(tzinfo=None)
+    all_flows: list[tuple[datetime, float]] = []
+    by_symbol: dict[str, dict[str, Any]] = {}
+    for m in mf_entries:
+        symbol = str(m.get("tradingsymbol") or "").strip().upper()
+        flows = list(flows_by_symbol.get(symbol, []))
+        terminal_value = _safe_float(m.get("current_value"))
+        cost_value = _safe_float(m.get("cost_value"))
+        dated_invested = -sum(v for _, v in flows if v < 0)
+        missing_cost = max(0.0, cost_value - dated_invested)
+        xirr_source = "kite_completed_orders"
+        if missing_cost > max(500.0, cost_value * 0.05):
+            # Kite's MF order endpoint is often recent-only. Add a clearly marked
+            # synthetic opening lot so the dashboard can still show a usable
+            # estimated XIRR while surfacing that exact dated lots are missing.
+            first_dt = min((d for d, v in flows if v < 0), default=today)
+            synthetic_dt = min(first_dt - timedelta(days=365), today - timedelta(days=365))
+            flows.append((synthetic_dt, -missing_cost))
+            xirr_source = "estimated_with_synthetic_opening_lot"
+        invested = -sum(v for _, v in flows if v < 0)
+        redeemed = sum(v for _, v in flows if v > 0) - terminal_value
+        x = _xirr(flows)
+        if x is not None:
+            m["xirr_pct"] = round(x * 100.0, 2)
+            m["xirr_available"] = True
+        else:
+            # Holding gain is not XIRR; keep it visibly separate.
+            m["xirr_pct"] = None
+            m["xirr_available"] = False
+        m["xirr_source"] = xirr_source if m.get("xirr_available") else "unavailable"
+        m["xirr_missing_cost_estimated"] = round(missing_cost, 2)
+        m["cashflow_invested"] = round(invested, 2)
+        m["cashflow_redeemed"] = round(max(0.0, redeemed), 2)
+        m["cashflow_count"] = len(flows)
+        by_symbol[symbol] = {
+            "fund": m.get("fund") or symbol,
+            "xirr_pct": m.get("xirr_pct"),
+            "current_value": m.get("current_value"),
+            "cashflow_count": len(flows),
+        }
+        all_flows.extend(flows)
+    portfolio_xirr = _xirr(all_flows)
+    return {
+        "portfolio_xirr_pct": round(portfolio_xirr * 100.0, 2) if portfolio_xirr is not None else None,
+        "by_symbol": by_symbol,
+        **meta,
+        "method": "Completed Kite MF orders as dated cash outflows/inflows plus current holding value as terminal inflow. Processing orders are excluded.",
+    }
+
+
+REPLACEMENT_CANDIDATES_BY_CATEGORY: dict[str, list[str]] = {
+    "Flexi Cap": ["Parag Parikh Flexi Cap Fund Direct Growth", "HDFC Flexi Cap Fund Direct Growth", "JM Flexicap Fund Direct Growth", "Kotak Flexicap Fund Direct Growth"],
+    "Focused": ["SBI Focused Equity Fund Direct Growth", "HDFC Focused 30 Fund Direct Growth", "ICICI Prudential Focused Equity Fund Direct Growth"],
+    "Mid Cap": ["Motilal Oswal Midcap Fund Direct Growth", "HDFC Mid-Cap Opportunities Fund Direct Growth", "Edelweiss Mid Cap Fund Direct Growth", "Kotak Emerging Equity Scheme Direct Growth"],
+    "Small Cap": ["Nippon India Small Cap Fund Direct Growth", "Tata Small Cap Fund Direct Growth", "HSBC Small Cap Fund Direct Growth", "Bandhan Small Cap Fund Direct Growth", "Quant Small Cap Fund Direct Growth"],
+    "ELSS": ["Parag Parikh ELSS Tax Saver Fund Direct Growth", "Quant ELSS Tax Saver Fund Direct Growth", "Mirae Asset ELSS Tax Saver Fund Direct Growth", "DSP ELSS Tax Saver Fund Direct Growth"],
+    "Hybrid/Equity+Debt": ["ICICI Prudential Equity & Debt Fund Direct Growth", "HDFC Balanced Advantage Fund Direct Growth", "Edelweiss Aggressive Hybrid Fund Direct Growth"],
+    "Sectoral/Banking": ["Parag Parikh Flexi Cap Fund Direct Growth", "HDFC Flexi Cap Fund Direct Growth", "ICICI Prudential Nifty Bank ETF", "Nippon India Banking & Financial Services Fund Direct Growth"],
+    "Infrastructure": ["ICICI Prudential Infrastructure Fund Direct Growth", "HDFC Infrastructure Fund Direct Growth", "Parag Parikh Flexi Cap Fund Direct Growth"],
+    "Index/NASDAQ": ["ICICI Prudential Nasdaq 100 Index Fund Direct Growth", "Motilal Oswal Nasdaq 100 Fund of Fund Direct Growth", "Mirae Asset NYSE FANG+ ETF Fund of Fund Direct Growth"],
+    "International/Taiwan": ["ICICI Prudential Nasdaq 100 Index Fund Direct Growth", "Motilal Oswal Nasdaq 100 Fund of Fund Direct Growth", "Parag Parikh Flexi Cap Fund Direct Growth"],
+    "Unknown": ["Parag Parikh Flexi Cap Fund Direct Growth", "HDFC Flexi Cap Fund Direct Growth"],
+}
+
+
+def _tokens(text: str) -> set[str]:
+    stop = {"fund", "direct", "plan", "growth", "option", "regular", "the", "and", "of"}
+    return {t for t in re.findall(r"[a-z0-9]+", str(text).lower()) if t not in stop and len(t) > 1}
+
+
+def _match_scheme_code(query: str) -> tuple[int | None, str | None]:
+    try:
+        from mf_dash_utils import fetch_scheme_list
+        schemes = fetch_scheme_list()
+    except Exception:
+        return None, None
+    qtok = _tokens(query)
+    if not qtok:
+        return None, None
+    best_score = -1.0
+    best = None
+    for row in schemes.itertuples(index=False):
+        name = str(row.scheme_name)
+        ntok = _tokens(name)
+        if not ntok:
+            continue
+        score = len(qtok & ntok) / max(1, len(qtok | ntok))
+        # Prefer direct growth matches.
+        lname = name.lower()
+        if "direct" in lname:
+            score += 0.08
+        if "growth" in lname:
+            score += 0.05
+        if score > best_score:
+            best_score = score
+            best = row
+    if best is None or best_score < 0.28:
+        return None, None
+    return int(best.scheme_code), str(best.scheme_name)
+
+
+def _nav_metric_for_query(query: str) -> dict[str, Any] | None:
+    code, matched_name = _match_scheme_code(query)
+    if not code:
+        return None
+    try:
+        from mf_dash_utils import fetch_nav_history
+        import pandas as pd
+        nav = fetch_nav_history(code)
+        if nav is None or nav.empty or len(nav) < 120:
+            return None
+        nav = nav.sort_values("date").reset_index(drop=True)
+        latest_date = pd.Timestamp(nav["date"].iloc[-1])
+        latest_nav = float(nav["nav"].iloc[-1])
+        def cagr(years: int) -> float | None:
+            cutoff = latest_date - pd.DateOffset(years=years)
+            hist = nav[nav["date"] <= cutoff]
+            if hist.empty:
+                return None
+            start_nav = float(hist["nav"].iloc[-1])
+            if start_nav <= 0:
+                return None
+            actual_years = max(0.25, (latest_date - pd.Timestamp(hist["date"].iloc[-1])).days / 365.0)
+            return ((latest_nav / start_nav) ** (1.0 / actual_years) - 1.0) * 100.0
+        one = cagr(1)
+        three = cagr(3)
+        five = cagr(5)
+        ret = nav.set_index("date")["nav"].pct_change().dropna()
+        vol = float(ret.tail(756).std() * (252 ** 0.5) * 100.0) if len(ret) > 30 else None
+        score = (three if three is not None else 0.0) * 0.55 + (five if five is not None else (three or 0.0)) * 0.25 + (one if one is not None else 0.0) * 0.20 - (vol or 0.0) * 0.08
+        return {
+            "scheme_code": code,
+            "matched_name": matched_name,
+            "return_1y_pct": round(one, 2) if one is not None else None,
+            "return_3y_cagr_pct": round(three, 2) if three is not None else None,
+            "return_5y_cagr_pct": round(five, 2) if five is not None else None,
+            "vol_3y_pct": round(vol, 2) if vol is not None else None,
+            "score": round(score, 2),
+        }
+    except Exception:
+        return None
+
+
+def build_mf_replacement_plan(mf_entries: list[dict[str, Any]]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    evaluated = 0
+    for m in sorted(mf_entries, key=lambda x: _safe_float(x.get("current_value")), reverse=True):
+        category = str(m.get("category") or "Unknown")
+        xirr = m.get("xirr_pct")
+        gain = _safe_float(m.get("gain_pct"))
+        weak = (xirr is not None and _safe_float(xirr) < 10.0) or gain < 0 or str(m.get("recommendation") or "").lower() == "sell"
+        if not weak:
+            continue
+        current_metric = _nav_metric_for_query(str(m.get("fund") or m.get("tradingsymbol") or ""))
+        candidates = []
+        for q in REPLACEMENT_CANDIDATES_BY_CATEGORY.get(category, REPLACEMENT_CANDIDATES_BY_CATEGORY["Unknown"]):
+            metric = _nav_metric_for_query(q)
+            if not metric:
+                continue
+            if current_metric and metric.get("scheme_code") == current_metric.get("scheme_code"):
+                continue
+            candidates.append(metric)
+            evaluated += 1
+        candidates = sorted(candidates, key=lambda x: _safe_float(x.get("score")), reverse=True)[:3]
+        for cand in candidates:
+            current_3y = current_metric.get("return_3y_cagr_pct") if current_metric else None
+            uplift = None
+            if current_3y is not None and cand.get("return_3y_cagr_pct") is not None:
+                uplift = round(_safe_float(cand.get("return_3y_cagr_pct")) - _safe_float(current_3y), 2)
+                if uplift < 0.5:
+                    continue
+            rows.append({
+                "priority": "high" if (xirr is not None and _safe_float(xirr) < 6) or gain < -3 else "medium",
+                "current_fund": (m.get("fund") or m.get("tradingsymbol") or "?")[:72],
+                "category": category,
+                "current_value": round(_safe_float(m.get("current_value")), 2),
+                "current_xirr_pct": xirr,
+                "current_gain_pct": round(gain, 2),
+                "current_3y_cagr_pct": current_3y,
+                "replacement_fund": cand.get("matched_name"),
+                "replacement_1y_pct": cand.get("return_1y_pct"),
+                "replacement_3y_cagr_pct": cand.get("return_3y_cagr_pct"),
+                "replacement_5y_cagr_pct": cand.get("return_5y_cagr_pct"),
+                "replacement_vol_3y_pct": cand.get("vol_3y_pct"),
+                "estimated_3y_cagr_uplift_pct": uplift,
+                "action_logic": "Switch only after exit-load, LTCG/STCG, and ELSS lock-in checks; use this as a shortlist, not an auto-order.",
+            })
+    return {
+        "method": "Compares weak current holdings with curated same-sleeve/direct-plan candidates using MFAPI NAV 1Y/3Y/5Y CAGR and volatility.",
+        "evaluated_candidates": evaluated,
+        "actions": rows[:18],
+    }
 
 def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: dict[str, Any]) -> dict[str, Any]:
     """Build actionable, current-holding based MF XIRR improvement ideas.
@@ -466,11 +770,13 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
             category_breakdown[cat]["value"] += h.get("current_value", 0)
             category_breakdown[cat]["cost"] += h.get("cost_value", 0)
 
+    mf_xirr_summary = enrich_mf_xirr(mf_entries, holdings_data.get("mf_orders") or [])
     mf_xirr_boosters = build_mf_xirr_boosters(mf_entries, {
         "total_value": round(total_value, 2),
         "mf_value": round(mf_value, 2),
         "mf_weight_pct": round(mf_weight_pct, 2),
     })
+    mf_replacement_plan = build_mf_replacement_plan(mf_entries)
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -483,13 +789,16 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
             "equity_weight_pct": round(eq_weight_pct, 2),
             "mf_value": round(mf_value, 2),
             "mf_weight_pct": round(mf_weight_pct, 2),
+            "mf_xirr_pct": mf_xirr_summary.get("portfolio_xirr_pct"),
             "n_equity_holdings": len(eq_entries),
             "n_mf_holdings": len(mf_entries),
         },
         "equity_holdings": eq_entries,
         "mf_holdings": mf_entries,
         "category_breakdown": category_breakdown,
+        "mf_xirr_summary": mf_xirr_summary,
         "mf_xirr_boosters": mf_xirr_boosters,
+        "mf_replacement_plan": mf_replacement_plan,
     }
 
     return report
@@ -509,6 +818,8 @@ def format_md(report: dict[str, Any]) -> str:
     lines.append(f"- **Total P/L:** ₹{s['total_pnl']:,.0f} ({s['total_pnl_pct']:.2f}%)")
     lines.append(f"- **Equity:** ₹{s['equity_value']:,.0f} ({s['equity_weight_pct']:.1f}%)")
     lines.append(f"- **Mutual Funds:** ₹{s['mf_value']:,.0f} ({s['mf_weight_pct']:.1f}%)")
+    if s.get("mf_xirr_pct") is not None:
+        lines.append(f"- **MF XIRR:** {s['mf_xirr_pct']:+.2f}%")
     lines.append("")
 
     # Category breakdown
@@ -541,6 +852,17 @@ def format_md(report: dict[str, Any]) -> str:
             lines.append(f"- **{a.get('priority', '').upper()} / {a.get('action', '')}:** {a.get('fund')} — {a.get('xirr_logic')} _{a.get('suggested_route')}_")
         lines.append("")
 
+    # MF replacement plan
+    repl_plan = report.get("mf_replacement_plan") or {}
+    if repl_plan.get("actions"):
+        lines.append("## 🔁 MF Replacement Shortlist")
+        lines.append("")
+        for r in repl_plan.get("actions", [])[:10]:
+            uplift = r.get("estimated_3y_cagr_uplift_pct")
+            uplift_txt = f" | est 3Y CAGR uplift {uplift:+.2f}pp" if uplift is not None else ""
+            lines.append(f"- **{r.get('priority', '').upper()}** replace/watch **{r.get('current_fund')}** → **{r.get('replacement_fund')}**{uplift_txt}. Current XIRR: {r.get('current_xirr_pct', '-')}; replacement 3Y CAGR: {r.get('replacement_3y_cagr_pct', '-') }%")
+        lines.append("")
+
     # MF holdings
     if report["mf_holdings"]:
         lines.append("## 📈 Mutual Funds")
@@ -551,7 +873,8 @@ def format_md(report: dict[str, Any]) -> str:
             fund_short = (m.get("fund") or m["tradingsymbol"])[:60]
             lines.append(f"**{fund_short}** {emoji} **{m['recommendation'].upper()}**")
             lines.append(f"  - Category: {m.get('category', '?')} | Risk: {m.get('risk_level', '?')}")
-            lines.append(f"  - Value: ₹{m['current_value']:,.0f} | Cost: ₹{m['cost_value']:,.0f} | Gain: {m['gain_pct']:+.2f}% | Weight: {m['weight_pct']:.1f}%")
+            xirr_text = f" | XIRR: {m['xirr_pct']:+.2f}%" if m.get("xirr_pct") is not None else ""
+            lines.append(f"  - Value: ₹{m['current_value']:,.0f} | Cost: ₹{m['cost_value']:,.0f} | Gain: {m['gain_pct']:+.2f}%{xirr_text} | Weight: {m['weight_pct']:.1f}%")
             lines.append(f"  - _{m['rationale']}_")
             lines.append("")
 
@@ -592,12 +915,12 @@ def main() -> int:
             'import json,sys; sys.path.insert(0,\\"/home/ubuntu/Auto_Trader\\");'
             'from Auto_Trader.utils import get_kite_client;'
             'kite=get_kite_client();'
-            'print(json.dumps({\\"holdings\\":kite.holdings(),\\"mf_holdings\\":kite.mf_holdings()}))"'
+            'print(json.dumps({\\"holdings\\":kite.holdings(),\\"mf_holdings\\":kite.mf_holdings(),\\"mf_orders\\":kite.mf_orders()}, default=str))"'
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0 and result.stdout.strip():
             holdings_data = json.loads(result.stdout.strip())
-            print(f"Fetched {len(holdings_data.get('holdings',[]))} equity + {len(holdings_data.get('mf_holdings',[]))} MF from Kite")
+            print(f"Fetched {len(holdings_data.get('holdings',[]))} equity + {len(holdings_data.get('mf_holdings',[]))} MF + {len(holdings_data.get('mf_orders',[]))} MF orders from Kite")
     except Exception as e:
         print(f"Kite fetch failed: {e}, using local fallback")
 
@@ -619,6 +942,7 @@ def main() -> int:
             try:
                 prev = json.loads(cached.read_text())
                 holdings_data["mf_holdings"] = prev.get("mf_holdings_raw", [])
+                holdings_data["mf_orders"] = prev.get("mf_orders_raw", [])
                 # Rebuild from raw if present
                 if not holdings_data["mf_holdings"] and prev.get("mf_holdings"):
                     # Already enriched — extract raw data
@@ -636,6 +960,7 @@ def main() -> int:
 
     # Also store raw MF data for future cache fallback
     report["mf_holdings_raw"] = holdings_data.get("mf_holdings", [])
+    report["mf_orders_raw"] = holdings_data.get("mf_orders", [])
 
     # Write JSON
     OUTPUT_JSON.parent.mkdir(parents=True, exist_ok=True)

@@ -359,6 +359,12 @@ def mf_xirr_booster_rows(tracker: dict[str, Any]) -> tuple[list[dict[str, Any]],
         "category_pct": category_pct,
     }
 
+
+def mf_replacement_rows(tracker: dict[str, Any]) -> list[dict[str, Any]]:
+    plan = tracker.get("mf_replacement_plan") or {}
+    rows = list(plan.get("actions") or [])
+    return rows
+
 def normalize_price_history(df: pd.DataFrame | None) -> pd.DataFrame | None:
     if df is None or df.empty:
         return None
@@ -1240,9 +1246,9 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
         tracker_cards = html.Div(
             [
                 metric_card("MF value", friendly(psum.get("mf_value")), f"{psum.get('n_mf_holdings', 0)} funds"),
+                metric_card("MF XIRR", friendly(psum.get("mf_xirr_pct")), "% annualized"),
                 metric_card("MF weight", friendly(psum.get("mf_weight_pct")), "% of portfolio"),
                 metric_card("Equity value", friendly(psum.get("equity_value")), f"{psum.get('n_equity_holdings', 0)} holdings"),
-                metric_card("Equity weight", friendly(psum.get("equity_weight_pct")), "% of portfolio"),
             ],
             style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
         )
@@ -1257,6 +1263,16 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
                 "MF XIRR booster actions",
                 [table_from_df(xirr_df[show_cols], "mf-xirr-booster-table", page_size=8)],
                 f"Uses your current MF holdings. ELSS {friendly(diag.get('elss_pct_of_mf'))}% of MF sleeve · sector/thematic {friendly(diag.get('sector_thematic_pct_of_mf'))}% · international {friendly(diag.get('international_pct_of_mf'))}%.",
+            ))
+
+        repl_rows = mf_replacement_rows(tracker)
+        if repl_rows:
+            repl_df = pd.DataFrame(repl_rows)
+            repl_cols = [c for c in ["priority", "current_fund", "current_xirr_pct", "current_gain_pct", "replacement_fund", "replacement_3y_cagr_pct", "replacement_5y_cagr_pct", "estimated_3y_cagr_uplift_pct", "action_logic"] if c in repl_df.columns]
+            children.append(section(
+                "MF replacement shortlist",
+                [table_from_df(repl_df[repl_cols], "mf-replacement-table", page_size=10)],
+                "Flags low/negative XIRR holdings and suggests stronger same-sleeve replacements. Check exit load, tax, and ELSS lock-in before switching.",
             ))
 
     # Category allocation table
@@ -1283,6 +1299,8 @@ def build_portfolio_tab(data: dict[str, Any]) -> list[Any]:
                 "weight_pct": m.get("weight_pct", 0),
                 "mf_sleeve_pct": m.get("mf_sleeve_pct", mf_sleeve_pct(m, psum.get("mf_value"))),
                 "gain_pct": m.get("gain_pct", 0),
+                "xirr_pct": m.get("xirr_pct"),
+                "xirr_source": m.get("xirr_source", "-"),
                 "rationale": (m.get("rationale") or "")[:80],
             })
         children.append(section("MF holdings + recommendations", [table_from_df(pd.DataFrame(mf_rows), "mf-recommendations-table", page_size=15)], "Buy/sell/hold based on P\u0026L, risk, category outlook, and portfolio concentration."))
@@ -2624,8 +2642,8 @@ def build_mf_tab(data: dict[str, Any]) -> list[Any]:
     cards = html.Div(
         [
             metric_card("MF value", friendly(psum.get("mf_value")), f"{psum.get('n_mf_holdings', 0)} funds"),
+            metric_card("MF XIRR", friendly(psum.get("mf_xirr_pct")), "% annualized"),
             metric_card("MF weight", friendly(psum.get("mf_weight_pct")), "% of portfolio"),
-            metric_card("MF plan profile", mf_plan.get("profile", "-"), data.get("mf_rebalance_plan_path") or "mf_rebalance_plan"),
             metric_card("MF planned orders", len(mf_plan.get("orders") or []), mf_plan.get("tag", "mf_rebalance")),
         ],
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
@@ -2655,6 +2673,16 @@ def build_mf_tab(data: dict[str, Any]) -> list[Any]:
         if cat_pct:
             cat_df = pd.DataFrame([{"category": k, "mf_sleeve_pct": v} for k, v in sorted(cat_pct.items(), key=lambda x: -x[1])])
             children.append(section("MF sleeve category weights", [table_from_df(cat_df, "mf-category-xirr-table", page_size=12)]))
+
+    repl_rows = mf_replacement_rows(tracker)
+    if repl_rows:
+        repl_df = pd.DataFrame(repl_rows)
+        repl_cols = [c for c in ["priority", "current_fund", "current_xirr_pct", "current_gain_pct", "current_3y_cagr_pct", "replacement_fund", "replacement_1y_pct", "replacement_3y_cagr_pct", "replacement_5y_cagr_pct", "estimated_3y_cagr_uplift_pct", "action_logic"] if c in repl_df.columns]
+        children.append(section(
+            "MF replacement engine",
+            [table_from_df(repl_df[repl_cols], "mf-replacement-mf-tab-table", page_size=15)],
+            "Uses your current XIRR/gain plus NAV history to shortlist replacement funds that can improve future XIRR. No switch orders are placed.",
+        ))
 
     explorer = html.Div(
         [
