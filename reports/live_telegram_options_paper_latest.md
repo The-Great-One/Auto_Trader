@@ -1,6 +1,6 @@
 # Live Telegram Options Paper Ledger
 
-- Updated: `2026-05-03T10:55:21.725786+00:00`
+- Updated: `2026-05-03T10:59:08.038034+00:00`
 - Starting capital: `100000.0`
 - Cash: `100000.0`
 - Equity: `100000.0`
