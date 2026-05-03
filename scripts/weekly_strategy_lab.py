@@ -951,7 +951,8 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         for sell_patch in priority_meanrev_sell:
             priority_idx += 1
             add(f"priority_meanrev_{priority_idx:03d}", buy_patch, sell_patch, {"enabled": False})
-    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE:
+    portfolio_variant_enabled = os.getenv("AT_LAB_PORTFOLIO_OPT_VARIANTS", "1").strip().lower() not in {"0", "false", "no"}
+    if portfolio_variant_enabled and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE):
         for buy_patch in priority_meanrev_buy[:2]:
             priority_idx += 1
             for method in ["skfolio_hrp", "riskfolio_hrp_mv", "riskfolio_min_cvar", "riskfolio_cvar_sharpe", "inverse_volatility"]:
@@ -1112,7 +1113,7 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     # Portfolio-optimized variants: reuse best curated buy combos with portfolio optimization
     # These use skfolio/PyPortfolioOpt to weight symbols by correlation structure
-    if SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE:
+    if portfolio_variant_enabled and (SKFOLIO_AVAILABLE or PYPFOPT_AVAILABLE or RISKFOLIO_AVAILABLE):
         # Top curated combos that should benefit most from portfolio optimization
         po_buy_combos = [
             {"adx_min": 6, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "vwap_buy_above": 0, "rsi_floor": 34, "stoch_pull_max": 95, "max_extension_atr": 3.5, "max_obv_zscore": 5.0, "cci_buy_min": -175, "cmf_base_min": 0.0, "mmi_risk_off": 75},

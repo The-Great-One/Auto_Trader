@@ -92,7 +92,20 @@ def load_manifest() -> dict:
 def load_manifest_symbols() -> list[str]:
     payload = load_manifest()
     contracts = payload.get("contracts") or []
-    return [str(c.get("tradingsymbol") or "").upper() for c in contracts if c.get("tradingsymbol")]
+    symbols = [str(c.get("tradingsymbol") or "").upper() for c in contracts if c.get("tradingsymbol")]
+    underlyings = parse_symbol_list(os.getenv("AT_OPTIONS_LAB_UNDERLYINGS", "NIFTY"))
+    side_filter = os.getenv("AT_OPTIONS_LAB_SIDE", "BOTH").strip().upper()
+    max_symbols = max(1, int(os.getenv("AT_OPTIONS_LAB_MAX_SYMBOLS", str(len(symbols) or 1))))
+
+    filtered: list[str] = []
+    for symbol in symbols:
+        if underlyings and not any(symbol.startswith(u) for u in underlyings):
+            continue
+        side = option_side(symbol)
+        if side_filter in {"CE", "PE"} and side != side_filter:
+            continue
+        filtered.append(symbol)
+    return filtered[:max_symbols]
 
 
 

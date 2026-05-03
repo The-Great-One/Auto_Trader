@@ -257,6 +257,29 @@ def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tu
                 },
             )
 
+    # Cross entry + exit families. Earlier sweeps found that entry loosening and
+    # exits can each help, but testing them separately misses the interaction.
+    entry_templates = [
+        {"oi_change_min_pct": -1.0},
+        {"oi_sma_mult": 1.0, "oi_change_min_pct": 0.0, "buy_score_min": 5.5},
+        {"underlying_adx_min": 14, "underlying_rsi_bull_min": 50, "buy_score_min": 4.5, "option_rsi_min": 48, "volume_confirm_mult": 0.95, "oi_change_min_pct": 0.0},
+        {"underlying_adx_min": 14, "underlying_rsi_bull_min": 50, "buy_score_min": 5.0, "option_rsi_min": 50, "volume_confirm_mult": 0.95, "oi_change_min_pct": 0.0},
+        {"underlying_adx_min": 12, "underlying_rsi_bull_min": 50, "buy_score_min": 5.0, "option_rsi_min": 48, "volume_confirm_mult": 0.9, "oi_sma_mult": 1.0, "oi_change_min_pct": -1.0},
+    ]
+    exit_templates = [
+        {"take_profit_pct": 12.0, "stop_loss_pct": 8.0, "max_hold_bars": 1},
+        {"take_profit_pct": 15.0, "stop_loss_pct": 8.0, "max_hold_bars": 2},
+        {"take_profit_pct": 18.0, "stop_loss_pct": 10.0, "max_hold_bars": 2},
+        {"take_profit_pct": 25.0, "stop_loss_pct": 10.0, "max_hold_bars": 3},
+        {"take_profit_pct": 35.0, "stop_loss_pct": 8.0, "exit_rsi": 50.0},
+    ]
+    entry_exit_idx = 0
+    for entry_patch in entry_templates:
+        for exit_patch in exit_templates:
+            entry_exit_idx += 1
+            patch = {**entry_patch, **exit_patch}
+            add(f"entry_exit_combo_{entry_exit_idx:03d}", patch)
+
     max_variants = int(os.getenv("AT_OPTIONS_LAB_MAX_VARIANTS", os.getenv("AT_LAB_MAX_VARIANTS", "200")))
     return out[:max_variants]
 
@@ -375,6 +398,74 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], params: dict) -> B
         symbols_tested=tested_symbols,
         selection_score=round(selection_score, 3),
     )
+
+
+
+def _split_data_map(data_map: dict[str, pd.DataFrame], split_pct: float) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
+    """Chronological train/test split per option symbol.
+
+    Options histories are short, so keep only symbols that have enough bars on
+    both sides to run the rule warmup. This avoids selecting params solely on
+    the same bars used to report the headline result.
+    """
+    split_pct = min(0.85, max(0.45, float(split_pct)))
+    warmup = max(8, int(os.getenv("AT_OPTIONS_LAB_WARMUP_BARS", "10")))
+    train: dict[str, pd.DataFrame] = {}
+    test: dict[str, pd.DataFrame] = {}
+    for symbol, df in data_map.items():
+        if len(df) < (warmup * 2 + 4):
+            continue
+        cut = int(len(df) * split_pct)
+        cut = min(max(cut, warmup + 2), len(df) - warmup - 2)
+        left = df.iloc[:cut].copy().reset_index(drop=True)
+        right = df.iloc[cut:].copy().reset_index(drop=True)
+        if len(left) > warmup and len(right) > warmup:
+            train[symbol] = left
+            test[symbol] = right
+    return train, test
+
+
+
+def validate_top_candidates(rank: list[BacktestResult], data_map: dict[str, pd.DataFrame]) -> dict:
+    if os.getenv("AT_OPTIONS_LAB_VALIDATE", "1").strip().lower() in {"0", "false", "no"}:
+        return {"enabled": False, "reason": "disabled"}
+    split_pct = float(os.getenv("AT_OPTIONS_LAB_VALIDATION_SPLIT", "0.65") or 0.65)
+    train_map, test_map = _split_data_map(data_map, split_pct)
+    if not train_map or not test_map:
+        return {"enabled": False, "reason": "insufficient_bars_for_split", "split_pct": split_pct}
+
+    top_n = max(1, int(os.getenv("AT_OPTIONS_LAB_VALIDATE_TOP", "30") or 30))
+    candidates = rank[:top_n]
+    rows = []
+    for cand in candidates:
+        params = dict((cand.params or {}).get("options", {}) or {})
+        train = run_variant(cand.name, train_map, params)
+        test = run_variant(cand.name, test_map, params)
+        robust_score = round(
+            (0.65 * test.selection_score)
+            + (0.25 * train.selection_score)
+            + (0.10 * cand.selection_score)
+            - (0.20 * max(0.0, abs(test.max_drawdown_pct) - abs(train.max_drawdown_pct))),
+            3,
+        )
+        rows.append({
+            "name": cand.name,
+            "params": cand.params,
+            "full": asdict(cand),
+            "train": asdict(train),
+            "test": asdict(test),
+            "robust_score": robust_score,
+        })
+    rows.sort(key=lambda r: (r["robust_score"], r["test"]["total_return_pct"], -abs(r["test"]["max_drawdown_pct"])), reverse=True)
+    return {
+        "enabled": True,
+        "split_pct": split_pct,
+        "train_symbols": len(train_map),
+        "test_symbols": len(test_map),
+        "validated_top_n": len(rows),
+        "best_validated": rows[0] if rows else None,
+        "ranked_validated": rows,
+    }
 
 
 
@@ -545,6 +636,8 @@ def main():
     )
     baseline = next(r for r in rank if r.name == "baseline_current")
     best = rank[0]
+    validation = validate_top_candidates(rank, data_map)
+    validated_best = (validation.get("best_validated") or {}) if validation.get("enabled") else {}
 
     recommendation = {
         "generated_at": datetime.now().isoformat(),
@@ -559,6 +652,8 @@ def main():
         "tested_variants": len(rank),
         "improvement_return_pct": round(best.total_return_pct - baseline.total_return_pct, 2),
         "improvement_score": round(best.selection_score - baseline.selection_score, 3),
+        "validation": validation,
+        "selected_by_validation": validated_best.get("name"),
         "should_promote": False,
         "notes": [
             "Research-only NIFTY options lab using RULE_SET_OPTIONS_1.",
