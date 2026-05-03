@@ -180,9 +180,13 @@ def _compute_return_metrics(returns: pd.Series | list[float], *, periods_per_yea
             metrics["empyrical_error"] = str(exc)[:160]
     if QUANTSTATS_AVAILABLE:
         try:
-            metrics["quantstats_sharpe"] = round(float(qs.stats.sharpe(ser)), 4)
-            metrics["quantstats_sortino"] = round(float(qs.stats.sortino(ser)), 4)
-            metrics["quantstats_calmar"] = round(float(qs.stats.calmar(ser)), 4)
+            # quantstats expects a datetime-like index for some annualized ratios.
+            qs_ser = ser.copy()
+            if not isinstance(qs_ser.index, pd.DatetimeIndex):
+                qs_ser.index = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=len(qs_ser))
+            metrics["quantstats_sharpe"] = round(float(qs.stats.sharpe(qs_ser)), 4)
+            metrics["quantstats_sortino"] = round(float(qs.stats.sortino(qs_ser)), 4)
+            metrics["quantstats_calmar"] = round(float(qs.stats.calmar(qs_ser)), 4)
         except Exception as exc:
             metrics["quantstats_error"] = str(exc)[:160]
     return metrics
