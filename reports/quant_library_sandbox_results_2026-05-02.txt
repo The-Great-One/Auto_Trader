@@ -1,0 +1,111 @@
+{
+  "imports": {
+    "riskfolio": {
+      "ok": true,
+      "version": "7.2.1"
+    },
+    "quantstats": {
+      "ok": true,
+      "version": "0.0.81"
+    },
+    "empyrical": {
+      "ok": true,
+      "version": "0.5.12"
+    },
+    "ffn": {
+      "ok": true,
+      "version": "1.1.5"
+    },
+    "alphalens": {
+      "ok": true,
+      "version": "0.4.6"
+    },
+    "arch": {
+      "ok": true,
+      "version": "8.0.0"
+    },
+    "pyod": {
+      "ok": true,
+      "version": "3.2.1"
+    },
+    "stumpy": {
+      "ok": true,
+      "version": "Please install this project with setup.py"
+    }
+  },
+  "api": {
+    "riskfolio_cvar": {
+      "ok": true,
+      "n_weights": 3,
+      "sum": 1.0
+    },
+    "empyrical_metrics": {
+      "ok": true,
+      "annual_return": -0.2896762969148894,
+      "max_drawdown": -0.2923661219508197,
+      "sharpe": -2.261198840058106
+    },
+    "arch_garch": {
+      "ok": true,
+      "aic": 858.1481250758854
+    }
+  }
+}__BENCH__
+{
+  "note": "Standalone buy-and-hold allocation smoke on cached Kite closes; not strategy/live-parity result.",
+  "symbols": 50,
+  "days": 499,
+  "train_days": 349,
+  "test_days": 150,
+  "methods": {
+    "equal": {
+      "cagr": -0.0032791568276656635,
+      "max_dd": -0.13368685276284462,
+      "sharpe": 0.060743505732700855,
+      "total_return": -0.001953176399826728,
+      "nonzero_weights": 50,
+      "top_weight": 0.02
+    },
+    "inverse_vol": {
+      "cagr": -0.004486622446496669,
+      "max_dd": -0.13163573112289217,
+      "sharpe": 0.051473532064949624,
+      "total_return": -0.0026730386384734572,
+      "nonzero_weights": 50,
+      "top_weight": 0.027708605905963694
+    },
+    "riskfolio_cvar_sharpe": {
+      "cagr": -0.10332341449304061,
+      "max_dd": -0.1509992064836396,
+      "sharpe": -0.5477373025684981,
+      "total_return": -0.06285446293992192,
+      "nonzero_weights": 50,
+      "top_weight": 0.15
+    },
+    "riskfolio_min_cvar": {
+      "cagr": -0.0502785230236974,
+      "max_dd": -0.15069140521295754,
+      "sharpe": -0.2390248739595841,
+      "total_return": -0.030239612901198032,
+      "nonzero_weights": 11,
+      "top_weight": 0.15
+    },
+    "riskfolio_hrp_mv": {
+      "cagr": -0.016848022147759267,
+      "max_dd": -0.12711419643891853,
+      "sharpe": -0.03554509065758145,
+      "total_return": -0.010063051795961897,
+      "nonzero_weights": 50,
+      "top_weight": 0.04707108737015619
+    }
+  },
+  "errors": {}
+}__STATUS__
+{
+  "status": "running",
+  "current_variant": "priority_meanrev_003",
+  "variants_done": 3,
+  "variants_total": 80,
+  "progress_pct": 3.8,
+  "updated_at": "2026-05-02T22:01:17.427082"
+}
