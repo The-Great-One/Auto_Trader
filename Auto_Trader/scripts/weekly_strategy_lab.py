@@ -748,6 +748,22 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
         "ich_cloud_bull": prioritized_values([0, 1], buy_cfg["ich_cloud_bull"]),
         "vwap_buy_above": prioritized_values([0, 1], buy_cfg["vwap_buy_above"]),
         "cci_buy_min": prioritized_values([-175, -150, -125, -100, -75, -50], buy_cfg["cci_buy_min"]),
+        # --- TradingView-popular indicator gates ---
+        "willr_oversold_max": prioritized_values([-80, -70, -60, -50, -40, -30, -20], buy_cfg["willr_oversold_max"]),
+        "sar_buy_enabled": prioritized_values([0, 1], buy_cfg["sar_buy_enabled"]),
+        "di_plus_min": prioritized_values([0, 15, 20, 25], buy_cfg["di_plus_min"]),
+        "di_cross_enabled": prioritized_values([0, 1], buy_cfg["di_cross_enabled"]),
+        "mfi_buy_min": prioritized_values([0, 20, 30, 40, 50], buy_cfg["mfi_buy_min"]),
+        "stochrsi_buy_max": prioritized_values([100, 30, 40, 50, 60], buy_cfg["stochrsi_buy_max"]),
+        "aroon_osc_min": prioritized_values([-101, 0, 10, 25, 50], buy_cfg["aroon_osc_min"]),
+        "trix_buy_min": prioritized_values([-999, 0], buy_cfg["trix_buy_min"]),
+        "ppo_hist_rising_enabled": prioritized_values([0, 1], buy_cfg["ppo_hist_rising_enabled"]),
+        "roc_buy_min": prioritized_values([-999, -5, -2, 0, 2, 5], buy_cfg["roc_buy_min"]),
+        "vortex_bull_enabled": prioritized_values([0, 1], buy_cfg["vortex_bull_enabled"]),
+        "macd_hist_rising_enabled": prioritized_values([0, 1], buy_cfg["macd_hist_rising_enabled"]),
+        "ema_cross_buy_enabled": prioritized_values([0, 1], buy_cfg["ema_cross_buy_enabled"]),
+        "bb_pctb_buy_max": prioritized_values([1.1, 0.8, 0.9, 1.0], buy_cfg["bb_pctb_buy_max"]),
+        "bb_width_min": prioritized_values([0, 0.02, 0.04, 0.06], buy_cfg["bb_width_min"]),
     }
     sell_grid = {
         "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0, 48.0], sell_cfg["momentum_exit_rsi"]),
@@ -770,6 +786,12 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
         buy_grid["stoch_pull_max"] = prioritized_values([85, 90, 95, *buy_grid["stoch_pull_max"]], buy_cfg["stoch_pull_max"])
         buy_grid["ich_cloud_bull"] = prioritized_values([0, 1], buy_cfg["ich_cloud_bull"])
         buy_grid["vwap_buy_above"] = prioritized_values([0, 1], buy_cfg["vwap_buy_above"])
+        # Expand TradingView-popular indicator ranges on no-trade days
+        buy_grid["mfi_buy_min"] = prioritized_values([20, 30, 40, *buy_grid["mfi_buy_min"]], buy_cfg["mfi_buy_min"])
+        buy_grid["stochrsi_buy_max"] = prioritized_values([30, 40, 50, *buy_grid["stochrsi_buy_max"]], buy_cfg["stochrsi_buy_max"])
+        buy_grid["aroon_osc_min"] = prioritized_values([0, 10, 25, *buy_grid["aroon_osc_min"]], buy_cfg["aroon_osc_min"])
+        buy_grid["roc_buy_min"] = prioritized_values([-5, -2, 0, *buy_grid["roc_buy_min"]], buy_cfg["roc_buy_min"])
+        buy_grid["willr_oversold_max"] = prioritized_values([-80, -70, -60, *buy_grid["willr_oversold_max"]], buy_cfg["willr_oversold_max"])
 
     if tradebook_context.get("weak_mid_hold_window"):
         sell_grid["equity_time_stop_bars"] = prioritized_values([4, 5, 6, *sell_grid["equity_time_stop_bars"]], sell_cfg["equity_time_stop_bars"])
@@ -880,6 +902,17 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         "vwap_buy_above",
         "stoch_pull_max",
         "cci_buy_min",
+        # --- TradingView-popular focus params ---
+        "willr_oversold_max",
+        "mfi_buy_min",
+        "stochrsi_buy_max",
+        "aroon_osc_min",
+        "roc_buy_min",
+        "sar_buy_enabled",
+        "di_cross_enabled",
+        "vortex_bull_enabled",
+        "macd_hist_rising_enabled",
+        "ema_cross_buy_enabled",
     ]
     focus_sell = [
         "equity_time_stop_bars",
@@ -925,6 +958,33 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         # Contrarian / mean-reversion adjacent
         {"adx_min": 6, "rsi_floor": 34, "stoch_pull_max": 95, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "cci_buy_min": -175, "max_extension_atr": 3.5, "obv_min_zscore": 0.0, "cmf_base_min": 0.0},
         {"adx_min": 8, "rsi_floor": 36, "stoch_pull_max": 90, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0, "cci_buy_min": -150, "max_extension_atr": 3.2},
+        # --- TradingView-popular indicator combos ---
+        # MFI oversold + volume confirm (popular TV: RSI+MFI double oversold)
+        {"mfi_buy_min": 30, "rsi_floor": 40, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        {"mfi_buy_min": 20, "rsi_floor": 38, "stoch_pull_max": 90, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0},
+        # StochRSI pullback (TV: StochRSI below 30 then cross up)
+        {"stochrsi_buy_max": 40, "rsi_floor": 42, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        {"stochrsi_buy_max": 50, "mfi_buy_min": 30, "rsi_floor": 40, "ich_cloud_bull": 0},
+        # Aroon uptrend + ADX (TV: Aroon up + strong trend)
+        {"aroon_osc_min": 0, "adx_min": 12, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        {"aroon_osc_min": 25, "adx_strong_min": 18, "rsi_floor": 42},
+        # Vortex bullish + MACD rising (TV: Vortex + MACD combo)
+        {"vortex_bull_enabled": 1, "macd_hist_rising_enabled": 1, "rsi_floor": 40, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        {"vortex_bull_enabled": 1, "ppo_hist_rising_enabled": 1, "rsi_floor": 42, "ich_cloud_bull": 0},
+        # EMA cross 9/21 + ROC positive (TV: EMA cross + momentum)
+        {"ema_cross_buy_enabled": 1, "roc_buy_min": 0, "adx_min": 10, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        {"ema_cross_buy_enabled": 1, "mfi_buy_min": 40, "rsi_floor": 42, "ich_cloud_bull": 0},
+        # TRIX bullish + BB not overbought (TV: TRIX + BB combo)
+        {"trix_buy_min": 0, "bb_pctb_buy_max": 0.9, "rsi_floor": 42, "volume_confirm_mult": 0.85, "ich_cloud_bull": 0},
+        # BB squeeze (TV: Bollinger Band Squeeze detection)
+        {"bb_width_min": 0.04, "roc_buy_min": -2, "rsi_floor": 40, "ich_cloud_bull": 0, "volume_confirm_mult": 0.9},
+        # Multi-indicator "TradingView style" combos
+        {"mfi_buy_min": 30, "stochrsi_buy_max": 50, "vortex_bull_enabled": 1, "rsi_floor": 40, "ich_cloud_bull": 0, "volume_confirm_mult": 0.85},
+        {"aroon_osc_min": 0, "roc_buy_min": 0, "macd_hist_rising_enabled": 1, "rsi_floor": 42, "ich_cloud_bull": 0, "volume_confirm_mult": 0.85},
+        # SAR + Williams %R oversold (TV: Parabolic SAR + Williams combo)
+        {"sar_buy_enabled": 1, "willr_oversold_max": -50, "rsi_floor": 40, "ich_cloud_bull": 0, "volume_confirm_mult": 0.85},
+        # DMI cross + Aroon (TV: DMI + Aroon trend confirmation)
+        {"di_cross_enabled": 1, "aroon_osc_min": 10, "rsi_floor": 42, "ich_cloud_bull": 0, "volume_confirm_mult": 0.9},
     ]
     curated_sell = [
         # Original sell combos

@@ -32,6 +32,18 @@ CONFIG = {
     "sar_buy_enabled": float(os.getenv("AT_BUY_SAR_ENABLED", "0")),
     "di_plus_min": float(os.getenv("AT_BUY_DI_PLUS_MIN", "0")),
     "di_cross_enabled": float(os.getenv("AT_BUY_DI_CROSS_ENABLED", "0")),
+    # --- TradingView-popular indicator gates ---
+    "mfi_buy_min": float(os.getenv("AT_BUY_MFI_BUY_MIN", "0")),          # MFI threshold (0 = disabled, TradingView default oversold=20)
+    "stochrsi_buy_max": float(os.getenv("AT_BUY_STOCHRSI_MAX", "100")),  # StochRSI pullback max (100 = disabled, TV oversold=20-30)
+    "aroon_osc_min": float(os.getenv("AT_BUY_AROON_OSC_MIN", "-101")),  # Aroon Oscillator min (-101 = disabled, TV: positive=trend)
+    "trix_buy_min": float(os.getenv("AT_BUY_TRIX_MIN", "-999")),         # TRIX trend filter (-999 = disabled, TV: positive=bullish)
+    "ppo_hist_rising_enabled": float(os.getenv("AT_BUY_PPO_HIST_RISING", "0")),  # PPO histogram rising gate
+    "roc_buy_min": float(os.getenv("AT_BUY_ROC_MIN", "-999")),           # Rate of Change min (-999 = disabled)
+    "vortex_bull_enabled": float(os.getenv("AT_BUY_VORTEX_BULL", "0")),  # Vortex +VI > -VI gate
+    "macd_hist_rising_enabled": float(os.getenv("AT_BUY_MACD_HIST_RISING", "0")),  # MACD histogram rising gate
+    "ema_cross_buy_enabled": float(os.getenv("AT_BUY_EMA_CROSS_ENABLED", "0")),   # EMA 9/21 bullish cross gate
+    "bb_pctb_buy_max": float(os.getenv("AT_BUY_BB_PCTB_MAX", "1.1")),    # BB %B max for trend entries (1.1 = disabled, TV: <0.8=not overbought)
+    "bb_width_min": float(os.getenv("AT_BUY_BB_WIDTH_MIN", "0")),        # BB Width min for volatility squeeze filter
     # --- Mean-reversion entry mode ---
     "meanrev_enabled": float(os.getenv("AT_BUY_MEANREV_ENABLED", "1")),
     "meanrev_rsi_oversold": float(os.getenv("AT_BUY_MEANREV_RSI_OVERSOLD", "35")),
@@ -102,6 +114,17 @@ def evaluate_signal(df, row, holdings):
         "cci_ok",
         "di_cross_ok",
         "di_plus_ok",
+        # --- TradingView-popular gates ---
+        "mfi_ok",
+        "stochrsi_ok",
+        "aroon_ok",
+        "trix_ok",
+        "ppo_rising_ok",
+        "roc_ok",
+        "vortex_ok",
+        "bb_pctb_ok",
+        "bb_width_ok",
+        "ema_cross_ok",
     ]
 
     if len(df) < 3:
@@ -253,6 +276,44 @@ def evaluate_signal(df, row, holdings):
     if CONFIG["di_plus_min"] > 0 and np.isfinite(plus_di):
         di_plus_ok = float(plus_di) >= CONFIG["di_plus_min"]
 
+    # --- TradingView-popular indicator gates ---
+    mfi = latest.get("MFI", np.nan)
+    mfi_ok = (not np.isfinite(mfi)) or (float(mfi) >= CONFIG["mfi_buy_min"])
+
+    stochrsi_k = latest.get("StochRSI_K", np.nan)
+    stochrsi_ok = (not np.isfinite(stochrsi_k)) or (float(stochrsi_k) <= CONFIG["stochrsi_buy_max"])
+
+    aroonosc = latest.get("AROONOSC", np.nan)
+    aroon_ok = (not np.isfinite(aroonosc)) or (float(aroonosc) >= CONFIG["aroon_osc_min"])
+
+    trix = latest.get("TRIX", np.nan)
+    trix_ok = (not np.isfinite(trix)) or (float(trix) >= CONFIG["trix_buy_min"])
+
+    ppo_hist = latest.get("PPO_Hist", np.nan)
+    ppo_prev = prev.get("PPO_Hist", np.nan)
+    ppo_rising = np.isfinite(ppo_hist) and np.isfinite(ppo_prev) and ppo_hist > ppo_prev
+    ppo_rising_ok = (CONFIG["ppo_hist_rising_enabled"] < 1) or ppo_rising
+
+    roc = latest.get("ROC", np.nan)
+    roc_ok = (not np.isfinite(roc)) or (float(roc) >= CONFIG["roc_buy_min"])
+
+    vortex_bull = latest.get("VORTEX_BULL", np.nan)
+    vortex_ok = (CONFIG["vortex_bull_enabled"] < 1) or (np.isfinite(vortex_bull) and float(vortex_bull) > 0)
+
+    macd_hist = latest.get("MACD_Hist", np.nan)
+    macd_prev = prev.get("MACD_Hist", np.nan)
+    macd_rising_internal = np.isfinite(macd_hist) and np.isfinite(macd_prev) and macd_hist > macd_prev
+    macd_rising_ok = (CONFIG["macd_hist_rising_enabled"] < 1) or macd_rising_internal
+
+    ema_cross_921 = latest.get("EMA_CROSS_9_21", np.nan)
+    ema_cross_ok = (CONFIG["ema_cross_buy_enabled"] < 1) or (np.isfinite(ema_cross_921) and float(ema_cross_921) > 0)
+
+    bb_pctb = latest.get("BB_PercentB", np.nan)
+    bb_pctb_ok = (not np.isfinite(bb_pctb)) or (float(bb_pctb) <= CONFIG["bb_pctb_buy_max"])
+
+    bb_width = latest.get("BB_Width", np.nan)
+    bb_width_ok = (not np.isfinite(bb_width)) or (float(bb_width) >= CONFIG["bb_width_min"])
+
     stoch_pull_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_pull_max"])
     stoch_momo_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_momo_max"])
 
@@ -348,6 +409,28 @@ def evaluate_signal(df, row, holdings):
         hard_blocks.append("di_cross")
     if not di_plus_ok and not meanrev_mode:
         hard_blocks.append("di_plus")
+    if not mfi_ok and not meanrev_mode:
+        hard_blocks.append("mfi")
+    if not stochrsi_ok and not meanrev_mode:
+        hard_blocks.append("stochrsi")
+    if not aroon_ok and not meanrev_mode:
+        hard_blocks.append("aroon")
+    if not trix_ok and not meanrev_mode:
+        hard_blocks.append("trix")
+    if not ppo_rising_ok and not meanrev_mode:
+        hard_blocks.append("ppo_rising")
+    if not roc_ok and not meanrev_mode:
+        hard_blocks.append("roc")
+    if not vortex_ok and not meanrev_mode:
+        hard_blocks.append("vortex")
+    if not macd_rising_ok and not meanrev_mode:
+        hard_blocks.append("macd_hist_rising")
+    if not ema_cross_ok and not meanrev_mode:
+        hard_blocks.append("ema_cross")
+    if not bb_pctb_ok and not meanrev_mode:
+        hard_blocks.append("bb_pctb")
+    if not bb_width_ok and not meanrev_mode:
+        hard_blocks.append("bb_width")
 
     decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode or meanrev_mode)) else "HOLD"
     entry_gate_failures = _uniq(hard_blocks + nearest_mode_missing)
@@ -376,6 +459,17 @@ def evaluate_signal(df, row, holdings):
         "cci_ok": bool(cci_ok),
         "di_cross_ok": bool(di_cross_ok),
         "di_plus_ok": bool(di_plus_ok),
+        # --- TradingView-popular gates ---
+        "mfi_ok": bool(mfi_ok),
+        "stochrsi_ok": bool(stochrsi_ok),
+        "aroon_ok": bool(aroon_ok),
+        "trix_ok": bool(trix_ok),
+        "ppo_rising_ok": bool(ppo_rising_ok),
+        "roc_ok": bool(roc_ok),
+        "vortex_ok": bool(vortex_ok),
+        "bb_pctb_ok": bool(bb_pctb_ok),
+        "bb_width_ok": bool(bb_width_ok),
+        "ema_cross_ok": bool(ema_cross_ok),
         "stoch_pull_ok": bool(stoch_pull_ok),
         "stoch_momo_ok": bool(stoch_momo_ok),
         "meanrev_rsi_oversold": bool(meanrev_rsi_oversold),
@@ -412,6 +506,10 @@ def evaluate_signal(df, row, holdings):
         "vwap_gap_pct": _safe_metric(max(0.0, (float(vwap) - close) / max(close, 1e-9))) if np.isfinite(vwap) else None,
         "cci_gap": _safe_metric(max(0.0, CONFIG["cci_buy_min"] - float(cci))) if np.isfinite(cci) else None,
         "di_plus_gap": _safe_metric(max(0.0, CONFIG["di_plus_min"] - float(plus_di))) if np.isfinite(plus_di) else None,
+        "mfi_gap": _safe_metric(max(0.0, CONFIG["mfi_buy_min"] - float(mfi))) if np.isfinite(mfi) else None,
+        "stochrsi_gap": _safe_metric(max(0.0, float(stochrsi_k) - CONFIG["stochrsi_buy_max"])) if np.isfinite(stochrsi_k) else None,
+        "aroon_gap": _safe_metric(max(0.0, CONFIG["aroon_osc_min"] - float(aroonosc))) if np.isfinite(aroonosc) else None,
+        "roc_gap": _safe_metric(max(0.0, CONFIG["roc_buy_min"] - float(roc))) if np.isfinite(roc) else None,
     }
 
     metric_snapshot = {
@@ -445,6 +543,16 @@ def evaluate_signal(df, row, holdings):
         "williams_r": _safe_metric(willr),
         "plus_di": _safe_metric(plus_di),
         "minus_di": _safe_metric(minus_di),
+        "mfi": _safe_metric(mfi),
+        "stochrsi_k": _safe_metric(stochrsi_k),
+        "aroonosc": _safe_metric(aroonosc),
+        "trix": _safe_metric(trix),
+        "ppo_hist": _safe_metric(ppo_hist),
+        "roc": _safe_metric(roc),
+        "vortex_bull": _safe_metric(vortex_bull),
+        "bb_percent_b": _safe_metric(bb_pctb),
+        "bb_width": _safe_metric(bb_width),
+        "ema_cross_9_21": _safe_metric(ema_cross_921),
         "mmi": _safe_metric(mmi),
         "cmf_gate": _safe_metric(cmf_gate),
         "rsi_pull_gate": _safe_metric(rsi_pull_gate),
@@ -471,6 +579,18 @@ def evaluate_signal(df, row, holdings):
         "sar_buy_enabled": CONFIG["sar_buy_enabled"],
         "di_plus_min": CONFIG["di_plus_min"],
         "di_cross_enabled": CONFIG["di_cross_enabled"],
+        # --- TradingView-popular thresholds ---
+        "mfi_buy_min": CONFIG["mfi_buy_min"],
+        "stochrsi_buy_max": CONFIG["stochrsi_buy_max"],
+        "aroon_osc_min": CONFIG["aroon_osc_min"],
+        "trix_buy_min": CONFIG["trix_buy_min"],
+        "ppo_hist_rising_enabled": CONFIG["ppo_hist_rising_enabled"],
+        "roc_buy_min": CONFIG["roc_buy_min"],
+        "vortex_bull_enabled": CONFIG["vortex_bull_enabled"],
+        "macd_hist_rising_enabled": CONFIG["macd_hist_rising_enabled"],
+        "ema_cross_buy_enabled": CONFIG["ema_cross_buy_enabled"],
+        "bb_pctb_buy_max": CONFIG["bb_pctb_buy_max"],
+        "bb_width_min": CONFIG["bb_width_min"],
         "meanrev_enabled": CONFIG["meanrev_enabled"],
         "meanrev_rsi_oversold": CONFIG["meanrev_rsi_oversold"],
         "meanrev_rsi_max": CONFIG["meanrev_rsi_max"],

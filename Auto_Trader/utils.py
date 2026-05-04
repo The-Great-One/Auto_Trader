@@ -425,6 +425,50 @@ def Indicators(
     MACD_Hist_Prev[0] = np.nan
     MACD_Hist_Rising = MACD_Hist > MACD_Hist_Prev
 
+    # --- TradingView-popular indicators ---
+    # MFI (Money Flow Index) — volume-weighted RSI analogue
+    MFI = talib.MFI(high, low, close, volume, timeperiod=14)
+
+    # Stochastic RSI — RSI of RSI, popular on TradingView
+    StochRSI_K, StochRSI_D = talib.STOCHRSI(
+        close, timeperiod=14, fastk_period=3, fastd_period=3, fastd_matype=0
+    )
+
+    # Aroon Up/Down/Oscillator — trend age and direction
+    AROON_DOWN, AROON_UP = talib.AROON(high, low, timeperiod=25)
+    AROONOSC = talib.AROONOSC(high, low, timeperiod=25)
+
+    # TRIX — triple-smoothed EMA rate of change (trend filter)
+    TRIX = talib.TRIX(close, timeperiod=30)
+
+    # PPO — Percentage Price Oscillator (MACD alternative, normalised)
+    PPO_val, PPO_signal, PPO_hist = talib.PPO(
+        close, fastperiod=12, slowperiod=26, matype=0
+    )
+
+    # ROC — Rate of Change (momentum)
+    ROC = talib.ROC(close, timeperiod=10)
+
+    # Vortex Indicator (+VI/-VI) — trend confirmation
+    #   +VI > -VI = bullish, -VI > +VI = bearish
+    vm_plus = np.abs(high - low.shift(1))  # type: ignore[attr-defined]
+    vm_minus = np.abs(low - high.shift(1))  # type: ignore[attr-defined]
+    tr_range = np.maximum(
+        high - low,
+        np.maximum(np.abs(high - close.shift(1)), np.abs(low - close.shift(1))),
+    )
+    vortex_period = 14
+    vm_plus_sum = pd.Series(vm_plus).rolling(vortex_period).sum()
+    vm_minus_sum = pd.Series(vm_minus).rolling(vortex_period).sum()
+    tr_sum = pd.Series(tr_range).rolling(vortex_period).sum()
+    VORTEX_PLUS = np.where(tr_sum > 0, vm_plus_sum / tr_sum, np.nan)
+    VORTEX_MINUS = np.where(tr_sum > 0, vm_minus_sum / tr_sum, np.nan)
+    VORTEX_BULL = np.where(
+        np.isnan(VORTEX_PLUS) | np.isnan(VORTEX_MINUS),
+        np.nan,
+        np.where(VORTEX_PLUS > VORTEX_MINUS, 1.0, -1.0),
+    )
+
     # Collect into single dict for assign
     assign_kwargs = {
         # momentum
@@ -494,6 +538,21 @@ def Indicators(
         "EMA_CROSS_9_21": EMA_CROSS_9_21,
         "ATR_Pct": ATR_Pct,
         "MACD_Hist_Rising": MACD_Hist_Rising,
+        # --- TradingView-popular indicators ---
+        "MFI": MFI,
+        "StochRSI_K": StochRSI_K,
+        "StochRSI_D": StochRSI_D,
+        "AROON_UP": AROON_UP,
+        "AROON_DOWN": AROON_DOWN,
+        "AROONOSC": AROONOSC,
+        "TRIX": TRIX,
+        "PPO": PPO_val,
+        "PPO_Signal": PPO_signal,
+        "PPO_Hist": PPO_hist,
+        "ROC": ROC,
+        "VORTEX_PLUS": VORTEX_PLUS,
+        "VORTEX_MINUS": VORTEX_MINUS,
+        "VORTEX_BULL": VORTEX_BULL,
     }
 
     # Bulk assign
