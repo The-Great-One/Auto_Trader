@@ -84,6 +84,11 @@ def repair_position_placeholders(state: dict[str, Any]) -> None:
             continue
         if status == 'skipped' and pos.get('reason') == 'not_option_signal':
             to_delete.append(pos_key)
+            continue
+        if status == 'skipped' and pos.get('reason') == 'channel_low_confidence':
+            # Low-confidence calls used to be skipped. Reprocess them now that
+            # observe-mode paper sizing is enabled, so they contribute outcomes.
+            to_delete.append(pos_key)
     for pos_key in to_delete:
         positions.pop(pos_key, None)
 
@@ -145,7 +150,10 @@ def load_channel_sizing_mult(chat: str, default: float = 1.0) -> float:
     ch_data = load_channel_learning_row(chat)
     action = ch_data.get("action", "")
     if action == "skip_or_observe":
-        return 0.0
+        # This is a PAPER learner. Low-confidence channels should still be
+        # tracked at tiny/observe sizing; otherwise the learner never gathers
+        # outcomes and stays permanently stuck at low confidence.
+        return float(os.getenv("AT_TELEGRAM_OBSERVE_SIZING_MULT", "0.10"))
     mult = ch_data.get("sizing_mult", default)
     return float(mult) if mult else default
 
