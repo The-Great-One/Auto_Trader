@@ -15,14 +15,15 @@ TRADING_MODE = os.getenv("AT_TRADING_MODE", "DAILY").strip().upper()
 BAR_MINUTES = max(1, int(os.getenv("AT_BAR_MINUTES", "5")))
 PAPER_SHADOW_MODE = os.getenv("AT_PAPER_SHADOW_MODE", "0").strip() in {"1", "true", "TRUE", "yes", "YES"}
 PAPER_ALERT_MIN_SECONDS = max(0, int(os.getenv("AT_PAPER_ALERT_MIN_SECONDS", "1800")))
-_PAPER_ALERT_COOLDOWN = max(30, int(os.getenv("AT_PAPER_ALERT_COOLDOWN", "60")))  # Min seconds between paper alerts
+_PAPER_ALERT_COOLDOWN = max(30, int(os.getenv("AT_PAPER_ALERT_COOLDOWN", "300")))  # Min seconds between paper alerts (5 min default)
 _LAST_PAPER_ALERT_SIGNATURE = None
 _LAST_PAPER_ALERT_AT = None
 _ALERTED_SYMBOLS = {"buy": set(), "sell": set()}  # Track already-alerted symbols to avoid spam
+_ALERTED_SYMBOLS_TIMESTAMP = {"buy": {}, "sell": {}}  # When each symbol was last alerted
 
 
 def _publish_paper_decisions(message_queue, decisions):
-    global _LAST_PAPER_ALERT_SIGNATURE, _LAST_PAPER_ALERT_AT, _ALERTED_SYMBOLS
+    global _LAST_PAPER_ALERT_SIGNATURE, _LAST_PAPER_ALERT_AT, _ALERTED_SYMBOLS, _ALERTED_SYMBOLS_TIMESTAMP
 
     buys = [d for d in decisions if d.get("Decision") == "BUY"]
     sells = [d for d in decisions if d.get("Decision") == "SELL"]
@@ -64,14 +65,21 @@ def _publish_paper_decisions(message_queue, decisions):
     if not buys and not sells:
         return
 
-    # --- Dedup: only alert for NEW symbols not yet alerted ---
-    new_buys = [s for s in buy_symbols if s not in _ALERTED_SYMBOLS["buy"]]
-    new_sells = [s for s in sell_symbols if s not in _ALERTED_SYMBOLS["sell"]]
+    # --- Dedup: only alert for symbols not alerted in the last PAPER_ALERT_MIN_SECONDS ---
+    # A symbol that was alerted less than PAPER_ALERT_MIN_SECONDS ago should NOT re-alert
+    new_buys = []
+    for s in buy_symbols:
+        last_alert = _ALERTED_SYMBOLS_TIMESTAMP["buy"].get(s)
+        if last_alert is None or (now - last_alert).total_seconds() >= PAPER_ALERT_MIN_SECONDS:
+            new_buys.append(s)
+            _ALERTED_SYMBOLS_TIMESTAMP["buy"][s] = now
 
-    # Update alerted set: only keep symbols that are still actively signaling.
-    # Symbols that stopped signaling will be removed, so they can re-alert later.
-    _ALERTED_SYMBOLS["buy"] = set(buy_symbols)
-    _ALERTED_SYMBOLS["sell"] = set(sell_symbols)
+    new_sells = []
+    for s in sell_symbols:
+        last_alert = _ALERTED_SYMBOLS_TIMESTAMP["sell"].get(s)
+        if last_alert is None or (now - last_alert).total_seconds() >= PAPER_ALERT_MIN_SECONDS:
+            new_sells.append(s)
+            _ALERTED_SYMBOLS_TIMESTAMP["sell"][s] = now
 
     if not new_buys and not new_sells:
         logger.debug(f"[PAPER] No new alerts (buys={buy_symbols}, sells={sell_symbols})")
