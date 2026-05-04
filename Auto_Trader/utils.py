@@ -442,9 +442,9 @@ def Indicators(
     TRIX = talib.TRIX(close, timeperiod=30)
 
     # PPO — Percentage Price Oscillator (MACD alternative, normalised)
-    PPO_val, PPO_signal, PPO_hist = talib.PPO(
-        close, fastperiod=12, slowperiod=26, matype=0
-    )
+    PPO_val = talib.PPO(close, fastperiod=12, slowperiod=26, matype=0)
+    PPO_signal = talib.EMA(PPO_val, timeperiod=9)
+    PPO_hist = np.where(np.isfinite(PPO_val) & np.isfinite(PPO_signal), PPO_val - PPO_signal, np.nan)
 
     # ROC — Rate of Change (momentum)
     ROC = talib.ROC(close, timeperiod=10)
