@@ -15,6 +15,7 @@ TRADING_MODE = os.getenv("AT_TRADING_MODE", "DAILY").strip().upper()
 BAR_MINUTES = max(1, int(os.getenv("AT_BAR_MINUTES", "5")))
 PAPER_SHADOW_MODE = os.getenv("AT_PAPER_SHADOW_MODE", "0").strip() in {"1", "true", "TRUE", "yes", "YES"}
 PAPER_ALERT_MIN_SECONDS = max(0, int(os.getenv("AT_PAPER_ALERT_MIN_SECONDS", "1800")))
+_PAPER_ALERT_COOLDOWN = max(30, int(os.getenv("AT_PAPER_ALERT_COOLDOWN", "60")))  # Min seconds between paper alerts
 _LAST_PAPER_ALERT_SIGNATURE = None
 _LAST_PAPER_ALERT_AT = None
 _ALERTED_SYMBOLS = {"buy": set(), "sell": set()}  # Track already-alerted symbols to avoid spam
@@ -73,12 +74,20 @@ def _publish_paper_decisions(message_queue, decisions):
     _ALERTED_SYMBOLS["sell"] = set(sell_symbols)
 
     if not new_buys and not new_sells:
+        logger.debug(f"[PAPER] No new alerts (buys={buy_symbols}, sells={sell_symbols})")
         return
 
+    # Cooldown: don't send more than one Telegram alert per _PAPER_ALERT_COOLDOWN seconds
+    if _LAST_PAPER_ALERT_AT is not None:
+        elapsed = (now - _LAST_PAPER_ALERT_AT).total_seconds()
+        if elapsed < _PAPER_ALERT_COOLDOWN:
+            logger.debug(f"[PAPER] Cooldown: {elapsed:.0f}s < {_PAPER_ALERT_COOLDOWN}s, skipping")
+            return
+
     _LAST_PAPER_ALERT_AT = now
-    message_queue.put(
-        f"[PAPER] {ts} | NEW BUY:{len(new_buys)} {new_buys} | NEW SELL:{len(new_sells)} {new_sells}"
-    )
+    msg = f"[PAPER] {ts} | NEW BUY:{len(new_buys)} {new_buys} | NEW SELL:{len(new_sells)} {new_sells}"
+    logger.info(msg)
+    message_queue.put(msg)
 
 
 def _resolve_bar_timestamp(stock_data):
