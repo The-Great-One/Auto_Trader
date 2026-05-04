@@ -451,16 +451,20 @@ def Indicators(
 
     # Vortex Indicator (+VI/-VI) — trend confirmation
     #   +VI > -VI = bullish, -VI > +VI = bearish
-    vm_plus = np.abs(high - low.shift(1))  # type: ignore[attr-defined]
-    vm_minus = np.abs(low - high.shift(1))  # type: ignore[attr-defined]
-    tr_range = np.maximum(
+    # Need pandas Series for .shift()
+    _high_s = pd.Series(high, index=df.index)
+    _low_s = pd.Series(low, index=df.index)
+    _close_s = pd.Series(close, index=df.index)
+    vm_plus = np.abs(_high_s - _low_s.shift(1)).values
+    vm_minus = np.abs(_low_s - _high_s.shift(1)).values
+    tr_range_v = np.maximum(
         high - low,
-        np.maximum(np.abs(high - close.shift(1)), np.abs(low - close.shift(1))),
+        np.maximum(np.abs(high - _close_s.shift(1).values), np.abs(low - _close_s.shift(1).values)),
     )
     vortex_period = 14
-    vm_plus_sum = pd.Series(vm_plus).rolling(vortex_period).sum()
-    vm_minus_sum = pd.Series(vm_minus).rolling(vortex_period).sum()
-    tr_sum = pd.Series(tr_range).rolling(vortex_period).sum()
+    vm_plus_sum = pd.Series(vm_plus).rolling(vortex_period).sum().values
+    vm_minus_sum = pd.Series(vm_minus).rolling(vortex_period).sum().values
+    tr_sum = pd.Series(tr_range_v).rolling(vortex_period).sum().values
     VORTEX_PLUS = np.where(tr_sum > 0, vm_plus_sum / tr_sum, np.nan)
     VORTEX_MINUS = np.where(tr_sum > 0, vm_minus_sum / tr_sum, np.nan)
     VORTEX_BULL = np.where(
