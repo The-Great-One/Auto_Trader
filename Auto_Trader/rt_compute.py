@@ -17,10 +17,11 @@ PAPER_SHADOW_MODE = os.getenv("AT_PAPER_SHADOW_MODE", "0").strip() in {"1", "tru
 PAPER_ALERT_MIN_SECONDS = max(0, int(os.getenv("AT_PAPER_ALERT_MIN_SECONDS", "1800")))
 _LAST_PAPER_ALERT_SIGNATURE = None
 _LAST_PAPER_ALERT_AT = None
+_ALERTED_SYMBOLS = {"buy": set(), "sell": set()}  # Track already-alerted symbols to avoid spam
 
 
 def _publish_paper_decisions(message_queue, decisions):
-    global _LAST_PAPER_ALERT_SIGNATURE, _LAST_PAPER_ALERT_AT
+    global _LAST_PAPER_ALERT_SIGNATURE, _LAST_PAPER_ALERT_AT, _ALERTED_SYMBOLS
 
     buys = [d for d in decisions if d.get("Decision") == "BUY"]
     sells = [d for d in decisions if d.get("Decision") == "SELL"]
@@ -62,21 +63,21 @@ def _publish_paper_decisions(message_queue, decisions):
     if not buys and not sells:
         return
 
-    signature = (
-        tuple(sorted(d.get("Symbol") for d in buys if d.get("Symbol"))),
-        tuple(sorted(d.get("Symbol") for d in sells if d.get("Symbol"))),
-    )
-    should_send = signature != _LAST_PAPER_ALERT_SIGNATURE
-    if not should_send and _LAST_PAPER_ALERT_AT is not None:
-        should_send = (now - _LAST_PAPER_ALERT_AT).total_seconds() >= PAPER_ALERT_MIN_SECONDS
+    # --- Dedup: only alert for NEW symbols not yet alerted ---
+    new_buys = [s for s in buy_symbols if s not in _ALERTED_SYMBOLS["buy"]]
+    new_sells = [s for s in sell_symbols if s not in _ALERTED_SYMBOLS["sell"]]
 
-    if not should_send:
+    # Update alerted set: only keep symbols that are still actively signaling.
+    # Symbols that stopped signaling will be removed, so they can re-alert later.
+    _ALERTED_SYMBOLS["buy"] = set(buy_symbols)
+    _ALERTED_SYMBOLS["sell"] = set(sell_symbols)
+
+    if not new_buys and not new_sells:
         return
 
-    _LAST_PAPER_ALERT_SIGNATURE = signature
     _LAST_PAPER_ALERT_AT = now
     message_queue.put(
-        f"[PAPER] {ts} | BUY:{len(buys)} {buy_symbols} | SELL:{len(sells)} {sell_symbols}"
+        f"[PAPER] {ts} | NEW BUY:{len(new_buys)} {new_buys} | NEW SELL:{len(new_sells)} {new_sells}"
     )
 
 
