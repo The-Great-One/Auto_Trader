@@ -427,7 +427,7 @@ def Indicators(
 
     # --- TradingView-popular indicators ---
     # MFI (Money Flow Index) — volume-weighted RSI analogue
-    MFI = talib.MFI(high, low, close, volume, timeperiod=14)
+    MFI = talib.MFI(high, low, close, vol, timeperiod=14)
 
     # Stochastic RSI — RSI of RSI, popular on TradingView
     StochRSI_K, StochRSI_D = talib.STOCHRSI(
