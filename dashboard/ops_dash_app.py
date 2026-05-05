@@ -1433,6 +1433,26 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
             val = live_paper.get(key)
             if val:
                 paper_items.append(html.Div([html.Span(label.upper(), style={"fontSize": "10px", "color": BLOOMBERG_GRAY, "letterSpacing": "0.5px"}), html.Span(f" {val}", style={"fontSize": "13px", "fontWeight": "700", "color": BLOOMBERG_ORANGE})], style={"display": "inline-block", "marginRight": "16px"}))
+
+    # Live equity paper positions from rt_compute shadow
+    live_buys = live_paper.get("buys") or []
+    buy_datetimes = live_paper.get("buy_datetimes") or {}
+    # Use buy_datetimes keys (persisted open positions) instead of buys (current cycle only)
+    open_symbols = list(buy_datetimes.keys()) if buy_datetimes else live_buys
+    if open_symbols:
+        pos_rows = []
+        for sym in open_symbols:
+            detail = next((d for d in (live_paper.get("decision_details") or []) if d.get("symbol") == sym), {})
+            pos_rows.append({
+                "symbol": sym,
+                "close": detail.get("close", "-"),
+                "buy_datetime": buy_datetimes.get(sym, live_paper.get("time", "-")),
+                "rules": ", ".join(detail.get("contributing_rules", {}).get("BUY", [])),
+            })
+        pos_df = pd.DataFrame(pos_rows)
+        if not pos_df.empty:
+            children.insert(1, section("Live paper equity BUY positions", [table_from_df(pos_df, "live-paper-pos-table", page_size=10)], f"Active paper equity buys from the real-time rt_compute shadow. {len(open_symbols)} symbols held."))
+
     if paper_items:
         children.append(section("Paper snapshot", [html.Div(paper_items, style={**CARD_STYLE, "display": "flex", "flexWrap": "wrap", "gap": "8px"})], "Oracle paper shadow is separate from the Telegram paper ledger. Service restarts update rules immediately, but the shadow snapshot only changes when paper_shadow.py runs."))
 
