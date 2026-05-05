@@ -75,9 +75,9 @@ def _save_nav_to_disk_cache(scheme_code: int, nav_df: pd.DataFrame) -> None:
         # Disk cache is best-effort; ignore cache write failures.
         pass
 
-@st.cache_data(show_spinner=False, ttl=3 * 3600)
+@st.cache_data(show_spinner="Loading mutual fund universe...", ttl=6 * 3600)
 def fetch_scheme_list() -> pd.DataFrame:
-    r = requests.get(SCHEME_LIST_URL, timeout=30)
+    r = requests.get(SCHEME_LIST_URL, timeout=60)
     r.raise_for_status()
     df = pd.DataFrame(r.json()).rename(
         columns={"schemeCode": "scheme_code", "schemeName": "scheme_name"}
@@ -1292,14 +1292,45 @@ def universe_scan_top5(
 # --------------------------------------------------------------------
 
 st.set_page_config(page_title="MF FIRE Planner", layout="wide")
-st.title("🪙 MF FIRE Planner — SIP → SWP")
-st.caption("Compare, derive a custom NAV, P&C your best 5 with diversification (progress + robust correlations), then run an inflation-aware SWP.")
+st.title("🪙 MF FIRE Planner")
+st.caption("SIP → SWP planner with diversification scoring, tax-aware withdrawals, and Monte Carlo survival checks.")
+st.markdown("---")
 
-col1, col2 = st.columns([2, 1])
+# ── Quick Start: Your Portfolio ──
+current_default_funds, current_default_weights, current_holdings_df, unmatched_current_holdings = resolve_current_mf_defaults(pd.DataFrame())
+_tracker_available = False
+_tracker_data = None
+_tracker_path = PORTFOLIO_TRACKER_PATH
+if _tracker_path.exists():
+    try:
+        with open(_tracker_path) as _f:
+            _tracker_data = json.load(_f)
+        _tracker_available = True
+    except Exception:
+        pass
 
-with col1:
+if _tracker_available and _tracker_data:
+    _mf_h = _tracker_data.get("mf_holdings") or []
+    if _mf_h:
+        st.subheader("📋 Your Current MF Holdings")
+        _show_cols = ["fund", "current_value", "gain_pct", "recommendation", "category", "risk_level"]
+        _pretty_cols = {"fund": "Fund", "current_value": "Value ₹", "gain_pct": "Gain %", "recommendation": "Reco", "category": "Category", "risk_level": "Risk"}
+        _rows = []
+        for h in _mf_h:
+            r = {k: h.get(k) for k in _show_cols if k in h}
+            for _k in ["current_value", "gain_pct"]:
+                if _k in r and r[_k] is not None:
+                    try: r[_k] = round(float(r[_k]), 2)
+                    except: pass
+            _rows.append(r)
+        if _rows:
+            _df = pd.DataFrame(_rows)[[c for c in _show_cols if c in _rows[0]]]
+            _df = _df.rename(columns=_pretty_cols)
+            st.dataframe(_df, use_container_width=True, height=280, hide_index=True)
+
+with st.expander("🔍 Search & Add Funds", expanded=False):
     df_schemes = fetch_scheme_list()
-    q = st.text_input("Search fund (type 3+ chars)")
+    q = st.text_input("Search fund (type 3+ chars)", key="main_search")
     if q and len(q) >= 3:
         matches = df_schemes[df_schemes["scheme_name_lc"].str.contains(q.lower())].head(25)
     else:
@@ -2003,13 +2034,4 @@ with st.expander("🔧 SWP Framework (inflation + risk-weighted portfolio)", exp
                         st.download_button("⬇️ Download SWP path (reduced) CSV", data=path_reduced.to_csv(index=False).encode("utf-8"),
                                            file_name="swp_path_reduced.csv", mime="text/csv", use_container_width=True)
 
-# Optional legacy inputs
-with col2:
-    st.subheader("Legacy Inputs (optional)")
-    lump_sum = st.number_input("Lump sum invested (₹)", min_value=0, value=0, step=1000)
-    lump_date = st.date_input("Lump sum date", value=dt.date.today().replace(day=1))
-    sip_amt = st.number_input("SIP monthly (₹)", min_value=0, value=10000, step=1000)
-    sip_start = st.date_input("SIP start", value=dt.date.today().replace(day=1))
-    sip_end = st.date_input("SIP end (inclusive)", value=dt.date.today().replace(day=1))
-
-st.caption("Diversified P&C uses pairwise correlations on an outer-joined returns panel, so selections won’t collapse. SWP now supports a 20% per-fund floor, tax/exit-load aware drawdown, guardrail spending, biennial rebalance, and Monte Carlo survival checks.")
+st.caption("P&C uses pairwise correlations on outer-joined returns. SWP supports 20%% per-fund floor, tax/exit-load aware drawdown, guardrails, and Monte Carlo.")
