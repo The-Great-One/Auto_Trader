@@ -42,6 +42,7 @@ def _publish_paper_decisions(message_queue, decisions):
                 "contributing_rules": decision.get("ContributingRules"),
                 "sentiment_overlay": decision.get("SentimentOverlay"),
                 "sentiment_overlays": decision.get("SentimentOverlays"),
+                "buy_datetime": decision.get("BuyDatetime"),
             }
         )
 
@@ -82,7 +83,20 @@ def _publish_paper_decisions(message_queue, decisions):
         return
 
     _LAST_PAPER_ALERT_AT = now
-    msg = f"[PAPER] {ts} | NEW BUY:{len(new_buys)} {new_buys} | NEW SELL:{len(new_sells)} {new_sells}"
+    buy_details = []
+    for d in decisions[:25]:
+        if d.get("Symbol") in new_buys:
+            buy_details.append(f"{d.get('Symbol')}@{d.get('Close','?')}")
+    sell_details = []
+    for d in decisions[:25]:
+        if d.get("Symbol") in new_sells:
+            sell_details.append(f"{d.get('Symbol')}@{d.get('Close','?')}")
+    detail_line = ""
+    if buy_details:
+        detail_line += f" BUY: {", ".join(buy_details)}"
+    if sell_details:
+        detail_line += f" SELL: {", ".join(sell_details)}"
+    msg = f"[PAPER] {ts} | BUY:{len(new_buys)} SELL:{len(new_sells)}{detail_line}"
     logger.info(msg)
     message_queue.put(msg)
 

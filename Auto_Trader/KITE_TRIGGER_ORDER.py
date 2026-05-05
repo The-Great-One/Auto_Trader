@@ -505,12 +505,15 @@ def trigger(
                 order_confirmed = True
 
                 # Notify
+                from datetime import datetime as _dt
+                _order_ts = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
                 message = (
                     f"Symbol: {symbol}\n"
                     f"Quantity: {qty}\n"
                     f"Price: {limit_price if order_type_k == kite.ORDER_TYPE_LIMIT else 'MARKET'}\n"
                     f"Type: {order_type}\n"
                     f"Order ID: {order_id}\n"
+                    f"Time: {_order_ts}\n"
                     f"Contributing Rules: {contributing_rules}"
                 )
                 try:

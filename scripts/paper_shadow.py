@@ -189,6 +189,8 @@ def _load_shadow_state(symbol: str, starting_capital: float) -> dict:
         "cash": float(starting_capital),
         "quantity": 0,
         "entry_price": None,
+        "buy_datetime": None,
+        "buy_datetime": None,
         "realized_pnl": 0.0,
         "bars_in_trade": 0,
         "trade_count": 0,
@@ -207,6 +209,8 @@ def _load_shadow_state(symbol: str, starting_capital: float) -> dict:
                 "starting_capital": float(starting_capital),
                 "cash": float(starting_capital),
                 "entry_price": None,
+        "buy_datetime": None,
+        "buy_datetime": None,
                 "realized_pnl": 0.0,
                 "bars_in_trade": 0,
                 "trade_count": 0,
@@ -227,6 +231,8 @@ def _apply_shadow_trade(state: dict, decision: str, price: float) -> dict:
     cash = float(state.get("cash") or 0.0)
     qty = int(state.get("quantity") or 0)
     entry_price = state.get("entry_price")
+    buy_datetime = state.get("buy_datetime")
+    buy_datetime = state.get("buy_datetime")
     realized_pnl = float(state.get("realized_pnl") or 0.0)
     bars_in_trade = int(state.get("bars_in_trade") or 0)
     trade_count = int(state.get("trade_count") or 0)
@@ -238,6 +244,7 @@ def _apply_shadow_trade(state: dict, decision: str, price: float) -> dict:
             cash = round(cash - cost, 2)
             qty = buy_qty
             entry_price = float(price)
+            buy_datetime = datetime.now().isoformat()
             bars_in_trade = 1
             trade_count += 1
             action = "BUY"
@@ -250,11 +257,13 @@ def _apply_shadow_trade(state: dict, decision: str, price: float) -> dict:
         realized_pnl = round(realized_pnl + pnl, 2)
         qty = 0
         entry_price = None
+        buy_datetime = None
         bars_in_trade = 0
         trade_count += 1
         action = "SELL"
     elif qty > 0:
         bars_in_trade = max(1, bars_in_trade + 1)
+        buy_datetime = buy_datetime or state.get("buy_datetime")
         action = "HOLD_POSITION"
 
     market_value = round(qty * price, 2)
@@ -269,6 +278,7 @@ def _apply_shadow_trade(state: dict, decision: str, price: float) -> dict:
         "cash": cash,
         "quantity": qty,
         "entry_price": entry_price,
+        "buy_datetime": buy_datetime,
         "realized_pnl": realized_pnl,
         "bars_in_trade": bars_in_trade,
         "trade_count": trade_count,
@@ -387,6 +397,8 @@ def run_equity_shadow() -> dict:
             "equity": float(shadow_state.get("equity") or 0.0),
             "quantity": int(shadow_state.get("quantity") or 0),
             "entry_price": shadow_state.get("entry_price"),
+            "buy_datetime": shadow_state.get("buy_datetime"),
+            "buy_datetime": shadow_state.get("buy_datetime"),
             "bars_in_trade": int(shadow_state.get("bars_in_trade") or 0),
             "realized_pnl": float(shadow_state.get("realized_pnl") or 0.0),
             "unrealized_pnl": float(shadow_state.get("unrealized_pnl") or 0.0),
