@@ -1067,3 +1067,212 @@ Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-26.md
 }
 Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-24.json
 Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-04-24.md
+{
+  "generated_at": "2026-05-03T16:10:02.397771",
+  "trade_date": "2026-05-03",
+  "market_open": false,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": -1,
+    "stderr": "Strategy lab timed out after 7200s \u2014 likely hung multiprocessing workers",
+    "stdout": "",
+    "file": null,
+    "requested_variants": 320,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "baseline_trades": null,
+    "best_return_pct": null,
+    "best_trades": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": null,
+    "stale_report": true,
+    "stale_reason": "lab_timed_out_7200s"
+  },
+  "paper_trader": {
+    "market_open": false,
+    "paper_executed": false,
+    "self_healed": false,
+    "decision": null,
+    "reason": "market_closed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "options_file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json"
+  },
+  "weekly_universe_cagr": {
+    "enabled": true,
+    "report_week": "2026_W18",
+    "scheduled_weekday": 5,
+    "ok": false,
+    "ran": false,
+    "reason": "not_scheduled_day",
+    "file": null,
+    "cagr_pct": null,
+    "total_return_pct": null,
+    "coverage_pct": null,
+    "tested_symbols": 0,
+    "requested_symbols": 0
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "lab_failed",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  },
+  "iteration_plan": {
+    "enabled": true,
+    "asset_class": "equity",
+    "objective": "Improve equity trade density and robustness with fresh daily iteration.",
+    "items": [
+      {
+        "priority": "high",
+        "focus": "repair_equity_iteration_inputs",
+        "detail": "Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports."
+      }
+    ]
+  },
+  "portfolio": {
+    "total_value": 549748.06,
+    "total_cost": 510757.89,
+    "total_pnl": 38990.17,
+    "total_pnl_pct": 7.63,
+    "risk_score": 7,
+    "risk_headlines": [
+      "<![cdata[the hormuz blockade: why a fragile ceasefire may not lower global oil prices]]> ",
+      "<![cdata[the hormuz blockade: why a fragile ceasefire may not lower global oil prices]]> ",
+      "<![cdata[will sensex, nifty extend losses on monday? iran war peace talks, 4 factors to dictate dalal street next week]]> ",
+      "<![cdata[what will berkshire do with $380 billion? greg abel speaks after taking over warren buffett's biggest cash puzzle]]> ",
+      "<![cdata[what warren buffett said at berkshire hathaway's first annual meeting after stepping aside]]> "
+    ],
+    "current_allocation": {
+      "EQUITY": 0.0,
+      "ETF": 0.0,
+      "MF": 1.0
+    },
+    "target_allocation": {
+      "EQUITY": 0.4,
+      "ETF": 0.35,
+      "MF": 0.25
+    },
+    "rebalance_advice_inr": {
+      "EQUITY": 219899.22,
+      "ETF": 192411.82,
+      "MF": -412311.04
+    }
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-03.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-03.md
+{
+  "generated_at": "2026-05-04T16:10:01.709184",
+  "trade_date": "2026-05-04",
+  "market_open": true,
+  "calendar": "NSE",
+  "strategy_test": {
+    "ok": false,
+    "returncode": -1,
+    "stderr": "Strategy lab timed out after 7200s \u2014 likely hung multiprocessing workers",
+    "stdout": "",
+    "file": null,
+    "requested_variants": 120,
+    "tested_variants": 0,
+    "baseline_return_pct": null,
+    "baseline_trades": null,
+    "best_return_pct": null,
+    "best_trades": null,
+    "improvement_return_pct": null,
+    "improvement_score": null,
+    "should_promote": false,
+    "best_name": null,
+    "candidate": null,
+    "report_generated_at": null,
+    "stale_report": true,
+    "stale_reason": "lab_timed_out_7200s"
+  },
+  "paper_trader": {
+    "market_open": true,
+    "paper_executed": true,
+    "self_healed": false,
+    "decision": "HOLD",
+    "reason": "already_executed",
+    "file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "options_file": "/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json"
+  },
+  "weekly_universe_cagr": {
+    "enabled": true,
+    "report_week": "2026_W19",
+    "scheduled_weekday": 5,
+    "ok": false,
+    "ran": false,
+    "reason": "market_open",
+    "file": null,
+    "cagr_pct": null,
+    "total_return_pct": null,
+    "coverage_pct": null,
+    "tested_symbols": 0,
+    "requested_symbols": 0
+  },
+  "autopromote": {
+    "enabled": true,
+    "applied": false,
+    "restarted_service": false,
+    "reason": "market_open",
+    "candidate": null,
+    "env_updates": null,
+    "repeat_hits": 0,
+    "lookback": 0
+  },
+  "iteration_plan": {
+    "enabled": true,
+    "asset_class": "equity",
+    "objective": "Improve equity trade density and robustness with fresh daily iteration.",
+    "items": [
+      {
+        "priority": "high",
+        "focus": "repair_equity_iteration_inputs",
+        "detail": "Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports."
+      },
+      {
+        "priority": "medium",
+        "focus": "add_equity_near_miss_diagnostics",
+        "detail": "Paper equity decision is HOLD. Add near-miss diagnostics so the daily loop can see which gates are preventing trades and tune them deliberately."
+      }
+    ]
+  },
+  "portfolio": {
+    "total_value": 549748.06,
+    "total_cost": 510757.06,
+    "total_pnl": 38991.0,
+    "total_pnl_pct": 7.63,
+    "risk_score": 3,
+    "risk_headlines": [
+      "<![cdata[oil jumps by 5% after report of us warship being hit by missiles]]> ",
+      "<![cdata[oil jumps by 5% after report of us warship being hit by missiles]]> ",
+      "<![cdata[gold, silver rates today nosedive up to 5% as crude oil price soars after escalation in the us-iran war]]>"
+    ],
+    "current_allocation": {
+      "EQUITY": 0.0,
+      "ETF": 0.0,
+      "MF": 1.0
+    },
+    "target_allocation": {
+      "EQUITY": 0.47000000000000003,
+      "ETF": 0.3,
+      "MF": 0.23
+    },
+    "rebalance_advice_inr": {
+      "EQUITY": 258381.59,
+      "ETF": 164924.42,
+      "MF": -423306.01
+    }
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-04.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-04.md

@@ -549,3 +549,100 @@ Saved: /home/ubuntu/Auto_Trader/reports/daily_improvement_audit_2026-04-24.md
 }
 Saved: /home/ubuntu/Auto_Trader/reports/daily_improvement_audit_2026-04-27.json
 Saved: /home/ubuntu/Auto_Trader/reports/daily_improvement_audit_2026-04-27.md
+{
+  "generated_at": "2026-05-04T16:40:02.561527",
+  "trade_date": "2026-05-04",
+  "market_open": true,
+  "paths": {
+    "scorecard": "/home/ubuntu/Auto_Trader/reports/daily_scorecard_2026-05-04.json",
+    "daily_ops": "/home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-04.json",
+    "options_supervisor": "/home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-05-04.json",
+    "paper_shadow": "/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json",
+    "paper_shadow_options": "/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json",
+    "equity_lab": "/home/ubuntu/Auto_Trader/reports/strategy_lab_20260502_204522.json",
+    "options_lab": "/home/ubuntu/Auto_Trader/reports/options_strategy_lab_20260504_155145.json",
+    "breakout_atr_candidate": null
+  },
+  "issues": [
+    {
+      "severity": "medium",
+      "area": "scorecard",
+      "detail": "No orders or trades recorded for the trade date."
+    }
+  ],
+  "improvement_areas": [
+    {
+      "priority": "high",
+      "title": "Improve entry sensitivity review",
+      "detail": "No-trade day detected. Revisit BUY gate strictness and inspect near-miss candidates in equity and options paper outputs."
+    },
+    {
+      "priority": "medium",
+      "title": "Explain options near-misses better",
+      "detail": "Current top options candidate is HOLD with score 2.0. Add gate-by-gate miss diagnostics so near-buy setups are easier to tune."
+    },
+    {
+      "priority": "medium",
+      "title": "Improve options ranking/search separation",
+      "detail": "Current options lab did not beat baseline. Expand diversity across expiries/strikes and improve ranking metrics beyond simple return/score."
+    }
+  ],
+  "snapshots": {
+    "scorecard": {
+      "orders": 0,
+      "trades": 0,
+      "verdict": "GOOD"
+    },
+    "daily_ops": {
+      "strategy_ok": null,
+      "strategy_stale": null,
+      "paper_ok": null,
+      "paper_reason": null
+    },
+    "options_supervisor": {
+      "fetch_ok": true,
+      "paper_ok": true,
+      "paper_stale": false,
+      "lab_ok": true,
+      "lab_stale": false
+    },
+    "breakout_atr_candidate": {
+      "decision": null,
+      "best_name": null,
+      "test_cagr_pct": null,
+      "test_max_drawdown_pct": null
+    }
+  },
+  "daily_iteration": {
+    "equity": {},
+    "options": {
+      "enabled": true,
+      "asset_class": "options",
+      "objective": "Improve options paper research quality with fresh daily iteration.",
+      "items": [
+        {
+          "priority": "medium",
+          "focus": "broaden_options_search",
+          "detail": "Daily options lab did not improve on baseline. Broaden the search across underlying trend filters, score thresholds, and exit logic."
+        },
+        {
+          "priority": "medium",
+          "focus": "deeper_options_weekend_sweep",
+          "detail": "Latest options lab tested 0 variants. Keep daily runs lean, but use deeper weekend sweeps for better separation."
+        },
+        {
+          "priority": "medium",
+          "focus": "add_options_near_miss_diagnostics",
+          "detail": "Top options paper candidate is still HOLD with score 2.0. Add gate-by-gate miss diagnostics so daily iteration can tune the last blockers."
+        }
+      ]
+    }
+  },
+  "log_tails": {
+    "daily_ops_supervisor_cron": "    \"stale_report\": true,\n    \"stale_reason\": \"lab_timed_out_7200s\"\n  },\n  \"paper_trader\": {\n    \"market_open\": false,\n    \"paper_executed\": false,\n    \"self_healed\": false,\n    \"decision\": null,\n    \"reason\": \"market_closed\",\n    \"file\": \"/home/ubuntu/Auto_Trader/reports/paper_shadow_latest.json\",\n    \"options_file\": \"/home/ubuntu/Auto_Trader/reports/paper_shadow_options_latest.json\"\n  },\n  \"weekly_universe_cagr\": {\n    \"enabled\": true,\n    \"report_week\": \"2026_W18\",\n    \"scheduled_weekday\": 5,\n    \"ok\": false,\n    \"ran\": false,\n    \"reason\": \"not_scheduled_day\",\n    \"file\": null,\n    \"cagr_pct\": null,\n    \"total_return_pct\": null,\n    \"coverage_pct\": null,\n    \"tested_symbols\": 0,\n    \"requested_symbols\": 0\n  },\n  \"autopromote\": {\n    \"enabled\": true,\n    \"applied\": false,\n    \"restarted_service\": false,\n    \"reason\": \"lab_failed\",\n    \"candidate\": null,\n    \"env_updates\": null,\n    \"repeat_hits\": 0,\n    \"lookback\": 0\n  },\n  \"iteration_plan\": {\n    \"enabled\": true,\n    \"asset_class\": \"equity\",\n    \"objective\": \"Improve equity trade density and robustness with fresh daily iteration.\",\n    \"items\": [\n      {\n        \"priority\": \"high\",\n        \"focus\": \"repair_equity_iteration_inputs\",\n        \"detail\": \"Equity lab did not complete cleanly. Repair history loading / freshness first so daily iteration is based on fresh data rather than stale reports.\"\n      }\n    ]\n  },\n  \"portfolio\": {\n    \"total_value\": 549748.06,\n    \"total_cost\": 510757.89,\n    \"total_pnl\": 38990.17,\n    \"total_pnl_pct\": 7.63,\n    \"risk_score\": 7,\n    \"risk_headlines\": [\n      \"<![cdata[the hormuz blockade: why a fragile ceasefire may not lower global oil prices]]> \",\n      \"<![cdata[the hormuz blockade: why a fragile ceasefire may not lower global oil prices]]> \",\n      \"<![cdata[will sensex, nifty extend losses on monday? iran war peace talks, 4 factors to dictate dalal street next week]]> \",\n      \"<![cdata[what will berkshire do with $380 billion? greg abel speaks after taking over warren buffett's biggest cash puzzle]]> \",\n      \"<![cdata[what warren buffett said at berkshire hathaway's first annual meeting after stepping aside]]> \"\n    ],\n    \"current_allocation\": {\n      \"EQUITY\": 0.0,\n      \"ETF\": 0.0,\n      \"MF\": 1.0\n    },\n    \"target_allocation\": {\n      \"EQUITY\": 0.4,\n      \"ETF\": 0.35,\n      \"MF\": 0.25\n    },\n    \"rebalance_advice_inr\": {\n      \"EQUITY\": 219899.22,\n      \"ETF\": 192411.82,\n      \"MF\": -412311.04\n    }\n  }\n}\nSaved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-03.json\nSaved: /home/ubuntu/Auto_Trader/reports/daily_ops_supervisor_2026-05-03.md",
+    "options_research_supervisor_cron": "                \"NIFTY2650524250CE\",\n                \"NIFTY2650524250PE\"\n              ],\n              \"selection_score\": 0.0\n            },\n            \"test\": {\n              \"name\": \"atr_pct_min_0.02\",\n              \"final_value\": 1400000.0,\n              \"total_return_pct\": 0.0,\n              \"trades\": 0,\n              \"win_rate_pct\": 0.0,\n              \"max_drawdown_pct\": 0.0,\n              \"params\": {\n                \"options\": {\n                  \"atr_pct_min\": 0.02\n                }\n              },\n              \"symbols_tested\": [\n                \"NIFTY2650523950CE\",\n                \"NIFTY2650523950PE\",\n                \"NIFTY2650524000CE\",\n                \"NIFTY2650524000PE\",\n                \"NIFTY2650524050CE\",\n                \"NIFTY2650524050PE\",\n                \"NIFTY2650524100CE\",\n                \"NIFTY2650524100PE\",\n                \"NIFTY2650524150CE\",\n                \"NIFTY2650524150PE\",\n                \"NIFTY2650524200CE\",\n                \"NIFTY2650524200PE\",\n                \"NIFTY2650524250CE\",\n                \"NIFTY2650524250PE\"\n              ],\n              \"selection_score\": 0.0\n            },\n            \"robust_score\": -125.0,\n            \"validation_pass\": false\n          }\n        ]\n      },\n      \"selected_by_validation\": null,\n      \"should_promote\": false,\n      \"notes\": [\n        \"Research-only NIFTY options lab using RULE_SET_OPTIONS_1.\",\n        \"Search space is context-aware, similar to the equity lab, but still never auto-promotes into live trading.\",\n        \"Use results to refine options paper trading before any live NFO execution work.\"\n      ]\n    },\n    \"stdout\": \"ymbols_tested\\\": [\\n            \\\"NIFTY2650523950CE\\\",\\n            \\\"NIFTY2650523950PE\\\",\\n            \\\"NIFTY2650524000CE\\\",\\n            \\\"NIFTY2650524000PE\\\",\\n            \\\"NIFTY2650524050CE\\\",\\n            \\\"NIFTY2650524050PE\\\",\\n            \\\"NIFTY2650524100CE\\\",\\n            \\\"NIFTY2650524100PE\\\",\\n            \\\"NIFTY2650524150CE\\\",\\n            \\\"NIFTY2650524150PE\\\",\\n            \\\"NIFTY2650524200CE\\\",\\n            \\\"NIFTY2650524200PE\\\",\\n            \\\"NIFTY2650524250CE\\\",\\n            \\\"NIFTY2650524250PE\\\"\\n          ],\\n          \\\"selection_score\\\": 0.0\\n        },\\n        \\\"test\\\": {\\n          \\\"name\\\": \\\"atr_pct_min_0.02\\\",\\n          \\\"final_value\\\": 1400000.0,\\n          \\\"total_return_pct\\\": 0.0,\\n          \\\"trades\\\": 0,\\n          \\\"win_rate_pct\\\": 0.0,\\n          \\\"max_drawdown_pct\\\": 0.0,\\n          \\\"params\\\": {\\n            \\\"options\\\": {\\n              \\\"atr_pct_min\\\": 0.02\\n            }\\n          },\\n          \\\"symbols_tested\\\": [\\n            \\\"NIFTY2650523950CE\\\",\\n            \\\"NIFTY2650523950PE\\\",\\n            \\\"NIFTY2650524000CE\\\",\\n            \\\"NIFTY2650524000PE\\\",\\n            \\\"NIFTY2650524050CE\\\",\\n            \\\"NIFTY2650524050PE\\\",\\n            \\\"NIFTY2650524100CE\\\",\\n            \\\"NIFTY2650524100PE\\\",\\n            \\\"NIFTY2650524150CE\\\",\\n            \\\"NIFTY2650524150PE\\\",\\n            \\\"NIFTY2650524200CE\\\",\\n            \\\"NIFTY2650524200PE\\\",\\n            \\\"NIFTY2650524250CE\\\",\\n            \\\"NIFTY2650524250PE\\\"\\n          ],\\n          \\\"selection_score\\\": 0.0\\n        },\\n        \\\"robust_score\\\": -125.0,\\n        \\\"validation_pass\\\": false\\n      }\\n    ]\\n  },\\n  \\\"selected_by_validation\\\": null,\\n  \\\"should_promote\\\": false,\\n  \\\"notes\\\": [\\n    \\\"Research-only NIFTY options lab using RULE_SET_OPTIONS_1.\\\",\\n    \\\"Search space is context-aware, similar to the equity lab, but still never auto-promotes into live trading.\\\",\\n    \\\"Use results to refine options paper trading before any live NFO execution work.\\\"\\n  ]\\n}\\nSaved: /home/ubuntu/Auto_Trader/reports/options_strategy_lab_20260504_155145.json\\nSaved: /home/ubuntu/Auto_Trader/reports/options_strategy_lab_20260504_155145.csv\\n\",\n    \"stderr\": \"\",\n    \"reason\": null,\n    \"generated_at\": \"2026-05-04T15:51:45.641219\",\n    \"stale_report\": false,\n    \"stale_reason\": null\n  },\n  \"iteration_plan\": {\n    \"enabled\": true,\n    \"asset_class\": \"options\",\n    \"objective\": \"Improve options paper research quality with fresh daily iteration.\",\n    \"items\": [\n      {\n        \"priority\": \"medium\",\n        \"focus\": \"broaden_options_search\",\n        \"detail\": \"Daily options lab did not improve on baseline. Broaden the search across underlying trend filters, score thresholds, and exit logic.\"\n      },\n      {\n        \"priority\": \"medium\",\n        \"focus\": \"deeper_options_weekend_sweep\",\n        \"detail\": \"Latest options lab tested 0 variants. Keep daily runs lean, but use deeper weekend sweeps for better separation.\"\n      },\n      {\n        \"priority\": \"medium\",\n        \"focus\": \"add_options_near_miss_diagnostics\",\n        \"detail\": \"Top options paper candidate is still HOLD with score 2.0. Add gate-by-gate miss diagnostics so daily iteration can tune the last blockers.\"\n      }\n    ]\n  }\n}\nSaved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-05-04.json\nSaved: /home/ubuntu/Auto_Trader/reports/options_research_supervisor_2026-05-04.md",
+    "scorecard_cron": "/home/ubuntu/Auto_Trader/reports/daily_scorecard_2026-05-04.md\n/home/ubuntu/Auto_Trader/reports/daily_scorecard_2026-05-04.json"
+  }
+}
+Saved: /home/ubuntu/Auto_Trader/reports/daily_improvement_audit_2026-05-04.json
+Saved: /home/ubuntu/Auto_Trader/reports/daily_improvement_audit_2026-05-04.md

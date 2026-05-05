@@ -3,3 +3,8 @@ AT_SERVER_HOST not set, cannot scan remote logs
 Failure counts: {'KOTAKBANK': 1, 'AMBUJACEM': 1, 'CIPLA': 1, 'IGL': 1, 'EIHOTEL': 1, 'CMPDI': 1, 'CEMPRO': 1, 'KIRLFER': 1, 'SAATVIKGL': 1, 'AHLUCONT': 1, 'ASHAPURMIN': 1, 'TIIL': 1, 'SMLMAH': 1, 'SYMPHONY': 1, 'PTC': 1, 'NETWORK18': 1, 'MASTEK': 1, 'GANESHHOU': 1, 'ICIL': 1}
 
 No new symbols to exclude (all already excluded or below threshold)
+Currently excluded: none
+AT_SERVER_HOST not set, cannot scan remote logs
+Failure counts: {'KIRLFER': 2, 'CMPDI': 2, 'SAATVIKGL': 2, 'IGL': 2, 'EIHOTEL': 2, 'BALUFORGE': 1, 'SUNTECK': 1, 'SMALLCAP': 1, 'AIIL': 1, 'LOTUSDEV': 1, 'AARTIPHARM': 1, 'IGIL': 1, 'CELLO': 1, 'EMBDL': 1, 'AKUMS': 1, 'AFCONS': 1, 'AWL': 1, 'TMB': 1, 'FIVESTAR': 1, 'ASKAUTOLTD': 1}
+
+No new symbols to exclude (all already excluded or below threshold)

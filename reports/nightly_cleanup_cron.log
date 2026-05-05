@@ -81,3 +81,31 @@ Summary: {
   "moved_count": 10,
   "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
 }
+Running nightly cleanup review...
+Cleanup review done in 5.2s
+Summary: {
+  "files_with_unused_imports": 60,
+  "large_files": 11,
+  "stale_reports": 11,
+  "secret_leaks": 2,
+  "dirty_files": 5
+}
+{
+  "planned_families": 24,
+  "moved_count": 26,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}
+Running nightly cleanup review...
+Cleanup review done in 5.4s
+Summary: {
+  "files_with_unused_imports": 60,
+  "large_files": 20,
+  "stale_reports": 11,
+  "secret_leaks": 2,
+  "dirty_files": 41
+}
+{
+  "planned_families": 10,
+  "moved_count": 19,
+  "summary_path": "/home/ubuntu/Auto_Trader/reports/report_clutter_cleanup_latest.json"
+}

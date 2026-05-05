@@ -337,12 +337,17 @@ def mf_xirr_booster_rows(tracker: dict[str, Any]) -> tuple[list[dict[str, Any]],
     elss_pct = sum(v for k, v in category_pct.items() if "ELSS" in k.upper())
     intl_pct = sum(v for k, v in category_pct.items() if any(tok in k.upper() for tok in ["NASDAQ", "TAIWAN", "INTERNATIONAL"]))
 
+    seen_funds = set()
     for h in sorted(mf_holdings, key=lambda x: safe_num(x.get("gain_pct")) or 0.0)[:5]:
         fund = str(h.get("fund") or h.get("tradingsymbol") or "?")
+        if fund in seen_funds:
+            continue
         cat = str(h.get("category") or "")
         gain = safe_num(h.get("gain_pct")) or 0.0
         pct = mf_sleeve_pct(h, mf_value)
-        if str(h.get("recommendation") or "").lower() == "buy" and pct < 12:
+        rec = str(h.get("recommendation") or "").lower()
+        if rec == "buy" and pct < 12:
+            seen_funds.add(fund)
             fallback_rows.append({
                 "priority": "high" if gain < 0 else "medium",
                 "action": "top_up",
@@ -2864,6 +2869,16 @@ app = Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Auto Trader Ops"
 app.config.suppress_callback_exceptions = True
 
+# Pre-load dashboard data at startup so the first page render is never blank
+try:
+    _preload = collect_data()
+    DASH_DATA_CACHE["ts"] = time.time()
+    DASH_DATA_CACHE["data"] = _preload
+    print(f"[ops_dash] Pre-loaded data at startup ({len(str(_preload))} bytes)")
+except Exception as _e:
+    print(f"[ops_dash] Pre-load failed: {_e}")
+
+
 
 def _dashboard_auth_enabled() -> bool:
     return bool(os.getenv("DASH_AUTH_PASSWORD", "").strip())
@@ -2959,13 +2974,13 @@ app.index_string = """<!DOCTYPE html>
 app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
-        dcc.Interval(id="refresh", interval=30_000, n_intervals=0),
+        dcc.Interval(id="refresh", interval=300_000, n_intervals=0),
         dcc.Interval(id="globe-anim", interval=2200, n_intervals=0),
         dcc.Store(id="data-version", data={"ts": 0.0}),
         html.H1("AUTO TRADER OPS", style={"fontSize": "18px", "fontWeight": "700", "letterSpacing": "2px", "color": BLOOMBERG_ORANGE, "marginBottom": "2px"}),
         html.Div("Live dashboard — service health, portfolios, paper trading, research, Telegram.", style={"color": BLOOMBERG_GRAY, "marginBottom": "8px", "fontSize": "11px"}),
-        html.Div(id="last-updated", style={"color": "#5a6a7a", "marginBottom": "8px", "fontSize": "11px"}),
-        html.Div(id="hero-row", style={"display": "flex", "gap": "12px", "flexWrap": "wrap"}),
+        html.Div(id="last-updated", children="Warming up...", style={"color": "#f5a623", "marginBottom": "8px", "fontSize": "11px"}),
+        html.Div(id="hero-row", children=html.Div("LOADING DASHBOARD...", style={"fontSize": "14px", "fontWeight": "700", "color": "#f5a623", "letterSpacing": "2px", "padding": "12px", "fontFamily": "JetBrains Mono, monospace"}), style={"display": "flex", "gap": "12px", "flexWrap": "wrap"}),
         dcc.Tabs(
             id="main-tab",
             value="telegram",
@@ -2985,7 +3000,7 @@ app.layout = html.Div(
             colors={"border": "#1e2a3a", "primary": BLOOMBERG_ORANGE, "background": "#111827"},
             style={"borderBottom": f"1px solid #1e2a3a"},
         ),
-        html.Div(id="tab-content", style={"marginTop": "12px"}),
+        html.Div(id="tab-content", children=html.Div("Preparing dashboard data...", style={"fontSize": "13px", "color": "#9ca3af", "padding": "24px 12px", "fontFamily": "JetBrains Mono, monospace"}), style={"marginTop": "12px"}),
     ],
 )
 

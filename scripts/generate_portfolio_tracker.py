@@ -76,7 +76,7 @@ FUND_META: dict[str, dict[str, Any]] = {
 CATEGORY_OUTLOOK: dict[str, str] = {
     "Infrastructure": "positive",   # govt capex push
     "Small Cap": "cautious",        # frothy valuations, FII selling
-    "Mid Cap": "neutral",           # mixed signals
+    "Mid Cap": "cautious",          # heavy FII selling, large outflows from midcap funds
     "Index/NASDAQ": "positive",     # US tech resilience
     "International/Taiwan": "cautious",  # geopolitical risk
     "Flexi Cap": "positive",        # flexibility in volatile markets
@@ -754,6 +754,26 @@ def compute_recommendation(entry: dict[str, Any], portfolio_context: dict[str, A
         elif buy_signals >= 1 and outlook not in ("negative",):
             action = "buy"
         else:
+            action = "hold"
+
+        # Override: if rationale says trim AND buy/hold, it's contradictory → hold
+        has_trim = any("trim" in r for r in reasons)
+        has_sip = any("SIP candidate" in r for r in reasons)
+        has_elss_hold = is_elss and any("lock-in" in r for r in reasons)
+        if has_trim and (has_sip or has_elss_hold) and action == "buy":
+            action = "hold"
+            if has_elss_hold:
+                reasons.append("overweight ELSS with lock-in → hold, don't add more")
+            else:
+                reasons.append("mixed signals (overweight + SIP) → hold and watch")
+
+        # Override: down more than 5% in a cautious/negative category → hold, don't buy
+        if gain_pct < -5 and outlook in ("cautious", "negative") and action == "buy":
+            action = "hold"
+            reasons.append("down >5% in cautious category → pause buying")
+
+        # Override: ELSS with trimming signal → hold (don't sell locked-in tax saver)
+        if is_elss and has_trim and action == "sell":
             action = "hold"
 
     else:

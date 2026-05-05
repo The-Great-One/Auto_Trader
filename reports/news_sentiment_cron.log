@@ -32771,3 +32771,3999 @@ Fetching sentiment for 0 symbols: []
     "hot_picks": []
   }
 }
+Kite login blocked by CAPTCHA challenge before TOTP: status_code=400, api_status='error', message='Invalid CAPTCHA values.', data_keys=['captcha'], content_type='application/json'
+Kite login blocked by CAPTCHA challenge before TOTP: status_code=400, api_status='error', message='Invalid CAPTCHA values.', data_keys=['captcha'], content_type='application/json'
+Fetching sentiment for 0 symbols: []
+{
+  "symbols": {
+    "generated_at": 1777879803,
+    "symbols": 0,
+    "active": [],
+    "top_bullish": [],
+    "top_bearish": [],
+    "feeds": [
+      "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+      "https://www.moneycontrol.com/rss/business.xml",
+      "https://www.livemint.com/rss/markets",
+      "https://feeds.feedburner.com/ndtvprofit-latest"
+    ],
+    "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+  },
+  "topics": {
+    "generated_at": 1777879820,
+    "topics": [
+      {
+        "weighted_sentiment": -0.1791,
+        "type_counts": {
+          "risk": 137,
+          "uncategorized": 41,
+          "bearish": 2,
+          "news": 6,
+          "bullish": 1,
+          "rumor": 1
+        },
+        "dominant_types": [
+          "risk",
+          "uncategorized",
+          "news",
+          "bearish"
+        ],
+        "sample_headlines": [
+          "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn - The Sunday Guardian",
+          "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels - BusinessLine",
+          "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times - Hindustan Times",
+          "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars - Forbes",
+          "Trump reignites trade war with tariffs on EU cars - \u0635\u0648\u062a \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a"
+        ],
+        "top_items": [
+          {
+            "title": "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn - The Sunday Guardian",
+            "summary": "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn The Sunday Guardian",
+            "link": "https://news.google.com/rss/articles/CBMigAJBVV95cUxOZ3JHMjZ6QnRsSFhVeFZ5OV9JWEtFNHZsaG8wNDh1dzY4Vms3VFQ0WnpBblNYcVZkU04zT1Nkc0RqMVZZel9TZXlGd1ZWQXM2TU80Z0E0ajZveGh2RmRCS1pfaDVMUzFjcjNBTVBNdm9LcFdKUGxQRldpdmJLRFpSaVlobGw0cXVNeVJCZTEwMERoSlltVDlkU0oyU01teUF5TDRVcWExTi1OWXdsWXAydmk1STVLcDdWaWFfT1BVUGlBS0tkU0lybjhBZzZZdnJBQWZmMk0xZlAwMjBOZmFfUWJ2dzZnZFZoZ0w0LVJaNlViZ1lVVFZZeDJtV3RTc05i?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777815774,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariffs",
+                  "recession",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.8
+            },
+            "weight": 0.95
+          },
+          {
+            "title": "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels - BusinessLine",
+            "summary": "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels BusinessLine",
+            "link": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxNX2xUX2QzZTlicHZpVkxQTTlUbTNBM3JPckh6LVpzc1BvSDktT3hMMU9rNW5WbEpFVU1rT1RMeUF1NnkwRGVpU2lRUU95Q2dXRzZYLTc2Y2RzdUdxYVhDTWRzTVk1QjljUDJQM2VxM29raE16bV9yNXNrWi10aGU2N0VDSERpbFZZZk1uTnVsRHlLZTdsMWcyLTZtODVxb0JSRzVyWktYZm1IYmMzZURlLUdhU1ByR0VtTGhhM2dnN2ViY04zS1BJMjJyMjNrSGYwRmswQUZKdHJadVBSRWl30gHmAUFVX3lxTE05OXVNVWNuUm9UYk1SWWhKZFJGX3ZyREhsTHNtOU83UmRBOURtMEFUcHppZkFiTnRING9FaXhBU1hYRVhfN3k4MWpjT2hPQ2VZMDdxZzZvVUdGeHMtY3hpYlBCaVFEdWVtYjRESGxHUUxHTFVwOVp3Y05sQnRlQjd1MGtrR3oyQzZEc19Yc19wS1ZhYzI0eFQ1bVQ0anBHWnhaa1E0cEctN3pOUmpqaTdiYXMtaHVjV0dPVG04dnRZbkJTWnd0UTlfeGtIS2ZPM2F1WEt6MFFjb1lNcGZTdDBfQmYzaFdn?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777866791,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "crude",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times - Hindustan Times",
+            "summary": "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxPbkdmc1g0dzJUOENNcjByRXdRYThVdElzS21scGVCWVVlSFpaS3psYU00ZW85c1hoREpaRm1yRGY5RFlRcHg3cTVoeVRvaVlSZEFnVGJ4V2dUQ09CbVZXSFpVVWxzOWxsMUVtYlZnUU5JRDBLZGg2dDBmbkJUNEZVTTVYV1NmbWpST1lvdG5kS1BYZ0NvbWRPeHdCM2FpNGotVVlVNnh6SWtzWnBvb1VpVzlPZHdDaFNUMHE0aWlNc0xmTWpfdGV0YTdidlEyb2JQUlBRSmxpTFhhQ3EweEHSAeMBQVVfeXFMTU1UN3FIRkVXT3J0SDVGcWdIazZlb3RWcmpFVUFQcmlqbEpiQ1REV1lkdU9FYjREVlVMc3VPNWRrcGUwSmpTcXlwQXkwV3VLdUlaeTZKcTZvTWpHSFlOeU1NaTZrTmxwTGlHMmZ2VXJOMDFkQTNQVkRBa2J4aGRKV1NTZmttOTJ0bnVWcG5wa1dYT0w1YnZuc0V2aUNWQUdMajdhX0ZqMFJaczJjbHJxMkoxN01VZEYxT29SSDhVVDl1d0J1ajZWaF9jUVZUbWxmbHBVWmNQU3ljejV6WHNFRG9PWkU?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777666887,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariffs",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars - Forbes",
+            "summary": "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars Forbes",
+            "link": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxQaEJnMzJfTVJrR1dYS0tNaGVJYkttV0treGtXLVhKTXp0Qm9SNGY3M1JlbmFHM1Z1XzE0bHlYeDI3TVVvR3pHMG5XeWY1NEtKOHk1VmlraFJlZnhFS1FmaEdvSnlDbWh0bFJvWE9RZnJpT2MxOElUdk01TlFTOXV4aWhQVTdlRXZlT0lJUlhpSnlJMnBYNFV4U3ZIZE11OHJPVWtMc3RNSnpjeEUwcjNrUkRjXzYzMUxzQnBaeFFKdmVLVS11VHBTMEVaTHlXZnZubk9oMTcycVRYSjNa?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777656131,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariff",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "Trump reignites trade war with tariffs on EU cars - \u0635\u0648\u062a \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a",
+            "summary": "Trump reignites trade war with tariffs on EU cars \u0635\u0648\u062a \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a",
+            "link": "https://news.google.com/rss/articles/CBMiowFBVV95cUxQWmd6Zm5TOUNtSXIwMGg5WnR5SFEtQV9hV2xLai1naXJXUkhxdmdrenRsUDBhcUlRanB4QnJTaVhxcUd4QzMwVy1fbXRmak9nODFDbFZZcHA2VHp4NGVYcGFIRG5MX0pRRkhHY0JRWWFIR2pIbHhuanl2ZG5nay1CVklaNVR0ZzZpd2tOaDVYMFFvUm90aHB5UVRrcXlDdnhaMDhV?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777742907,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariffs",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          }
+        ],
+        "generated_at": 1777879805,
+        "status": "ok",
+        "topic": "trump_market",
+        "item_count": 179,
+        "bullish_items": 7,
+        "bearish_items": 138,
+        "label": "Trump market impact",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%20OR%20%22Truth%20Social%22%29%20%28tariff%20OR%20tariffs%20OR%20trade%20OR%20market%20OR%20stocks%20OR%20oil%20OR%20fed%20OR%20china%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 100
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%29%20%28markets%20OR%20stocks%20OR%20trade%20war%20OR%20tariffs%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 100
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.2329,
+        "type_counts": {
+          "bullish": 11,
+          "bearish": 2,
+          "earnings_positive": 15,
+          "risk": 10,
+          "uncategorized": 8,
+          "news": 2
+        },
+        "dominant_types": [
+          "earnings_positive",
+          "bullish",
+          "risk",
+          "uncategorized"
+        ],
+        "sample_headlines": [
+          "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - malaysiasun.com",
+          "From Gift Nifty, Kospi, Nasdaq rally to crude oil prices: 8 key things that changed for Indian stock market over weekend - Mint",
+          "Sensex today | Stock market live: GIFT Nifty signals a firm opening; US markets mixed, Asia gains - MSN"
+        ],
+        "top_items": [
+          {
+            "title": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+            "summary": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell Mint",
+            "link": "https://news.google.com/rss/articles/CBMikwJBVV95cUxNazVVZjZINmQ0MmhHOUhKQ1FzdjhIejBmZkUyb0VTRzF3bFViXzd3bi1fb3FieFFnd20xRFZNN09xbDdLcDV6cEI4eHRxWkdwWklUWFNMSVlIZVpsUW1oRG5WQXdwQjF3dHpBUTBlNVVNQXVINUNfb2xCLUo0VWVKaE5zZVpzeUxidl94azRlazg2U3MySG9Ec00wQmZidTlibmdNR2tkOXZ1MTUzUGhpRWlfdUpvWUdYTm5GNzJfWC1jdHZrVHM0MS01b0hFS3NKY1Y3OWFKNC1KZWtENm94N1dmaUZwMFpERU92eGotZXhQNWpfSU80Sy1aX250WjFRZU0tLVVsbkZPTW85UVdVYlk3SdIBmAJBVV95cUxPNDFrNnVCbXdtbnJJeU53ZXhINC1aNF9LaVpEUS12RllobXZ0X19fVkgzTVdrVXpHNi1ERWlFbU9hakZGRW1Qak9PNzNwWFR2bFFERDRWdlQxWHVucWJCclFoNC1UVER4Qmp5R01FYjUzREJ2MlJGQzdhaWRucDE3bG5YaVVIN0ZGNksxR2ZGNzdNcEtOWjJMcU5jcVU1cER6UzJhOHU1VlZWYUdGam9Hd1BlRlFEeEZ2c05RbWJHQjhTdnlLeHc5cHk1djQ2WGVwZWdBc0NISFZndE1fc3RuWnVRSFcwZGFpVkVvdXAxMDhDRFBycnF3TGhqdm4wV1NMOFJBLV94M1NWcXY0MHhTUGxIODhxSmZS?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777862170,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 1.102
+          },
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states ANI News",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxNY0FFcDNXYnJzVVhYQmRfd1lUNHMxQ2x3YXhEc1NILTFiUFNxS2lYMkkzdEN5VkZIMlU2RXRGVGdLZzAwSnl3SnkyUG5ESC12Q25DQ09WUFZYeHJLajlrMWNkcnhYTjFZX2ZMMUdBUFFIU2gtTG53dFY1Z0ZxWUpZcEJnSkpfSUxPQzhuTl9RMHRabVl0VEhrNnFzbklMRjlaUE9BOGFMaS01Wm5wblNMV2h2a2RjUUNGQmJIMU95WktIZGc4a3ZMTUFGcnl3SnpWdVdzamp0dVZZd0JCcHc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867680,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - malaysiasun.com",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states malaysiasun.com",
+            "link": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxNNnlsaEdSSVdzUU1pa3RaOEh5emViMG9Ma25nc29vQXFzUkd1Um1RV0h0RUJONHBUX3A1LXV4dG9xbDNZSDRzMmpOTzlRRDMyUmdQNXVJV3ViejNuM1E4YkxkX2tobkFyMkx6Rm1qcUhDV2wwekRkMWlzSXQ0TTRiOFFWTUZncnFfWWRRaHhFMFNNZ3d1MEV2ZVdTZk5yRzNJeHdXX2cwNzltcmxRSVZncUtyZUxQVjVERTU0bEp1TUNZRXo2WUlLUHE4NWtITTVzeWc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777860660,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "From Gift Nifty, Kospi, Nasdaq rally to crude oil prices: 8 key things that changed for Indian stock market over weekend - Mint",
+            "summary": "From Gift Nifty, Kospi, Nasdaq rally to crude oil prices: 8 key things that changed for Indian stock market over weekend Mint",
+            "link": "https://news.google.com/rss/articles/CBMilgJBVV95cUxQRkNTYjBuMFNIdmtwMUJaU045RHJubUxTS0pGU3ViNGY3T002R3NpY1pBRzk3VDc1c3I3VUJFajU4Y0dIQ1dfYWxzR2hhaHk5dlIxMFJ1T28teFlrSjdZY0xwenpJMklhLUdNRnpiWnp1T2ZSeVhGeXNKV0NDcm15dHNkNThZUk1zbWlRVUxBZEljNl9CdFVveThrTVlnRUw1N1NXTjNXaE16blZPYlRZb2pHR3c3YWhwUHgxYlNFSkVheS1lNTZIMEJRNWpVVzR1VVV6T3ZWbWU4aFJibWVRX1dmU0JHLXdIdUF5QWNsZUtfRU9mbUpXMFZSdzl0Ym51VXNhMTU2ZGtuaEY1MHpPZ3N5aHRnUQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777858552,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "crude",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Sensex today | Stock market live: GIFT Nifty signals a firm opening; US markets mixed, Asia gains - MSN",
+            "summary": "Sensex today | Stock market live: GIFT Nifty signals a firm opening; US markets mixed, Asia gains MSN",
+            "link": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxOT1p3Q3c1eEdtd3Q2S0lGOHBIT1FNcG04Q3NlVjE4NXhrdnRWTW1GZnZfbUNFYkxldzBtR0I0XzZsSndwTng2ZDZ5Q2NZNDlvZXVDSzFlcmZnZlBCalBYc2ZobEY4WGg2MGJMUl91TUg5dTEzOVhjWUhIOU95SWs1cmJYR0o2Mm1fQXIzZmVFaGpqUTM5U3Y3czRkMTQ2WXYzbWR6ZHZMb3h3dkJMdld1MGFoYUEwZ0YxZHBxTFR0ZmU4eGRFS0JjQnppZVFOc2ZVTDhyR2ZBWHVJcjlR?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777862002,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          }
+        ],
+        "generated_at": 1777879806,
+        "status": "ok",
+        "topic": "gift_nifty",
+        "item_count": 36,
+        "bullish_items": 25,
+        "bearish_items": 12,
+        "label": "GIFT Nifty pre-market",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22GIFT%20Nifty%22%20%28India%20OR%20NSE%20OR%20BSE%20OR%20SGX%29%20when%3A1d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 23
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22GIFT%20Nifty%22%20%28sgx%20OR%20pre-market%20OR%20opening%20OR%20outlook%29%20when%3A1d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 21
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.1203,
+        "type_counts": {
+          "bullish": 6,
+          "bearish": 4,
+          "earnings_positive": 1,
+          "uncategorized": 5,
+          "risk": 2
+        },
+        "dominant_types": [
+          "bullish",
+          "uncategorized",
+          "bearish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+          "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell - MSN",
+          "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? - Business Standard",
+          "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street - MSN",
+          "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+            "summary": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell Mint",
+            "link": "https://news.google.com/rss/articles/CBMikwJBVV95cUxNazVVZjZINmQ0MmhHOUhKQ1FzdjhIejBmZkUyb0VTRzF3bFViXzd3bi1fb3FieFFnd20xRFZNN09xbDdLcDV6cEI4eHRxWkdwWklUWFNMSVlIZVpsUW1oRG5WQXdwQjF3dHpBUTBlNVVNQXVINUNfb2xCLUo0VWVKaE5zZVpzeUxidl94azRlazg2U3MySG9Ec00wQmZidTlibmdNR2tkOXZ1MTUzUGhpRWlfdUpvWUdYTm5GNzJfWC1jdHZrVHM0MS01b0hFS3NKY1Y3OWFKNC1KZWtENm94N1dmaUZwMFpERU92eGotZXhQNWpfSU80Sy1aX250WjFRZU0tLVVsbkZPTW85UVdVYlk3SdIBmAJBVV95cUxPNDFrNnVCbXdtbnJJeU53ZXhINC1aNF9LaVpEUS12RllobXZ0X19fVkgzTVdrVXpHNi1ERWlFbU9hakZGRW1Qak9PNzNwWFR2bFFERDRWdlQxWHVucWJCclFoNC1UVER4Qmp5R01FYjUzREJ2MlJGQzdhaWRucDE3bG5YaVVIN0ZGNksxR2ZGNzdNcEtOWjJMcU5jcVU1cER6UzJhOHU1VlZWYUdGam9Hd1BlRlFEeEZ2c05RbWJHQjhTdnlLeHc5cHk1djQ2WGVwZWdBc0NISFZndE1fc3RuWnVRSFcwZGFpVkVvdXAxMDhDRFBycnF3TGhqdm4wV1NMOFJBLV94M1NWcXY0MHhTUGxIODhxSmZS?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777862170,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 1.102
+          },
+          {
+            "title": "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell - MSN",
+            "summary": "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell MSN",
+            "link": "https://news.google.com/rss/articles/CBMimAJBVV95cUxPdG5HeDlacTdtVzZKc2hlOVNZNXFVTmJLQ21rd19nMklqek1tREJmNzBvR2RFRG5RX0V0T3MzVHZDN0ZiX3BjRW5tOUFsVGVoYXBaaWFNbWdXWmt5YU4wak9YUHcyQi1fTHNmanNlVURMVDVXcXJkTV9qdVA5cGpxaUNRSGw4VW9aeFVNOXB6bEhpNjkxVmhVWkI4d1JDWFdCbUlSaXVDc1AzREUwQjRHYlFSZmVnVUtlbENXNEpTR1AtTGNtSTFTUDJkcXcxNkZhS0xiUmdpN0FWOFRVTE5UeFhzOTdtWXp0MHBObnEzRzgyNncwU2l0VWFIcUY3NEx1Z2w1YkwxamhsUHMyd2x3NEp3TGdIa2ZI?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777633930,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "risk": [
+                  "rates",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.8
+            },
+            "weight": 0.798
+          },
+          {
+            "title": "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? - Business Standard",
+            "summary": "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? Business Standard",
+            "link": "https://news.google.com/rss/articles/CBMiiwJBVV95cUxOQVRkWEhZZ3hhQXNkNFpIYzB6ZTd6aW9yeEc2SzdDNGJ3cjZseU1TdF9KZlpWNXo2RVZCNE5GZHR2bXRFN0JNM1VKaUtPQzJ1SnU1aXY5QmVLLUNDZmJtOTllbXFhRFFpV09rSnNaY0VyWVh6WDUyaXZMNUZ3ZjItQ252Z3M3RkRIWVdtazVNcEpBUW5kMk1McmJaUVMzYndvM2NfcWRDemVwbXNLVHFRdXVuQXhzbWwzcTd6c3BvWTFRazNEeURtV3JnZG95T0gyYnhaUS1sSWx2ZjZKTVJ1TkJ6UDY3VHhLLWZ1blFvTlgxdlFXTXo3RmF6dzlwRTZ6OEY2ZjZ0dGI0Z1nSAYsCQVVfeXFMTkFUZFhIWWd4YUFzZDRaSGMwemU3emlvcnhHNks3QzRid3I2bHlNU3RfSmZaVjV6NkVWQjRORmR0dm10RTdCTTNVSmlLT0MydUp1NWl2OUJlSy1DQ2ZibTk5ZW1xYURRaVdPa0pzWmNFcllYelg1Mml2TDVGd2YyLUNudmdzN0ZESFlXbWs1TXBKQVFuZDJNTHJiWlFTM2J3bzNjX3FkQ3plcG1zS1RxUXV1bkF4c21sM3E3enNwb1kxUWszRHlEbVdyZ2RveU9IMmJ4WlEtbElsdmY2Sk1SdU5CelA2N1R4Sy1mdW5Rb05YMXZRV016N0Zhenc5cEU2ejhGNmY2dHRiNGdZ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777871413,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street - MSN",
+            "summary": "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street MSN",
+            "link": "https://news.google.com/rss/articles/CBMiuwNBVV95cUxNYzdjZkY5UnE3eXpES0Z3bWRMaUJaenI3Nkd3N0FGU21Wdkd1THBySGk4U2h1RUJMcnk2UnhuMENHaDBBcUx1RjBseml0c0libmpsLTBOZzVZUnBCTzVkWTVuRDBzRXpaYkszTUN2eUg0NU5vQklsZ1dxRnhzMXkzbkRrOU52bzI1NTZTOGlOaC1RVWJFcFhmNkhLMzNELUNXWUpLN3lyVFZVRGdHTTd1TTdvY1NEN0lnWE1CQUhSNllwSl9NdGJYcWJJMnlDc0ktN0RzNXhLeTR3NGZZcUNfOTM1OVpScEJVMjhncm9YMVJqSjlrUkFiYTJ6S3pNTDVhY1hWVHEySndBNEx5WGlPM2M5dTYyRnZoTFp4UmxvQVVRWGt3MDVZWG10a01zSmZNQmwtM21NYWdtWUlPQ1lYLWEtbXJ2clNha3J0YTJTX0d5cjVZQmpOY3NVOU1fbUxJcnl0V2VxZ01oRzJYbEstcHlxMFhwdHRpU2l1SzlhRXB6OS01NVQ0LWYzLVNrS0lHU0UwdkE4OG1OWVNBN1podTNwc3gtN2tkREkxQURHZ3l5V3pkWldSQk0wRQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777814241,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "surges"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.475
+          },
+          {
+            "title": "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points - The Economic Times",
+            "summary": "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMizAFBVV95cUxPUHBad2h4R2NIakQzUkRycjJFbDROX0NJZ0lDN1N3SU1YRVZhN0U5SUNFalNQZUxvbnE0Q0xCV0dzV3JGRDJXTUNOY0kxM0RjYlFPZVIzLUt1elpzVmo0Ukw2M0M0Slp3T2phMUc3YmNyX3owRjk4ZHMwVW90VTVweUpZb19aNzZad0IzVkFlUnllOUlNUWJYcE1nLUoxSlQyNG8zZTE0NGw5T1lRM2cwNEpQcE5iVjg3Rk4tc1BSOE12STZkaGY1U09LcW3SAdIBQVVfeXFMTndzYXNDeHNYOUxOWTdqb1lnSUEyRW41ejVVUURhOXlhTGVZSUNVTzNWM3F2STNoNkxZckNwSS1Jbzc4Y25naHcyTFNMdEJ0MHNpMlZYQnNuSVRwUHdwbEdLd1lDQm05ZzFodjBMLUluanBLN3NRSzU4VlFOeTBaZmRycS1oLUYxZmJvTkNCZW1pd0FwZGpQVVQ5LUVuX29JUjJjd1ZseWRtRXdERk0xVnZLaHRPTTI0bk45ajFNN3h4bHBWbklPazFYUDFrTkVhMUp3?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777856449,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "bullish"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.475
+          }
+        ],
+        "generated_at": 1777879807,
+        "status": "ok",
+        "topic": "india_vix",
+        "item_count": 14,
+        "bullish_items": 6,
+        "bearish_items": 5,
+        "label": "India VIX volatility",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22India%20VIX%22%20%28fear%20OR%20volatility%20OR%20options%20OR%20spike%20OR%20surge%20OR%20low%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 11
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22India%20VIX%22%20OR%20%22VIX%20India%22%29%20%28Nifty%20OR%20market%20OR%20panic%20OR%20calm%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 8
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0333,
+        "type_counts": {
+          "uncategorized": 188,
+          "earnings_positive": 11,
+          "bullish": 9,
+          "bearish": 9,
+          "news": 11,
+          "risk": 8,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "earnings_positive",
+          "news"
+        ],
+        "sample_headlines": [
+          "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show - MSN",
+          "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? - MSN",
+          "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+          "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show - MSN",
+            "summary": "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxOb0ZuNTd5WlNya1R6N1F0eXZOejVxYTdDNTFQUVhnLTBoUk5BTEtaUUR1TlppT25aM0xaczI3NGY3ZEZmZTRoSHJTNlNHTUwwMFNBcTFUU1JVaER2Y0hQRElsOGtuLW9QQWdRUjFPNmwyTVJ4bm5ZM2lqVWkxUGc1YWNsdUxjcGJkcXFWVVU2R0hENGw1S0hSMzJhd1IwM2dicmUzUkFhRWJyWTRnNEgtTlE5TDJidnB2cVlFck1FTUxkdHc0Vnl1bTh0ZGgybU8wamdUM3E3enE3TzNJamppdUpZNEdlbmdZcHNWUnJlZXB4VzJBLTh3SGhJYzBPZ3BSWkFKamdicHhVM25oVDU4QUltSnY3OHhSSWlWM3pLX0hwdWUzQXhNVS04TDlkMlZlUWtDeTkwUndNN1hWV19DN0V1a0dWS1RIYVIza2VFSU5KMG9IdDFQdnZyWjBOMWFoU0RFWmZOc3JmeEdvbDRSYXBubEVCSXJ2b3hCXw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777810043,
+            "classification": {
+              "types": [
+                "earnings_positive",
+                "news"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ],
+                "news": [
+                  "wins"
+                ]
+              },
+              "sentiment": 0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? - MSN",
+            "summary": "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? MSN",
+            "link": "https://news.google.com/rss/articles/CBMi7gJBVV95cUxNV3k1aklORFY0b1MweFdXNXJZcW16RWVEMFJxWGhBVHU2aTllRFlnSWRYRVVvTENiTzBSZ3lNUU5aaXI4WFlfQkRzRzgyaVRabWFtS2IxUU9Xc3pHb21UQlV1OUNlV2g1X0g2d1BKbGxfdVFWd2dYRDRmUTJSVGFhWmw4UXp3aFBqMjdOWlRSSkVLTElYbHJJQjdqSGJnOW90QlJpUnlGbUM1OFJOckxGcU9NeUo4UEhWOEM4YVNXUGdiWncxX2ZtTkI5R3I2c2hTZUs1NTZKOVppY1QwUl9yNEhkN0ZjNURkVm84LTk4S1pfTndmWmRzLW42cEhjM0Z1ZkhDZjNuVlVVUWZ1MzdxVVJDNVp1TkJPTE96U3RQdThQZEU3WTJkMW90bmZVRDMxc1RXVHlZcldXT1lyUFE5YmJfb0s3Q0ZpS3Y4TDBiNllaOGp0SzhpLXg2WXN1M0VSRkpLaGpDRXBWRmI1YlE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777728721,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 0.798
+          },
+          {
+            "title": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+            "summary": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxQeVZmVXVYdUQta0RDR09rcC00b05vd2dKRm9sUzJmV2JaMnVKOHhoSjA5OFhSS0dtNmx0dXhZMVVaR19vZ0ExOHZLeWZGN0ZUekNXRXhjTlFTZjdpQlJqVnlpYklHdWxheURyNU82Y1dZTFZhLUZoRkxoanhTWEZ3RVByRFdVYW84aVFPMlNIVGFSdWo0bTEyQ3pRRnl2WVRZQktTMVlmRGlTX1E3SU44VmNrclRQNEJIak5ZYU9KalZiT0M5OEZGdGlaaXNPWFZTQUFMLUNqUlVaRThOYlc2NVNIT2NWMXprQkpsaGptR1g1R1VYYWFXWFlMYTh6S1ppRV9XVWhhSnpYcmV6cjM0aTBxNnBPc2tMaDBxQzZuZkQ1VEZGMUdlRWRRcVVHTzZZempQOFNDeXdkOHMwSDhUaVFCVFpidDZkc0E2QV90eG1NS1pOdWhIT2F4YkhkWFFmeE9tZjNveUcyTjczTjlmRnVPR3RWRFUwa05yNg?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777855829,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus - MSN",
+            "summary": "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus MSN",
+            "link": "https://news.google.com/rss/articles/CBMi6gJBVV95cUxOQnpIRjcwQVhFSzhlWlpNYlB5RVVOT1RuZ0tVQmlsMFFCRHhTTm5adTVhWWgyOFpRcTZiYWl4bVB5YjJ5LUpfTWRJWjl6THhpV1lZakdhZ2dkcGo3cG01SjNrcW9EM2VDMk1WTG8zMEl4WjZTdEIwX09XaXNxdU16cTQxa2JqYjlYMFEyaF83d1lqUTZvV1FSOXRCSVdXVGdyMk9kTFVxVVZWOUdmLWg3SmdBalVqZEc4UTU5eVlwa2FCRTZhQ1dwTzFld1dNNktVQXVSMldQRzF6aDZ0cUk1em1yQWFMUjlLaHpZSFJXV1dlZ3VVOWhYNFVCaU1GV0M1UDY1U3hTelQtVGZWN2lOSy1aN0lXQWxvMm5kdndMUmZTaFpXRWRKNk5FTHJGNXdoTFRJT2Z3RUdMemdlTlBZZU04YXhKWU00R0hsdUxrU1FpQk1Pbm9HZjR5OS1iUi0xTkRveG1QMGE5QQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777816896,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q1"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          }
+        ],
+        "generated_at": 1777879809,
+        "status": "ok",
+        "topic": "sector_it",
+        "item_count": 244,
+        "bullish_items": 24,
+        "bearish_items": 26,
+        "label": "IT sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22IT%20sector%22%20OR%20TCS%20OR%20Infosys%20OR%20Wipro%20OR%20HCLTech%20OR%20%22tech%20stocks%22%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 78
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20IT%20OR%20%22information%20technology%22%29%20%28earnings%20OR%20outlook%20OR%20upgrade%20OR%20downgrade%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 7
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0478,
+        "type_counts": {
+          "uncategorized": 171,
+          "bearish": 12,
+          "risk": 17,
+          "bullish": 21,
+          "earnings_positive": 17,
+          "regulatory": 7,
+          "news": 9,
+          "rumor": 7,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "bullish",
+          "earnings_positive",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Equitas Small Finance Bank jumps as Q4 profit surges, asset quality improves - Business Standard",
+          "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore - Dailyhunt",
+          "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... - Moneycontrol.com",
+          "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? - Business Standard",
+          "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Equitas Small Finance Bank jumps as Q4 profit surges, asset quality improves - Business Standard",
+            "summary": "Equitas Small Finance Bank jumps as Q4 profit surges, asset quality improves Business Standard",
+            "link": "https://news.google.com/rss/articles/CBMi7gFBVV95cUxNaVVuYXBVNDUzQ0lYdlp4S29SMTNsUTU1NnZna3lCWW12aERRQ1NEZ2tmZEN4cXJMR0pibHhsTW5QNEhNZkx1TGg2V2J3ZG9VV092N01NOWRlWGVGM0I0UGl5WHZoSnZzeXBqdndNSHVPWEZ2RTV2VFJTREZvVjdPdTZxTWE4NzUzZkJhYzhKQWE1Z0Zab3ljVUI3Mld1anZzSW9vdkVtQ3ZVLXdGWE4yQWJsV3d0dkNmd2l4Ry1nLXJGUkJGZkd4NnM0WDJCakYwcWRrcldPbDdpUE5JZU1pQkQ3TFY0VjZvdGNXbndR0gHzAUFVX3lxTFBMU3NlUXJuMHloSV9OdUFzQXp4NlVJNUYwckRsV1dTTEdZNlRNenhtSkUxNEhfS21BM2NldXJpY3J3SkZ1T2hqbVNobzE2b3hNS0pmWlJzV3phSGVMYmpnRzBhMVFKN1JmSXlQdjRPSEhsUHJqT0NSRFNNaXRnWUZGMmR5dzNSbnFFOHdKYkU2NGNnemRzVGpaaGxQMDZmUnVoS2p4T1RoSDlCVGhwb1NoVE9PbERZZ245SlN0cE9jd1A3Qi1EMFBsX2IyWjBBSkhvZnFCd2pNTUhnaFpVY2pOaXo0RWRUaXJlZ1l4anV0Zk5kRQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777872858,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps",
+                  "surges"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.8954
+          },
+          {
+            "title": "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore - Dailyhunt",
+            "summary": "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxPbUZJV082djVRZTM3b2kzNEg0bnkyd3dnTHUtY3NEVmF6UUlXdHVEc1lEMHRyM0h3RW03VWhlNk1ON0RuSzNaSzNUdmRKcjQ3YlhKejZ2LXl1V2MyZ1JNSWctQndUcTFkUEIzc1laSmJZSFJ3RDA4MW9LX3hfbTNyMHJ3Nnh0elA1eExhTUFhU21fWldoaU1NM0k3Ylhla1VQQVZNNmszaFpKV1pPd3hJWXlORmdoM1ktdGMzaVB1ZGx5TTRxTGgwNEZDb1dsN1FGV3RwaFJzTzNIVW41Tm5aYVU3eEw2Uk5weG0ybw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777803520,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "rises"
+                ],
+                "earnings_positive": [
+                  "profit rises",
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... - Moneycontrol.com",
+            "summary": "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... Moneycontrol.com",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxQRTdjWFAza1JYSFhORVZ0b3YzeWRPZVp1elZfemt5bHU1eHNpdDJudGY1WklCOXVVZGpaZENTc1NzMFZhNWktdmxsV3dRSTMwR0ppNk44VkVRdmRhUjRvbmRlU2VOYWE4bUUxaVF0eW9VLTdZX19FZlNZRHFPWW1EUkpOZTAxWXM1emhqRHVxVkpLbkVtMWJTMlQ1VVgyb2FjUWxMNkFONmdVbHV4Z1Y3ZldpNnI1cGU1cGtoX1VvSUx3YmhRUXNseDlxT2RGZnJJTFY4M0VlSFRvN2puX21MYnpOYTlqSjF2MHh3VHlXanhVMVE1Uk5oOVF1VE81VnPSAYQCQVVfeXFMTmEyQkFjTkdoSnRYNzhvVHZBZ3B0aW53YlpnOVpWenhVNGJGY1VPOS04T2R4S1pmMm16LVBGMEFnUktIcUZBaERUOG4xSDI2MXlSZWNFZXQ5LVJ3NFNDd1lmWk44MGlZSW1RWmllenZFSEhIYUVkZ3ZocFoxNVptbnlSYmF3ZlBEWUF5akxHMl9aR0lXUHRfcWc1NUxvWjNkWkpEQ3VqZWRFajBjMHd4RjV4VzdfSExCXzB3anhGRGt1emh1ME11eXlnUkFNRUZQcnlEMkNNYWFWa3JXQjV5UDNQSTZrR1ROeWJzTWZRdXZvWVZhcGlpdExqMExoYi1PZ25uX00?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867670,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "bearish": [
+                  "falls"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 1.102
+          },
+          {
+            "title": "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? - Business Standard",
+            "summary": "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? Business Standard",
+            "link": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQU2pDZGp4czkxbjdoeXFobVhhS1FTQnJlX1h1MVFBUUtxa0hCY0VzMS1PWjk2VTExeDk5OHNhUWFxQWE3MGtyamR4YmVZTGNrZTV6c3VwdW93UHNQaUdoZ3Z5bkdJVXVmVzNhWE4wbGl6SjhnMnp2MDRLcnJQakJyRGhETzkwZnFjMzQ4ZjNUVDN4aDdOUTdVb29hcnJOUUZOcDdEY3Bqa1dWOFY3bmhUbTIwTGladVRmQVlkWjR4ZTM3RTB5SlJsYUpmZ9IB0AFBVV95cUxPTmM4SDk5X2Iwbng0OHQyd2VYU01SR1ljd3kwclBMcW1sQUJvZHJlZVoyZVBzR21Ec0oxNFVuV0w0Q1VUTnBvU0ZFX3VHaG5tU25ZaE0xbnlHTFdNeG40SEppWld1cWpMb2hUUjRWdk5QUGJRMGdNV0FRVDVnS1Z1Tjk2U1RHWURINDR0bmpHby1sUnFybF9FX25lcWtXSTFiZmxkY0VWT3hDVW1JaW5zU1ZrU2tFTk00bWRzX0VrTHA0MWtrRDVrZGVvZ3hTQV8x?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777871458,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "risk": [
+                  "oil",
+                  "war"
+                ]
+              },
+              "sentiment": -0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.8954
+          },
+          {
+            "title": "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya - The Economic Times",
+            "summary": "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMi0wFBVV95cUxPeURIckFidU15M2FjNlNUeFpZNUlLeFlzOEwtRTN4cEQ5d29lYmR6N05Md3VXM1VWWUYzNXU1ZnBrZHJsOFdtY3JNWm1jM2ZGdTB5MXJqSzB6Um4td0xkVmFtb0RqaDN0RU1hMDZORUYtTmtCNkd4QzNqN3c2dmZXWkp3Q3A3UjE5VGNIaWNfQWFnWXNvZ3dPVlRnVUtzSk1yREh1VzVQOFA0NmdNd0Q4TUM5YXR3QXZfMEJnbjJaZlNHcVJoamNBR08tZjRsNF9OS0JV?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777873048,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          }
+        ],
+        "generated_at": 1777879811,
+        "status": "ok",
+        "topic": "sector_banking",
+        "item_count": 258,
+        "bullish_items": 41,
+        "bearish_items": 40,
+        "label": "Banking sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22banking%20sector%22%20OR%20HDFC%20Bank%20OR%20ICICI%20Bank%20OR%20SBI%20OR%20Kotak%20OR%20Axis%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 51
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Bank%20OR%20%22bank%20stocks%22%20OR%20NPAs%20OR%20credit%20growth%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 48
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": -0.0148,
+        "type_counts": {
+          "earnings_positive": 7,
+          "uncategorized": 170,
+          "bearish": 11,
+          "bullish": 12,
+          "risk": 12,
+          "rumor": 8,
+          "news": 8,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+          "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% - Dailyhunt",
+          "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% - Dailyhunt",
+          "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states ANI News",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxNY0FFcDNXYnJzVVhYQmRfd1lUNHMxQ2x3YXhEc1NILTFiUFNxS2lYMkkzdEN5VkZIMlU2RXRGVGdLZzAwSnl3SnkyUG5ESC12Q25DQ09WUFZYeHJLajlrMWNkcnhYTjFZX2ZMMUdBUFFIU2gtTG53dFY1Z0ZxWUpZcEJnSkpfSUxPQzhuTl9RMHRabVl0VEhrNnFzbklMRjlaUE9BOGFMaS01Wm5wblNMV2h2a2RjUUNGQmJIMU95WktIZGc4a3ZMTUFGcnl3SnpWdVdzamp0dVZZd0JCcHc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867680,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% - Dailyhunt",
+            "summary": "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMipgJBVV95cUxNVUI2VjgyZFgtdEM5eGRqWUp0UnZXeWYwa0tncWc4eGhtWXEydDk2akZzWGxWSWZLRDJjbi03dnpPamZkR0Y1MzYtVkRLdTBELURHd2VFcnlHdGpRaXplWE1qSTVkdW9oTkZZOGdBSHZmSjd2VTlnbS1QNHRLRVhGTGlFV1JmaThnUlJNQ2tvY0VzdXYwQnZ2N25pSFhnOHd3NWhPV1BlZVBZbEU5MHhIRnhNV2JKRVlFZUhJaDQ2MENtOWdBTWpHcGpiQ2hkeEcxQnJtUjVrclhoOC1aTUNGaXF3SjIxSExmOEhmTEdjbEtFN0Y3X2FoZUN1UUJqMHlGVUdHZDVuQkc0YWdfTWYwaW5hNk8yUGV6Z1JFZFktMFktY2dnWUE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777814880,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls",
+                  "drops"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% - Dailyhunt",
+            "summary": "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMiogJBVV95cUxPVDdydGU3TWtSX1N4R2VsSUh2a3NoVnBfUHN5emVTeEwzZGJ4OUlIR3F2NnE2dEdkaVRrYVUxYVQ2VHdJeVdNN0h4RjVnX204VlFsLXUtdndEeHlwMzVjaW1DZFdtaU1OaFc0MDVlb3NBYzJvQmc0Ni1oZ2VlQTM4YUl3Ul9ycUZURmlOTTVOQVZfT1ZzNnluQWpqN3FjZzFfQzlXVHJZaTc4czJVd3BXYnlXU0RMdEU1SWFtOGJOVkRtU1dVUnhWZ1NmUEpnZ3lhQWoxdXFOUFpJc083ZmpUTERLMVBTVmx6bzh5Y1RDMlRMa1VreWhjelROY1Z3QjBTWUNMUjhuUWxUcmFpZkdIR3dORmFlQ0tocE1DaWRJYm9fdw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777658303,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls",
+                  "drops"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights - MSN",
+            "summary": "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights MSN",
+            "link": "https://news.google.com/rss/articles/CBMitANBVV95cUxNVXN6QjNUTFQ3MjI1elZrd2l5UWluZE85OTdaakRCMDNNVGJ6S09ZWlc3VmFZNmdCYnJpSE9sODNfOTNxZTZITkozMDdwMTRVaG5EZ2diZDZEbkNVNEN1V0pMVEdoYnpKQU8teXo1UDAwUC1NZmVBQUhXWlIwRTlaV01lZGFRQWNHTVMxWUJMMnlFb3hNUFdWekUwUjFHWGV4X1RkYmtDVDNpQVZ3T1YwX1A0Qk9Bb3c0OFlEM0dmSnVkRE9YNTlPTlR1UTdKRGtuRzZkb3pOWktQVjQ0eXZQV3hTN2poWXhveEtWRHpaNEgxWEZtTXY4YW9VV3cxaG5RZEdENUFxM19FY2ZQYjhXdV9wNEJrdTBseG9QM1NmVV9WNGdrLWgtM2RrMHhwUlhpSlpqamt5R3NkR2NhUkQ1a1NZNVV2OXR5NnhtV0M3Mm1wcHNiYkYxd0RtaXhaYWstWU9remNTLW8wVm9CMG0tUWltWU9hcjJqRDBnSFgwaG5pcFk5SFMxWVV4Wi13MWw0OXRaSkhYaVdqNXlzX0xfX2VDX2ZPa05NVVJPTGc4SzlyQUd3?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777697816,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell",
+                  "tumbles"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          }
+        ],
+        "generated_at": 1777879812,
+        "status": "ok",
+        "topic": "sector_pharma",
+        "item_count": 234,
+        "bullish_items": 24,
+        "bearish_items": 32,
+        "label": "Pharma sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22pharma%20sector%22%20OR%20Sun%20Pharma%20OR%20Dr%20Reddy%20OR%20Cipla%20OR%20Divis%20OR%20Lupin%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 40
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Pharma%20OR%20%22pharmaceutical%22%20OR%20%22drug%20approval%22%20OR%20FDA%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 36
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": -0.1034,
+        "type_counts": {
+          "uncategorized": 178,
+          "bullish": 8,
+          "news": 17,
+          "bearish": 12,
+          "risk": 78,
+          "regulatory": 5,
+          "earnings_positive": 5,
+          "rumor": 7,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "news",
+          "meme"
+        ],
+        "sample_headlines": [
+          "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday - BBN Times",
+          "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics - Whalesbook",
+          "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe - INDIA New England News",
+          "Amazon urges Sebi to probe Future Retail - Economic Times",
+          "UAE\u2019s Exit from OPEC May Redraw Global Oil Map: Why India and Its PSU Oil Giants Could Emerge Stronger - Indian PSU"
+        ],
+        "top_items": [
+          {
+            "title": "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday - BBN Times",
+            "summary": "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday BBN Times",
+            "link": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxNaEVZNHdsVUgxbk0wTElwQUotOG1BREpwWUJuQ0E1cWFTb1ZwUVpoTHVuY1otS0NFcFV6aGF2TWtvV2w0cTJja01mU1pkblRaa0l2dGgyZ0JzTHBfM19xOGNCbU95N2F3VkhVN2hkTDV6RnItTkVVWlFHT01YVWxMdm9yVy1TUmtNcU5CcHZfQzZfbFlCNDhqVlJVOVlQVjM0VUxHYkx1V2gzOTR0Z0ZrM0txa1hZNlIxZWUzZnZXRE02Q2pZSUgwRQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777835296,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls"
+                ],
+                "risk": [
+                  "fed",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics - Whalesbook",
+            "summary": "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics Whalesbook",
+            "link": "https://news.google.com/rss/articles/CBMi0wFBVV95cUxOd2M0bGROOTQwN2ZCVDVqOUxZWmpLdXh6V1BITEFEVnJGZzE2OVQ4aWU0bVg0MWRGUEN5eHYwdktYS3ZVNHlIdlVzNXRHSmlCSXZFa2xLUElXT2JLbm5Fcy1mU0UxUnJnZHExdURaWnhnOExSVnpTa3pWdkJOU1FrY0FrZ0l1VG5vdzAxVWhoNVBWZGdEcWk2QlRnallVMS1Mc1U0eW1VREFicVZXQWdkQlhwZHJxWlhCVzUxT1hwLTAxenlDTmlCYlV4R0lCa2drZzVF?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869473,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "exit"
+                ],
+                "risk": [
+                  "oil"
+                ]
+              },
+              "sentiment": -0.65,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe - INDIA New England News",
+            "summary": "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe INDIA New England News",
+            "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNWTZfSnVWdFJWNk84a1V4V1dXRWFoV1lWd1BtR0xaMURmbklFSDBMLVBmZnRqUVpYNTVFWHhBOTQteUlQQmtPSngwem53ZExxRzVZQ0VJTTlsUTdNMU03TGpXUldoUGlMMXRyV01uN0ZVd1JmUjMyOGFPcWh3N1FoM3l3NTQ5MVVOVEVSNU42OEJQME1t?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777632698,
+            "classification": {
+              "types": [
+                "regulatory"
+              ],
+              "matches": {
+                "regulatory": [
+                  "probe",
+                  "fraud"
+                ]
+              },
+              "sentiment": -0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          },
+          {
+            "title": "UAE\u2019s Exit from OPEC May Redraw Global Oil Map: Why India and Its PSU Oil Giants Could Emerge Stronger - Indian PSU",
+            "summary": "UAE\u2019s Exit from OPEC May Redraw Global Oil Map: Why India and Its PSU Oil Giants Could Emerge Stronger Indian PSU",
+            "link": "https://news.google.com/rss/articles/CBMigwFBVV95cUxQSmxDNENhOGtXbDBxNldnOUloa25NWDVETXViQkVteG5rSUx6cU42N1hwaVJ6Q2dzeVpFWmRUQngwUWg1Wm4zSmFlR01PTXAyYXZBMkJqazRiQXV6U3BCNnlnU3VPMjM1RnlacUZXYURRV0h6RWZhOU9Va3RZaC1MZGRXaw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777695388,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "exit"
+                ],
+                "risk": [
+                  "oil"
+                ]
+              },
+              "sentiment": -0.65,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          }
+        ],
+        "generated_at": 1777879815,
+        "status": "ok",
+        "topic": "sector_energy",
+        "item_count": 306,
+        "bullish_items": 28,
+        "bearish_items": 95,
+        "label": "Energy & Oil sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22oil%20and%20gas%22%20OR%20Reliance%20OR%20ONGC%20OR%20BPCL%20OR%20HPCL%20OR%20IOC%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 52
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28crude%20oil%20OR%20%22energy%20stocks%22%20OR%20NIFTY%20Energy%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 100
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0217,
+        "type_counts": {
+          "uncategorized": 132,
+          "bullish": 12,
+          "earnings_positive": 5,
+          "bearish": 6,
+          "risk": 11,
+          "news": 8,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+          "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times",
+          "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+          "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors - MSN"
+        ],
+        "top_items": [
+          {
+            "title": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+            "summary": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxPQ3loNXZsUGVWOEZ1R2pvc1BkVllEQXd2VUdxWENMd0ZMZE8tdTBJcE9JMkdKU25obE9KTG1kQ3Nvd2l3alF2RGV6cDg4dTcwWnZTY2RWTVFOUHNtMy1kYUd0VkttVi1sR0lSLTc5ZmY4R0hKQWF4N1pQZmxJYUJ2NWZiMHZ0cVlHUDZtTV9RZGExakVfVko3ZDZhREpsU3BmZkprcmxnTW42Y192REd6dkViS1ZRdWFzb2poRzdKVU5jMnpERFZSWFJUSFU3Y09LRWFFYkxQZmd3a1NhM2RER2NXV19xdzN6THlkbFZWSXFpZWdpaHFNUTZtQnJIaTTSAf8BQVVfeXFMT0N5aDV2bFBlVjhGdUdqb3NQZFZZREF3dlVHcVhDTHdGTGRPLXUwSXBPSTJHSlNuaGxPSkxtZENzb3dpd2pRdkRlenA4OHU3MFp2U2NkVk1RTlBzbTMtZGFHdFZLbVYtbEdJUi03OWZmOEdISkFheDdaUGZsSWFCdjVmYjB2dHFZR1A2bU1fUWRhMWpFX1ZKN2Q2YURKbFNwZmZKa3JsZ01uNmNfdkRHenZFYktWUXVhc29qaEc3SlVOYzJ6RERWUlhSVEhVN2NPS0VhRWJMUGZnd2tTYTNkREdjV1dfcXczekx5ZGxWVklxaWVnaWhxTVE2bUJySGk0?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869551,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand - MSN",
+            "summary": "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand MSN",
+            "link": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxOQ3BFQS1lMG1iTkc5dG5QV29ka3BNbE42SlNOd2ZveFVXTE1ETnpEUGZBeVo4djhHSURfSjhnbWlBNkdMNXU4UWF0RHVXQzNsZjVGQ2dHQ01mZDNuM21YRmJyeDFmbFU4eXUyTngxVWdzUXZicGU1SUJCMm5NMnkzQ2pZcWdZZ0NKU01MUjdrVWtyaERBVFlTblRDWFFhUVp6VjZpODVRV2Z2aFJBWFJfVld0cUNoeVI5QlpZanhuWEtDeHFOd2xCUFZsamc2VWRHUFdqZVRtVlh0QWt3Rl91cUppMmFFNmc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777846530,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy",
+                  "upside"
+                ]
+              },
+              "sentiment": 0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          },
+          {
+            "title": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+            "summary": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k HDFC Sky",
+            "link": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQenUyRy1ZaUUybUdkVk5yZk16RUhRQTExRVlCZmcwWDRlNjVYXzlTWTZDYS1wYUFvSkpzcDFaRjJZcWlFaVRyWmNhRzFMeE40cFNQTWFnX0l6SUxKZGttLTQtQUV3VmFRaGRtSG8xTURRajM0S1BvZDA5ZF8yU1lPTGtibnliamhaS3VMZnZR?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777870038,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors - MSN",
+            "summary": "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors MSN",
+            "link": "https://news.google.com/rss/articles/CBMilwJBVV95cUxQaTBlRjd1OXQ2MkRvNG1UV0U5QnpaUzN6TFE5SUdUWU9oVEp5NGVuTl9iWkZ2RTJWQUZCZUhfcVJPRnFnRktTUWFoWVJGOEthS1dMck1FcnF5YjMtTTg5bUhDcS1LalNLRkwtT0lfaWxuU3RJSHBwWWE5WTkzOGlITXZYRmJ1T3FXdWs3bGllRG95a1RWUmt6eTBXRG4yXzBhXy1uRVpjaHRWS2Q2NjhoVlNkY2s0elNSV2FvRzdVMHF2VlA5TXdoeXlhano2UEhsSTg0X1lSQzA0czBRNEtOSzNGNGhwLTdYTEdiREZQd3JUNTdISE5SOURnd3U1R25UV2paRno5OUNXRldfem1KYk5XYnI3R2c?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777870982,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "surges"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          }
+        ],
+        "generated_at": 1777879816,
+        "status": "ok",
+        "topic": "sector_auto",
+        "item_count": 186,
+        "bullish_items": 22,
+        "bearish_items": 26,
+        "label": "Auto sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22auto%20sector%22%20OR%20Maruti%20OR%20M%26M%20OR%20Tata%20Motors%20OR%20Bajaj%20Auto%20OR%20Hero%20Moto%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 4
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Auto%20OR%20%22car%20sales%22%20OR%20%22EV%22%20OR%20%22vehicle%20sales%22%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 24
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": -0.0096,
+        "type_counts": {
+          "uncategorized": 130,
+          "bullish": 10,
+          "risk": 15,
+          "earnings_positive": 5,
+          "bearish": 7,
+          "news": 8,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "meme",
+          "bullish"
+        ],
+        "sample_headlines": [
+          "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+          "Amazon urges Sebi to probe Future Retail - Economic Times",
+          "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+          "Vinay Rajani of HDFC Sec suggests Tata Steel, Linde India shares to buy - Mint",
+          "Nifty may keep to 23,500\u201324,800 range amid high oil prices, war uncertainty - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+            "summary": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxPQ3loNXZsUGVWOEZ1R2pvc1BkVllEQXd2VUdxWENMd0ZMZE8tdTBJcE9JMkdKU25obE9KTG1kQ3Nvd2l3alF2RGV6cDg4dTcwWnZTY2RWTVFOUHNtMy1kYUd0VkttVi1sR0lSLTc5ZmY4R0hKQWF4N1pQZmxJYUJ2NWZiMHZ0cVlHUDZtTV9RZGExakVfVko3ZDZhREpsU3BmZkprcmxnTW42Y192REd6dkViS1ZRdWFzb2poRzdKVU5jMnpERFZSWFJUSFU3Y09LRWFFYkxQZmd3a1NhM2RER2NXV19xdzN6THlkbFZWSXFpZWdpaHFNUTZtQnJIaTTSAf8BQVVfeXFMT0N5aDV2bFBlVjhGdUdqb3NQZFZZREF3dlVHcVhDTHdGTGRPLXUwSXBPSTJHSlNuaGxPSkxtZENzb3dpd2pRdkRlenA4OHU3MFp2U2NkVk1RTlBzbTMtZGFHdFZLbVYtbEdJUi03OWZmOEdISkFheDdaUGZsSWFCdjVmYjB2dHFZR1A2bU1fUWRhMWpFX1ZKN2Q2YURKbFNwZmZKa3JsZ01uNmNfdkRHenZFYktWUXVhc29qaEc3SlVOYzJ6RERWUlhSVEhVN2NPS0VhRWJMUGZnd2tTYTNkREdjV1dfcXczekx5ZGxWVklxaWVnaWhxTVE2bUJySGk0?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869551,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          },
+          {
+            "title": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+            "summary": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k HDFC Sky",
+            "link": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQenUyRy1ZaUUybUdkVk5yZk16RUhRQTExRVlCZmcwWDRlNjVYXzlTWTZDYS1wYUFvSkpzcDFaRjJZcWlFaVRyWmNhRzFMeE40cFNQTWFnX0l6SUxKZGttLTQtQUV3VmFRaGRtSG8xTURRajM0S1BvZDA5ZF8yU1lPTGtibnliamhaS3VMZnZR?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777870038,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Vinay Rajani of HDFC Sec suggests Tata Steel, Linde India shares to buy - Mint",
+            "summary": "Vinay Rajani of HDFC Sec suggests Tata Steel, Linde India shares to buy Mint",
+            "link": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxPZEo1aXhHSFctSTI0bVFyT1pMa3FJdFNSSFR2UV9jcG5tZmRFWHpQQVRHLXBlYUJrSjhueGdGUlhUZE5wdElRUlhTQXBmZGRvWUE2WHM3RE16V25XWkktRWE1QmJ1bDQwcU5COVY4bU5STEs5Y0FOQ2pjX3FvVEF1cUl0NEw0Y25TMzN6WVByYjJaeHBCYV85bG00TUktQmlaMENhSmF0c3U1LUFMTkItT1dyLXJyaUlDdjMxZElYWkFoWTVnTDRXMXZ1cmtwM0FqR1h0NHlQONIB3AFBVV95cUxQUzNGcnFSUVJXM0JMdkxPQVJDNDFsTXNFQjltXy1Yd20wcUxIWDVyblc2Rnk0MGtqYUw0czNZeGl1ZG0taWhiMk5qemFtc2VaVkZ0T3E3U3VRTFc2Q1lHa2dWLURHWWRhQnNGRzNwdHVVc0VzZ0dEYmowMmMzdjRiWVBkWXZNN014VEZlVEVXcmxzUi1rc2ZZa2pCbVJIWHkxSU1nV3RLekFfWTQ5SHd3dzNadE1GSTNQa00wRnlvMmVRRi1ja2tqZ0dMUE9WZ3Y4cGhpS1FWbTkybUdz?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777875471,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Nifty may keep to 23,500\u201324,800 range amid high oil prices, war uncertainty - The Economic Times",
+            "summary": "Nifty may keep to 23,500\u201324,800 range amid high oil prices, war uncertainty The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMi6gFBVV95cUxNc3hxWFgyQkFJUEthVDVNY0cyb0NpbVZudjNySXdWTHd2QU1QVVFsMXlmcVg2OXprckFVblppM1ozOTh0UFFZUzVTZ0R4VGlMWXNsTjUwaTc3OUZRX0FQcFdMZVBESm5KRWdnSFdSOEd0S1FRTVhQV3RPNGZCLS1EV3hqNFZhQ3Z2YVRlTjVyT042NldCUFJjbWREbVJJd2tpTXI0Ml82SE9RQ256T3hYWVZtZ05BbjRYWlByMTdDNVpTUTRjckFmV1pCYzBGWU1lVGlNQmVsckMycGlGWHZMU092RHFtOVlrV3c?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777853951,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "oil",
+                  "war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          }
+        ],
+        "generated_at": 1777879818,
+        "status": "ok",
+        "topic": "sector_metals",
+        "item_count": 190,
+        "bullish_items": 20,
+        "bearish_items": 31,
+        "label": "Metals sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22metal%20stocks%22%20OR%20Tata%20Steel%20OR%20JSW%20Steel%20OR%20Hindalco%20OR%20Vedanta%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 0
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Metal%20OR%20copper%20OR%20aluminium%20OR%20steel%20prices%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 31
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0426,
+        "type_counts": {
+          "uncategorized": 160,
+          "bearish": 8,
+          "earnings_positive": 17,
+          "bullish": 12,
+          "risk": 13,
+          "news": 9,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "meme",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced - MSN",
+          "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+          "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? - MSN",
+          "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+          "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN"
+        ],
+        "top_items": [
+          {
+            "title": "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced - MSN",
+            "summary": "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced MSN",
+            "link": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxQWGM1Uk5pWDdzX0c5T0diQ1F2ZER0RDNMeF9IdlMwdHFrSV93NnVsYWMwQ1lIUWpxQUxQV0JKUl9KUGlfWjZVMjN4RkdXclhrSW5MbDZYbHg4TWE5X3hPS1lBdHVrUFBSMkhDUExaVml6SnJXWktnMVB1WUtlREVqcEVORkFsSEZIekdTbHVaSUpzRG5ZcnppYTdBN1A1NG1LRGswR0tPYjRLTjlaWWRrelFkQjJZcWhiU2Q4a0w3ZHV2bFBYVEZDMW9wUXFqUjVCQzNrNEI2aFdqYTVHYThCbk95REY5ZnJo?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777783098,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "beats estimates"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+            "summary": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date MSN",
+            "link": "https://news.google.com/rss/articles/CBMinANBVV95cUxPemlHRzBFRWRIdzY3MTk1RjdGTHJuN1NpZWVGbFpJTnVqREpRSEJxT2dnZFFhLVNlbHN2aW1QQmxpa3JRd3dEZmZzNERmWmJieTljRjZwVkU2UVJhVUcwUnI2VnREdGF1Z0thQ0E3dGl5b1Nrd1ZFeXNUd3Y2bE1GZmxLaHlYeXVyMUd3dnZqUFljbnJEc05MVE5sX1U2UzlySXVGc0MtcUdHQ1BqRmZsS2FOa0RqRkl4M25HZktHZjVQQm1abHJ0NWhoM3drTU9FVEk3NVpJMldHWE5QYmVkelJKanUtWjRiMGlXMTVsbVJvS0kxM25vTlpEbVAzNkpOeFV0SmROOFFKRFY3TkMwaFVKTm5kTTFsckFBSm5Db1ZHUnNrcWJhR3pjWTZhOUUtU3EwbTdrRF9SaWdmZURUTGg3NnBraVo3M1QxQ1MtZU1ndU5QZWlyOHBKSkgyZEFJYUNXb2RGR0pFYk5YT3NuMkVkTWVKbmtyT1l4R3dsS25ZYlpzeXYtY3lWR3hlSGpIZEE5WlU2cllkV3dt?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777823904,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "record high"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? - MSN",
+            "summary": "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? MSN",
+            "link": "https://news.google.com/rss/articles/CBMihgNBVV95cUxNamRuM25MZ2gzcGlrNHViX2dKa0ZCbUZWSmZJZG00VkY3bXlJdkxKN0NMOGFjZG5yWk1uWkNHYWJld3REZmJzUS1STy13TXdWTUtVcUlidlZ1MU1yam5Zd0ZYdUNGeDZPMjRvZTJqTHoyTFpFTDFMUWFvbUczV1liZ0E0dXU4cmJZWEJvazJLNm1hMmRnbUNTX3psLV9MMW1sZGNtLVI0N0hDUmtvTmtxWkhSdmV0TmNZQzdfREJiczBSMnYxamNWWVc3X0tKWElFVV9zdjhiTVNJbU9kRFladFUwN1JGZEFfaS0xNm1BQzFMcHdReUtZTW5pV2FTN0RlYUlaX1hCX185OGxwWXVYaXhFejFLZVRLNFFGenpTS19WWEZfWnlSdUJzdTR4NlJTUG8tZFVOWGtwU0RVRHAzZmJkTjE4RUVleENjNkFoZ2lLZjJMMU55WWRYaktzUDZncDlmTkVsRWpTZlJVTXU4Ym9TRlFfU0FhcVQ3anBBMVNyU2NZblE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777822783,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+            "summary": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxQeVZmVXVYdUQta0RDR09rcC00b05vd2dKRm9sUzJmV2JaMnVKOHhoSjA5OFhSS0dtNmx0dXhZMVVaR19vZ0ExOHZLeWZGN0ZUekNXRXhjTlFTZjdpQlJqVnlpYklHdWxheURyNU82Y1dZTFZhLUZoRkxoanhTWEZ3RVByRFdVYW84aVFPMlNIVGFSdWo0bTEyQ3pRRnl2WVRZQktTMVlmRGlTX1E3SU44VmNrclRQNEJIak5ZYU9KalZiT0M5OEZGdGlaaXNPWFZTQUFMLUNqUlVaRThOYlc2NVNIT2NWMXprQkpsaGptR1g1R1VYYWFXWFlMYTh6S1ppRV9XVWhhSnpYcmV6cjM0aTBxNnBPc2tMaDBxQzZuZkQ1VEZGMUdlRWRRcVVHTzZZempQOFNDeXdkOHMwSDhUaVFCVFpidDZkc0E2QV90eG1NS1pOdWhIT2F4YkhkWFFmeE9tZjNveUcyTjczTjlmRnVPR3RWRFUwa05yNg?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777855829,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+            "summary": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date MSN",
+            "link": "https://news.google.com/rss/articles/CBMilwNBVV95cUxNS2tjZER1N2labURRaExUbVJVYXh6R0NGM0prd29Talp3S1hNZTJTbmhQY2NHSm5XRWVYdGZaeXBwelE5VUtlenhaUnhxR2hkNW9DaDJqRE9EeTl1c05EaDFpQ05ydXYxZVFiVnF6VXk2dmFyUGNHSFFBSUJCZmI2OFFoaGUxbzM4V0l3U29vN192eUg1UXZSaGZfQVJUV2NSdnNrY3VVZjR6bkRUbmNxa1N4Tnhxc1BESTJGb0pMY0hjWjRmMTYxdTFndWJnVUdYUmVNOTJCN09KVTZ6bDJEdWRFYndSeVJzdFZCeGc0ZWVEclE2SVdDdWFwTUtGcGJrODRLeEQzVnBzampjazlZRHE3MFpNdnNGbThNa1N3ekVWYVdoUXBwMGRjU0NvU1NyWWlvcDVqb3hHM0REd2g4aHVEeXl5YkJUSGpRb21CaW51T3RjSjhyMzFPcWdpU1ZWR254d3E1d1MyYmV0WlRMSmwxR0d2Sml4OGd1M3ZJNFRYdUh1VmhuR2s4VkhkcXg4N2txTm9vaw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777694172,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "record high"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          }
+        ],
+        "generated_at": 1777879820,
+        "status": "ok",
+        "topic": "sector_fmcg",
+        "item_count": 229,
+        "bullish_items": 32,
+        "bearish_items": 30,
+        "label": "FMCG sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22FMCG%20sector%22%20OR%20ITC%20OR%20HUL%20OR%20Nestle%20OR%20Britannia%20OR%20Dabur%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20FMCG%20OR%20%22consumer%20goods%22%20OR%20rural%20demand%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 8
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      }
+    ],
+    "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+  },
+  "sector_rotation": {
+    "generated_at": 1777879820,
+    "sector_ranking": [
+      {
+        "topic": "sector_banking",
+        "label": "Banking sector focus",
+        "weighted_sentiment": 0.0478,
+        "item_count": 258,
+        "dominant_types": [
+          "uncategorized",
+          "bullish",
+          "earnings_positive",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "HDFCBANK",
+          "ICICIBANK",
+          "SBIN"
+        ]
+      },
+      {
+        "topic": "sector_fmcg",
+        "label": "FMCG sector focus",
+        "weighted_sentiment": 0.0426,
+        "item_count": 229,
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "meme",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "ITC",
+          "HINDUNILVR",
+          "NESTLEIND"
+        ]
+      },
+      {
+        "topic": "sector_it",
+        "label": "IT sector focus",
+        "weighted_sentiment": 0.0333,
+        "item_count": 244,
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "earnings_positive",
+          "news"
+        ],
+        "bullish": true,
+        "bearish": false,
+        "top_picks": [
+          "TCS",
+          "INFY",
+          "WIPRO"
+        ]
+      },
+      {
+        "topic": "sector_auto",
+        "label": "Auto sector focus",
+        "weighted_sentiment": 0.0217,
+        "item_count": 186,
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "MARUTI",
+          "M&M",
+          "TATAMOTORS"
+        ]
+      },
+      {
+        "topic": "sector_metals",
+        "label": "Metals sector focus",
+        "weighted_sentiment": -0.0096,
+        "item_count": 190,
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "meme",
+          "bullish"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "TATASTEEL",
+          "JSWSTEEL",
+          "HINDALCO"
+        ]
+      },
+      {
+        "topic": "sector_pharma",
+        "label": "Pharma sector focus",
+        "weighted_sentiment": -0.0148,
+        "item_count": 234,
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "SUNPHARMA",
+          "DRREDDY",
+          "CIPLA"
+        ]
+      },
+      {
+        "topic": "sector_energy",
+        "label": "Energy & Oil sector focus",
+        "weighted_sentiment": -0.1034,
+        "item_count": 306,
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "news",
+          "meme"
+        ],
+        "bullish": false,
+        "bearish": true,
+        "top_picks": [
+          "RELIANCE",
+          "ONGC",
+          "BPCL"
+        ]
+      }
+    ],
+    "hot_picks": []
+  }
+}
+Fetching sentiment for 0 symbols: []
+{
+  "symbols": {
+    "generated_at": 1777887003,
+    "symbols": 0,
+    "active": [],
+    "top_bullish": [],
+    "top_bearish": [],
+    "feeds": [
+      "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+      "https://www.moneycontrol.com/rss/business.xml",
+      "https://www.livemint.com/rss/markets",
+      "https://feeds.feedburner.com/ndtvprofit-latest"
+    ],
+    "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+  },
+  "topics": {
+    "generated_at": 1777887021,
+    "topics": [
+      {
+        "weighted_sentiment": -0.1807,
+        "type_counts": {
+          "uncategorized": 43,
+          "risk": 137,
+          "news": 8,
+          "bearish": 3,
+          "bullish": 1,
+          "rumor": 1
+        },
+        "dominant_types": [
+          "risk",
+          "uncategorized",
+          "news",
+          "bearish"
+        ],
+        "sample_headlines": [
+          "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn - The Sunday Guardian",
+          "Oil prices rise slightly as investors monitor Iran war developments - Euronews.com",
+          "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels - BusinessLine",
+          "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times - Hindustan Times",
+          "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars - Forbes"
+        ],
+        "top_items": [
+          {
+            "title": "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn - The Sunday Guardian",
+            "summary": "Trump\u2019s Trade War: US Tariffs Risk Slipping Germany into Recession in 2026, Will Collapse EU Powerhouse\u2019s Economy, Experts Warn The Sunday Guardian",
+            "link": "https://news.google.com/rss/articles/CBMigAJBVV95cUxOZ3JHMjZ6QnRsSFhVeFZ5OV9JWEtFNHZsaG8wNDh1dzY4Vms3VFQ0WnpBblNYcVZkU04zT1Nkc0RqMVZZel9TZXlGd1ZWQXM2TU80Z0E0ajZveGh2RmRCS1pfaDVMUzFjcjNBTVBNdm9LcFdKUGxQRldpdmJLRFpSaVlobGw0cXVNeVJCZTEwMERoSlltVDlkU0oyU01teUF5TDRVcWExTi1OWXdsWXAydmk1STVLcDdWaWFfT1BVUGlBS0tkU0lybjhBZzZZdnJBQWZmMk0xZlAwMjBOZmFfUWJ2dzZnZFZoZ0w0LVJaNlViZ1lVVFZZeDJtV3RTc05i?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777815774,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariffs",
+                  "recession",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.8
+            },
+            "weight": 0.95
+          },
+          {
+            "title": "Oil prices rise slightly as investors monitor Iran war developments - Euronews.com",
+            "summary": "Oil prices rise slightly as investors monitor Iran war developments Euronews.com",
+            "link": "https://news.google.com/rss/articles/CBMiswFBVV95cUxPYmo5TXMzR0VvUHFoeTk3eWVXWExDRkhqRVliSjhwU2U1VHh4bmNxcmlBRmJuUENUNlhsZGZjV1VPVVRBV1JjTjFoNjZRTXQ0c1IzRHBmd3ByVGtkTmktZEJEazBJYmh5alVWV05hS0pQUU56ZTAtNFVUVnl1UFpjc1ozRm1NUDctbjBSTEs2YVM5ZUZXTmFLUEJ2YTUtRExNUm83cDN6RUpYako4dmpzdzlLaw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777871724,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "oil",
+                  "war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels - BusinessLine",
+            "summary": "Crude oil futures rise despite Trump\u2019s decision to free Hormuz vessels BusinessLine",
+            "link": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxNX2xUX2QzZTlicHZpVkxQTTlUbTNBM3JPckh6LVpzc1BvSDktT3hMMU9rNW5WbEpFVU1rT1RMeUF1NnkwRGVpU2lRUU95Q2dXRzZYLTc2Y2RzdUdxYVhDTWRzTVk1QjljUDJQM2VxM29raE16bV9yNXNrWi10aGU2N0VDSERpbFZZZk1uTnVsRHlLZTdsMWcyLTZtODVxb0JSRzVyWktYZm1IYmMzZURlLUdhU1ByR0VtTGhhM2dnN2ViY04zS1BJMjJyMjNrSGYwRmswQUZKdHJadVBSRWl30gHmAUFVX3lxTE05OXVNVWNuUm9UYk1SWWhKZFJGX3ZyREhsTHNtOU83UmRBOURtMEFUcHppZkFiTnRING9FaXhBU1hYRVhfN3k4MWpjT2hPQ2VZMDdxZzZvVUdGeHMtY3hpYlBCaVFEdWVtYjRESGxHUUxHTFVwOVp3Y05sQnRlQjd1MGtrR3oyQzZEc19Yc19wS1ZhYzI0eFQ1bVQ0anBHWnhaa1E0cEctN3pOUmpqaTdiYXMtaHVjV0dPVG04dnRZbkJTWnd0UTlfeGtIS2ZPM2F1WEt6MFFjb1lNcGZTdDBfQmYzaFdn?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777866791,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "crude",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times - Hindustan Times",
+            "summary": "Trump vs EU: Bloc\u2019s brutal response to 25% auto tariffs amid trade war fears | Hindustan Times Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxPbkdmc1g0dzJUOENNcjByRXdRYThVdElzS21scGVCWVVlSFpaS3psYU00ZW85c1hoREpaRm1yRGY5RFlRcHg3cTVoeVRvaVlSZEFnVGJ4V2dUQ09CbVZXSFpVVWxzOWxsMUVtYlZnUU5JRDBLZGg2dDBmbkJUNEZVTTVYV1NmbWpST1lvdG5kS1BYZ0NvbWRPeHdCM2FpNGotVVlVNnh6SWtzWnBvb1VpVzlPZHdDaFNUMHE0aWlNc0xmTWpfdGV0YTdidlEyb2JQUlBRSmxpTFhhQ3EweEHSAeMBQVVfeXFMTU1UN3FIRkVXT3J0SDVGcWdIazZlb3RWcmpFVUFQcmlqbEpiQ1REV1lkdU9FYjREVlVMc3VPNWRrcGUwSmpTcXlwQXkwV3VLdUlaeTZKcTZvTWpHSFlOeU1NaTZrTmxwTGlHMmZ2VXJOMDFkQTNQVkRBa2J4aGRKV1NTZmttOTJ0bnVWcG5wa1dYT0w1YnZuc0V2aUNWQUdMajdhX0ZqMFJaczJjbHJxMkoxN01VZEYxT29SSDhVVDl1d0J1ajZWaF9jUVZUbWxmbHBVWmNQU3ljejV6WHNFRG9PWkU?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777666887,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariffs",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars - Forbes",
+            "summary": "Trump Restarts Trade War With EU\u2014Slaps New 25% Tariff On European Cars Forbes",
+            "link": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxQaEJnMzJfTVJrR1dYS0tNaGVJYkttV0treGtXLVhKTXp0Qm9SNGY3M1JlbmFHM1Z1XzE0bHlYeDI3TVVvR3pHMG5XeWY1NEtKOHk1VmlraFJlZnhFS1FmaEdvSnlDbWh0bFJvWE9RZnJpT2MxOElUdk01TlFTOXV4aWhQVTdlRXZlT0lJUlhpSnlJMnBYNFV4U3ZIZE11OHJPVWtMc3RNSnpjeEUwcjNrUkRjXzYzMUxzQnBaeFFKdmVLVS11VHBTMEVaTHlXZnZubk9oMTcycVRYSjNa?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777656131,
+            "classification": {
+              "types": [
+                "risk"
+              ],
+              "matches": {
+                "risk": [
+                  "war",
+                  "tariff",
+                  "trade war"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          }
+        ],
+        "generated_at": 1777887005,
+        "status": "ok",
+        "topic": "trump_market",
+        "item_count": 181,
+        "bullish_items": 9,
+        "bearish_items": 138,
+        "label": "Trump market impact",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%20OR%20%22Truth%20Social%22%29%20%28tariff%20OR%20tariffs%20OR%20trade%20OR%20market%20OR%20stocks%20OR%20oil%20OR%20fed%20OR%20china%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 100
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22Donald%20Trump%22%20OR%20Trump%29%20%28markets%20OR%20stocks%20OR%20trade%20war%20OR%20tariffs%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 100
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.2352,
+        "type_counts": {
+          "bullish": 12,
+          "bearish": 2,
+          "earnings_positive": 15,
+          "risk": 11,
+          "uncategorized": 10,
+          "news": 1
+        },
+        "dominant_types": [
+          "earnings_positive",
+          "bullish",
+          "risk",
+          "uncategorized"
+        ],
+        "sample_headlines": [
+          "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+          "Share Market Update: Sensex Rises 726 Points, Nifty Gains 134 Points, Realty Tops Sectoral Chart - ABP News",
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+          "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+          "Sensex jumps 300 points at opening, Nifty 50 above 24,063 amid vote counting for assembly elections 2026 - news24online.com"
+        ],
+        "top_items": [
+          {
+            "title": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+            "summary": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell Mint",
+            "link": "https://news.google.com/rss/articles/CBMikwJBVV95cUxNazVVZjZINmQ0MmhHOUhKQ1FzdjhIejBmZkUyb0VTRzF3bFViXzd3bi1fb3FieFFnd20xRFZNN09xbDdLcDV6cEI4eHRxWkdwWklUWFNMSVlIZVpsUW1oRG5WQXdwQjF3dHpBUTBlNVVNQXVINUNfb2xCLUo0VWVKaE5zZVpzeUxidl94azRlazg2U3MySG9Ec00wQmZidTlibmdNR2tkOXZ1MTUzUGhpRWlfdUpvWUdYTm5GNzJfWC1jdHZrVHM0MS01b0hFS3NKY1Y3OWFKNC1KZWtENm94N1dmaUZwMFpERU92eGotZXhQNWpfSU80Sy1aX250WjFRZU0tLVVsbkZPTW85UVdVYlk3SdIBmAJBVV95cUxPNDFrNnVCbXdtbnJJeU53ZXhINC1aNF9LaVpEUS12RllobXZ0X19fVkgzTVdrVXpHNi1ERWlFbU9hakZGRW1Qak9PNzNwWFR2bFFERDRWdlQxWHVucWJCclFoNC1UVER4Qmp5R01FYjUzREJ2MlJGQzdhaWRucDE3bG5YaVVIN0ZGNksxR2ZGNzdNcEtOWjJMcU5jcVU1cER6UzJhOHU1VlZWYUdGam9Hd1BlRlFEeEZ2c05RbWJHQjhTdnlLeHc5cHk1djQ2WGVwZWdBc0NISFZndE1fc3RuWnVRSFcwZGFpVkVvdXAxMDhDRFBycnF3TGhqdm4wV1NMOFJBLV94M1NWcXY0MHhTUGxIODhxSmZS?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777862170,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 0.95
+          },
+          {
+            "title": "Share Market Update: Sensex Rises 726 Points, Nifty Gains 134 Points, Realty Tops Sectoral Chart - ABP News",
+            "summary": "Share Market Update: Sensex Rises 726 Points, Nifty Gains 134 Points, Realty Tops Sectoral Chart ABP News",
+            "link": "https://news.google.com/rss/articles/CBMizgFBVV95cUxPRHlpbnp2NnpwTm5hdmRMcXVJLUlPdnBobXp2Sk1CZlVjWWRDTGs1WE5LQmJ3TXcwOEo1cEl5cGlaMUI3Ty1zenR5d0VnMWh6dzFDZjIxRnlHRW1yRmdyaFdnNkc5bjNiMjlrWFMyR2dQSzdZaFlxMkpielpDSENxN2Qyajd0V3hOTjY1ZGN1cU1XR3FLWmhTeHlqRGVEOWlFNVhqZG5scEpldm9Wbi12YVFzMWMwR3pvQU5GTFFJejhVdi1VMy1ibkF3dUpNZw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777885339,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "rises",
+                  "gains"
+                ]
+              },
+              "sentiment": 0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states ANI News",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxNY0FFcDNXYnJzVVhYQmRfd1lUNHMxQ2x3YXhEc1NILTFiUFNxS2lYMkkzdEN5VkZIMlU2RXRGVGdLZzAwSnl3SnkyUG5ESC12Q25DQ09WUFZYeHJLajlrMWNkcnhYTjFZX2ZMMUdBUFFIU2gtTG53dFY1Z0ZxWUpZcEJnSkpfSUxPQzhuTl9RMHRabVl0VEhrNnFzbklMRjlaUE9BOGFMaS01Wm5wblNMV2h2a2RjUUNGQmJIMU95WktIZGc4a3ZMTUFGcnl3SnpWdVdzamp0dVZZd0JCcHc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867680,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+            "summary": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxPQ3loNXZsUGVWOEZ1R2pvc1BkVllEQXd2VUdxWENMd0ZMZE8tdTBJcE9JMkdKU25obE9KTG1kQ3Nvd2l3alF2RGV6cDg4dTcwWnZTY2RWTVFOUHNtMy1kYUd0VkttVi1sR0lSLTc5ZmY4R0hKQWF4N1pQZmxJYUJ2NWZiMHZ0cVlHUDZtTV9RZGExakVfVko3ZDZhREpsU3BmZkprcmxnTW42Y192REd6dkViS1ZRdWFzb2poRzdKVU5jMnpERFZSWFJUSFU3Y09LRWFFYkxQZmd3a1NhM2RER2NXV19xdzN6THlkbFZWSXFpZWdpaHFNUTZtQnJIaTTSAf8BQVVfeXFMT0N5aDV2bFBlVjhGdUdqb3NQZFZZREF3dlVHcVhDTHdGTGRPLXUwSXBPSTJHSlNuaGxPSkxtZENzb3dpd2pRdkRlenA4OHU3MFp2U2NkVk1RTlBzbTMtZGFHdFZLbVYtbEdJUi03OWZmOEdISkFheDdaUGZsSWFCdjVmYjB2dHFZR1A2bU1fUWRhMWpFX1ZKN2Q2YURKbFNwZmZKa3JsZ01uNmNfdkRHenZFYktWUXVhc29qaEc3SlVOYzJ6RERWUlhSVEhVN2NPS0VhRWJMUGZnd2tTYTNkREdjV1dfcXczekx5ZGxWVklxaWVnaWhxTVE2bUJySGk0?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869551,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Sensex jumps 300 points at opening, Nifty 50 above 24,063 amid vote counting for assembly elections 2026 - news24online.com",
+            "summary": "Sensex jumps 300 points at opening, Nifty 50 above 24,063 amid vote counting for assembly elections 2026 news24online.com",
+            "link": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxPRng1SFlnSjEzX0NSMk9wRXhid3owc3lZTDBPenVUYkN4eHpfQzRqcWdzZVhDV3ZnVW01bl9VbHlsNTVaNnZCUXEySGx1NGFRd3VjMUMzSUVGRGw5ZTdOTW1OU2Q0NzVyaXQ3N0lCMFM5bGYyQTV2ZkZYRzA0YnBrN0t5QUFRWkpZTjA4T2tqNmgtdFNqT2tGaFRqXzlxTWpaekpobUVZZFR4NEhHbXVhR3ZhQVJWMURXTmlxTFFack9GbWFBclJZcXJJeHVnZW5CbnY2QXZPM2EtSDdv0gHgAUFVX3lxTE5xUDhFZGcwRzZCc1BGc0ZTTUZoa2ZERVFZTzNzU3pXaE84ejJsaW5wWE9TeEJMUzJoeXRLVzd4RTlYa3NvXzB0SUlxOGpxOERydXpROTdqY1VYZjZCOFhOQy1uR1cxbVk2NXdocXJRckpqNnhhazVFQ0VPVHRDRnpFaENIVVM5M3dUY2VjcEw2SGliZ2FHbnh4X1ltak10Z2R0OUU1T0lQSUVqbW0zUklWRmgtRlZCanpfZkJpZ3J6T2NPNEh6VU1jQ2VwSS1HN1ZwemZNSmFaY3BuSGdqZmdG?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777866446,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          }
+        ],
+        "generated_at": 1777887007,
+        "status": "ok",
+        "topic": "gift_nifty",
+        "item_count": 39,
+        "bullish_items": 25,
+        "bearish_items": 13,
+        "label": "GIFT Nifty pre-market",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22GIFT%20Nifty%22%20%28India%20OR%20NSE%20OR%20BSE%20OR%20SGX%29%20when%3A1d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 27
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22GIFT%20Nifty%22%20%28sgx%20OR%20pre-market%20OR%20opening%20OR%20outlook%29%20when%3A1d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 22
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.1078,
+        "type_counts": {
+          "bullish": 6,
+          "bearish": 4,
+          "earnings_positive": 1,
+          "uncategorized": 5,
+          "risk": 2
+        },
+        "dominant_types": [
+          "bullish",
+          "uncategorized",
+          "bearish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+          "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell - MSN",
+          "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? - Business Standard",
+          "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street - MSN",
+          "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell - Mint",
+            "summary": "Stock market today: Gift Nifty signals gap-up start; election results, India VIX to Q4 results \u2014 7 stocks to buy or sell Mint",
+            "link": "https://news.google.com/rss/articles/CBMikwJBVV95cUxNazVVZjZINmQ0MmhHOUhKQ1FzdjhIejBmZkUyb0VTRzF3bFViXzd3bi1fb3FieFFnd20xRFZNN09xbDdLcDV6cEI4eHRxWkdwWklUWFNMSVlIZVpsUW1oRG5WQXdwQjF3dHpBUTBlNVVNQXVINUNfb2xCLUo0VWVKaE5zZVpzeUxidl94azRlazg2U3MySG9Ec00wQmZidTlibmdNR2tkOXZ1MTUzUGhpRWlfdUpvWUdYTm5GNzJfWC1jdHZrVHM0MS01b0hFS3NKY1Y3OWFKNC1KZWtENm94N1dmaUZwMFpERU92eGotZXhQNWpfSU80Sy1aX250WjFRZU0tLVVsbkZPTW85UVdVYlk3SdIBmAJBVV95cUxPNDFrNnVCbXdtbnJJeU53ZXhINC1aNF9LaVpEUS12RllobXZ0X19fVkgzTVdrVXpHNi1ERWlFbU9hakZGRW1Qak9PNzNwWFR2bFFERDRWdlQxWHVucWJCclFoNC1UVER4Qmp5R01FYjUzREJ2MlJGQzdhaWRucDE3bG5YaVVIN0ZGNksxR2ZGNzdNcEtOWjJMcU5jcVU1cER6UzJhOHU1VlZWYUdGam9Hd1BlRlFEeEZ2c05RbWJHQjhTdnlLeHc5cHk1djQ2WGVwZWdBc0NISFZndE1fc3RuWnVRSFcwZGFpVkVvdXAxMDhDRFBycnF3TGhqdm4wV1NMOFJBLV94M1NWcXY0MHhTUGxIODhxSmZS?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777862170,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 0.95
+          },
+          {
+            "title": "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell - MSN",
+            "summary": "Stock market today: GIFT Nifty signals gap-up opening; India VIX, oil to gold, silver rates \u2014 8 stocks to buy or sell MSN",
+            "link": "https://news.google.com/rss/articles/CBMimAJBVV95cUxPdG5HeDlacTdtVzZKc2hlOVNZNXFVTmJLQ21rd19nMklqek1tREJmNzBvR2RFRG5RX0V0T3MzVHZDN0ZiX3BjRW5tOUFsVGVoYXBaaWFNbWdXWmt5YU4wak9YUHcyQi1fTHNmanNlVURMVDVXcXJkTV9qdVA5cGpxaUNRSGw4VW9aeFVNOXB6bEhpNjkxVmhVWkI4d1JDWFdCbUlSaXVDc1AzREUwQjRHYlFSZmVnVUtlbENXNEpTR1AtTGNtSTFTUDJkcXcxNkZhS0xiUmdpN0FWOFRVTE5UeFhzOTdtWXp0MHBObnEzRzgyNncwU2l0VWFIcUY3NEx1Z2w1YkwxamhsUHMyd2x3NEp3TGdIa2ZI?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777633930,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "risk": [
+                  "rates",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.4,
+              "confidence": 0.8
+            },
+            "weight": 0.798
+          },
+          {
+            "title": "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? - Business Standard",
+            "summary": "Sensex jumps 997 pts; Nifty near 24,300: Why are markets rising today? Business Standard",
+            "link": "https://news.google.com/rss/articles/CBMiiwJBVV95cUxOQVRkWEhZZ3hhQXNkNFpIYzB6ZTd6aW9yeEc2SzdDNGJ3cjZseU1TdF9KZlpWNXo2RVZCNE5GZHR2bXRFN0JNM1VKaUtPQzJ1SnU1aXY5QmVLLUNDZmJtOTllbXFhRFFpV09rSnNaY0VyWVh6WDUyaXZMNUZ3ZjItQ252Z3M3RkRIWVdtazVNcEpBUW5kMk1McmJaUVMzYndvM2NfcWRDemVwbXNLVHFRdXVuQXhzbWwzcTd6c3BvWTFRazNEeURtV3JnZG95T0gyYnhaUS1sSWx2ZjZKTVJ1TkJ6UDY3VHhLLWZ1blFvTlgxdlFXTXo3RmF6dzlwRTZ6OEY2ZjZ0dGI0Z1nSAYsCQVVfeXFMTkFUZFhIWWd4YUFzZDRaSGMwemU3emlvcnhHNks3QzRid3I2bHlNU3RfSmZaVjV6NkVWQjRORmR0dm10RTdCTTNVSmlLT0MydUp1NWl2OUJlSy1DQ2ZibTk5ZW1xYURRaVdPa0pzWmNFcllYelg1Mml2TDVGd2YyLUNudmdzN0ZESFlXbWs1TXBKQVFuZDJNTHJiWlFTM2J3bzNjX3FkQ3plcG1zS1RxUXV1bkF4c21sM3E3enNwb1kxUWszRHlEbVdyZ2RveU9IMmJ4WlEtbElsdmY2Sk1SdU5CelA2N1R4Sy1mdW5Rb05YMXZRV016N0Zhenc5cEU2ejhGNmY2dHRiNGdZ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777871413,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street - MSN",
+            "summary": "Sensex, Nifty crash: India VIX surges 24% as bears tighten grip on D-Street MSN",
+            "link": "https://news.google.com/rss/articles/CBMiuwNBVV95cUxNYzdjZkY5UnE3eXpES0Z3bWRMaUJaenI3Nkd3N0FGU21Wdkd1THBySGk4U2h1RUJMcnk2UnhuMENHaDBBcUx1RjBseml0c0libmpsLTBOZzVZUnBCTzVkWTVuRDBzRXpaYkszTUN2eUg0NU5vQklsZ1dxRnhzMXkzbkRrOU52bzI1NTZTOGlOaC1RVWJFcFhmNkhLMzNELUNXWUpLN3lyVFZVRGdHTTd1TTdvY1NEN0lnWE1CQUhSNllwSl9NdGJYcWJJMnlDc0ktN0RzNXhLeTR3NGZZcUNfOTM1OVpScEJVMjhncm9YMVJqSjlrUkFiYTJ6S3pNTDVhY1hWVHEySndBNEx5WGlPM2M5dTYyRnZoTFp4UmxvQVVRWGt3MDVZWG10a01zSmZNQmwtM21NYWdtWUlPQ1lYLWEtbXJ2clNha3J0YTJTX0d5cjVZQmpOY3NVOU1fbUxJcnl0V2VxZ01oRzJYbEstcHlxMFhwdHRpU2l1SzlhRXB6OS01NVQ0LWYzLVNrS0lHU0UwdkE4OG1OWVNBN1podTNwc3gtN2tkREkxQURHZ3l5V3pkWldSQk0wRQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777814241,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "surges"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.475
+          },
+          {
+            "title": "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points - The Economic Times",
+            "summary": "Bullish start likely for Dalal Street as GIFT Nifty advances 100 points The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMizAFBVV95cUxPUHBad2h4R2NIakQzUkRycjJFbDROX0NJZ0lDN1N3SU1YRVZhN0U5SUNFalNQZUxvbnE0Q0xCV0dzV3JGRDJXTUNOY0kxM0RjYlFPZVIzLUt1elpzVmo0Ukw2M0M0Slp3T2phMUc3YmNyX3owRjk4ZHMwVW90VTVweUpZb19aNzZad0IzVkFlUnllOUlNUWJYcE1nLUoxSlQyNG8zZTE0NGw5T1lRM2cwNEpQcE5iVjg3Rk4tc1BSOE12STZkaGY1U09LcW3SAdIBQVVfeXFMTndzYXNDeHNYOUxOWTdqb1lnSUEyRW41ejVVUURhOXlhTGVZSUNVTzNWM3F2STNoNkxZckNwSS1Jbzc4Y25naHcyTFNMdEJ0MHNpMlZYQnNuSVRwUHdwbEdLd1lDQm05ZzFodjBMLUluanBLN3NRSzU4VlFOeTBaZmRycS1oLUYxZmJvTkNCZW1pd0FwZGpQVVQ5LUVuX29JUjJjd1ZseWRtRXdERk0xVnZLaHRPTTI0bk45ajFNN3h4bHBWbklPazFYUDFrTkVhMUp3?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777856449,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "bullish"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.475
+          }
+        ],
+        "generated_at": 1777887008,
+        "status": "ok",
+        "topic": "india_vix",
+        "item_count": 14,
+        "bullish_items": 6,
+        "bearish_items": 5,
+        "label": "India VIX volatility",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%22India%20VIX%22%20%28fear%20OR%20volatility%20OR%20options%20OR%20spike%20OR%20surge%20OR%20low%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 11
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22India%20VIX%22%20OR%20%22VIX%20India%22%29%20%28Nifty%20OR%20market%20OR%20panic%20OR%20calm%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 8
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0314,
+        "type_counts": {
+          "uncategorized": 183,
+          "bearish": 10,
+          "earnings_positive": 11,
+          "bullish": 9,
+          "news": 11,
+          "risk": 7,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "earnings_positive",
+          "news"
+        ],
+        "sample_headlines": [
+          "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show - MSN",
+          "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? - MSN",
+          "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+          "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show - MSN",
+            "summary": "Infosys vs TCS vs Wipro: Deal wins to outlook \u2014 what Q4 results of India's top IT players show MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxOb0ZuNTd5WlNya1R6N1F0eXZOejVxYTdDNTFQUVhnLTBoUk5BTEtaUUR1TlppT25aM0xaczI3NGY3ZEZmZTRoSHJTNlNHTUwwMFNBcTFUU1JVaER2Y0hQRElsOGtuLW9QQWdRUjFPNmwyTVJ4bm5ZM2lqVWkxUGc1YWNsdUxjcGJkcXFWVVU2R0hENGw1S0hSMzJhd1IwM2dicmUzUkFhRWJyWTRnNEgtTlE5TDJidnB2cVlFck1FTUxkdHc0Vnl1bTh0ZGgybU8wamdUM3E3enE3TzNJamppdUpZNEdlbmdZcHNWUnJlZXB4VzJBLTh3SGhJYzBPZ3BSWkFKamdicHhVM25oVDU4QUltSnY3OHhSSWlWM3pLX0hwdWUzQXhNVS04TDlkMlZlUWtDeTkwUndNN1hWV19DN0V1a0dWS1RIYVIza2VFSU5KMG9IdDFQdnZyWjBOMWFoU0RFWmZOc3JmeEdvbDRSYXBubEVCSXJ2b3hCXw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777810043,
+            "classification": {
+              "types": [
+                "earnings_positive",
+                "news"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ],
+                "news": [
+                  "wins"
+                ]
+              },
+              "sentiment": 0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? - MSN",
+            "summary": "Infosys shares down 5% after Q4 results: Should you buy, sell or hold? MSN",
+            "link": "https://news.google.com/rss/articles/CBMi7gJBVV95cUxNV3k1aklORFY0b1MweFdXNXJZcW16RWVEMFJxWGhBVHU2aTllRFlnSWRYRVVvTENiTzBSZ3lNUU5aaXI4WFlfQkRzRzgyaVRabWFtS2IxUU9Xc3pHb21UQlV1OUNlV2g1X0g2d1BKbGxfdVFWd2dYRDRmUTJSVGFhWmw4UXp3aFBqMjdOWlRSSkVLTElYbHJJQjdqSGJnOW90QlJpUnlGbUM1OFJOckxGcU9NeUo4UEhWOEM4YVNXUGdiWncxX2ZtTkI5R3I2c2hTZUs1NTZKOVppY1QwUl9yNEhkN0ZjNURkVm84LTk4S1pfTndmWmRzLW42cEhjM0Z1ZkhDZjNuVlVVUWZ1MzdxVVJDNVp1TkJPTE96U3RQdThQZEU3WTJkMW90bmZVRDMxc1RXVHlZcldXT1lyUFE5YmJfb0s3Q0ZpS3Y4TDBiNllaOGp0SzhpLXg2WXN1M0VSRkpLaGpDRXBWRmI1YlE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777728721,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "bearish": [
+                  "sell"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 0.798
+          },
+          {
+            "title": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+            "summary": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxQeVZmVXVYdUQta0RDR09rcC00b05vd2dKRm9sUzJmV2JaMnVKOHhoSjA5OFhSS0dtNmx0dXhZMVVaR19vZ0ExOHZLeWZGN0ZUekNXRXhjTlFTZjdpQlJqVnlpYklHdWxheURyNU82Y1dZTFZhLUZoRkxoanhTWEZ3RVByRFdVYW84aVFPMlNIVGFSdWo0bTEyQ3pRRnl2WVRZQktTMVlmRGlTX1E3SU44VmNrclRQNEJIak5ZYU9KalZiT0M5OEZGdGlaaXNPWFZTQUFMLUNqUlVaRThOYlc2NVNIT2NWMXprQkpsaGptR1g1R1VYYWFXWFlMYTh6S1ppRV9XVWhhSnpYcmV6cjM0aTBxNnBPc2tMaDBxQzZuZkQ1VEZGMUdlRWRRcVVHTzZZempQOFNDeXdkOHMwSDhUaVFCVFpidDZkc0E2QV90eG1NS1pOdWhIT2F4YkhkWFFmeE9tZjNveUcyTjczTjlmRnVPR3RWRFUwa05yNg?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777855829,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus - MSN",
+            "summary": "Cognizant Q1 results: Key takeaways for Indian IT firms; TCS, Infosys shares in focus MSN",
+            "link": "https://news.google.com/rss/articles/CBMi6gJBVV95cUxOQnpIRjcwQVhFSzhlWlpNYlB5RVVOT1RuZ0tVQmlsMFFCRHhTTm5adTVhWWgyOFpRcTZiYWl4bVB5YjJ5LUpfTWRJWjl6THhpV1lZakdhZ2dkcGo3cG01SjNrcW9EM2VDMk1WTG8zMEl4WjZTdEIwX09XaXNxdU16cTQxa2JqYjlYMFEyaF83d1lqUTZvV1FSOXRCSVdXVGdyMk9kTFVxVVZWOUdmLWg3SmdBalVqZEc4UTU5eVlwa2FCRTZhQ1dwTzFld1dNNktVQXVSMldQRzF6aDZ0cUk1em1yQWFMUjlLaHpZSFJXV1dlZ3VVOWhYNFVCaU1GV0M1UDY1U3hTelQtVGZWN2lOSy1aN0lXQWxvMm5kdndMUmZTaFpXRWRKNk5FTHJGNXdoTFRJT2Z3RUdMemdlTlBZZU04YXhKWU00R0hsdUxrU1FpQk1Pbm9HZjR5OS1iUi0xTkRveG1QMGE5QQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777816896,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q1"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          }
+        ],
+        "generated_at": 1777887011,
+        "status": "ok",
+        "topic": "sector_it",
+        "item_count": 239,
+        "bullish_items": 24,
+        "bearish_items": 26,
+        "label": "IT sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22IT%20sector%22%20OR%20TCS%20OR%20Infosys%20OR%20Wipro%20OR%20HCLTech%20OR%20%22tech%20stocks%22%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 73
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20IT%20OR%20%22information%20technology%22%29%20%28earnings%20OR%20outlook%20OR%20upgrade%20OR%20downgrade%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 7
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0468,
+        "type_counts": {
+          "uncategorized": 175,
+          "bearish": 12,
+          "risk": 16,
+          "bullish": 18,
+          "earnings_positive": 20,
+          "regulatory": 7,
+          "news": 9,
+          "rumor": 7,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "bullish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Exide Industries Q4 Results: Net profit jumps 22% YoY, auto OEM growth drives strong earnings - Business Upturn",
+          "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore - Dailyhunt",
+          "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... - Moneycontrol.com",
+          "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? - Business Standard",
+          "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Exide Industries Q4 Results: Net profit jumps 22% YoY, auto OEM growth drives strong earnings - Business Upturn",
+            "summary": "Exide Industries Q4 Results: Net profit jumps 22% YoY, auto OEM growth drives strong earnings Business Upturn",
+            "link": "https://news.google.com/rss/articles/CBMi2gFBVV95cUxQY010S2RCWGlhNldIbS0yTkpLYi10WXA5NHJ5N0hxd1FGSHZ3ZjBVSW1rTHltWFhUUjBpOURueTVxdW5Ja2FRRlZfbDc1RzNDNlo1YzV5bTRmLTNuci1OcDhRSlZheHItMlMwU2pXLTJKTHFQMUstVzluaWdVMFNkSU50c1hMS09ndWhseVFGd2FSVWtXWmdHbzJIdm90Tzk2VWJsV2o3Qmg5Q1hraGtSYThGcV9QcG92eU9OUjdkWmg1dndYN1dqR2V1V3piblNZc01QRUV6ejNQQQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777884205,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.8954
+          },
+          {
+            "title": "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore - Dailyhunt",
+            "summary": "HDFC Bank Q4 profit rises 8.04 per cent to Rs 20,350 crore Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxPbUZJV082djVRZTM3b2kzNEg0bnkyd3dnTHUtY3NEVmF6UUlXdHVEc1lEMHRyM0h3RW03VWhlNk1ON0RuSzNaSzNUdmRKcjQ3YlhKejZ2LXl1V2MyZ1JNSWctQndUcTFkUEIzc1laSmJZSFJ3RDA4MW9LX3hfbTNyMHJ3Nnh0elA1eExhTUFhU21fWldoaU1NM0k3Ylhla1VQQVZNNmszaFpKV1pPd3hJWXlORmdoM1ktdGMzaVB1ZGx5TTRxTGgwNEZDb1dsN1FGV3RwaFJzTzNIVW41Tm5aYVU3eEw2Uk5weG0ybw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777803520,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "rises"
+                ],
+                "earnings_positive": [
+                  "profit rises",
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... - Moneycontrol.com",
+            "summary": "Kotak Mahindra Bank stock falls 2.6%, top Nifty loser; analysts hail Q4 results margin gains, but flag RoE... Moneycontrol.com",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxQRTdjWFAza1JYSFhORVZ0b3YzeWRPZVp1elZfemt5bHU1eHNpdDJudGY1WklCOXVVZGpaZENTc1NzMFZhNWktdmxsV3dRSTMwR0ppNk44VkVRdmRhUjRvbmRlU2VOYWE4bUUxaVF0eW9VLTdZX19FZlNZRHFPWW1EUkpOZTAxWXM1emhqRHVxVkpLbkVtMWJTMlQ1VVgyb2FjUWxMNkFONmdVbHV4Z1Y3ZldpNnI1cGU1cGtoX1VvSUx3YmhRUXNseDlxT2RGZnJJTFY4M0VlSFRvN2puX21MYnpOYTlqSjF2MHh3VHlXanhVMVE1Uk5oOVF1VE81VnPSAYQCQVVfeXFMTmEyQkFjTkdoSnRYNzhvVHZBZ3B0aW53YlpnOVpWenhVNGJGY1VPOS04T2R4S1pmMm16LVBGMEFnUktIcUZBaERUOG4xSDI2MXlSZWNFZXQ5LVJ3NFNDd1lmWk44MGlZSW1RWmllenZFSEhIYUVkZ3ZocFoxNVptbnlSYmF3ZlBEWUF5akxHMl9aR0lXUHRfcWc1NUxvWjNkWkpEQ3VqZWRFajBjMHd4RjV4VzdfSExCXzB3anhGRGt1emh1ME11eXlnUkFNRUZQcnlEMkNNYWFWa3JXQjV5UDNQSTZrR1ROeWJzTWZRdXZvWVZhcGlpdExqMExoYi1PZ25uX00?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867670,
+            "classification": {
+              "types": [
+                "bullish",
+                "bearish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "bearish": [
+                  "falls"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.8
+            },
+            "weight": 1.102
+          },
+          {
+            "title": "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? - Business Standard",
+            "summary": "Oil above $100, Iran war drags: Should investors 'Sell in May' or stay put? Business Standard",
+            "link": "https://news.google.com/rss/articles/CBMiywFBVV95cUxQU2pDZGp4czkxbjdoeXFobVhhS1FTQnJlX1h1MVFBUUtxa0hCY0VzMS1PWjk2VTExeDk5OHNhUWFxQWE3MGtyamR4YmVZTGNrZTV6c3VwdW93UHNQaUdoZ3Z5bkdJVXVmVzNhWE4wbGl6SjhnMnp2MDRLcnJQakJyRGhETzkwZnFjMzQ4ZjNUVDN4aDdOUTdVb29hcnJOUUZOcDdEY3Bqa1dWOFY3bmhUbTIwTGladVRmQVlkWjR4ZTM3RTB5SlJsYUpmZ9IB0AFBVV95cUxPTmM4SDk5X2Iwbng0OHQyd2VYU01SR1ljd3kwclBMcW1sQUJvZHJlZVoyZVBzR21Ec0oxNFVuV0w0Q1VUTnBvU0ZFX3VHaG5tU25ZaE0xbnlHTFdNeG40SEppWld1cWpMb2hUUjRWdk5QUGJRMGdNV0FRVDVnS1Z1Tjk2U1RHWURINDR0bmpHby1sUnFybF9FX25lcWtXSTFiZmxkY0VWT3hDVW1JaW5zU1ZrU2tFTk00bWRzX0VrTHA0MWtrRDVrZGVvZ3hTQV8x?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777871458,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "risk": [
+                  "oil",
+                  "war"
+                ]
+              },
+              "sentiment": -0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.8954
+          },
+          {
+            "title": "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya - The Economic Times",
+            "summary": "Kotak\u2019s asset quality gains drive robust Q4 show: Dnyanada Vaidya The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMi0wFBVV95cUxPeURIckFidU15M2FjNlNUeFpZNUlLeFlzOEwtRTN4cEQ5d29lYmR6N05Md3VXM1VWWUYzNXU1ZnBrZHJsOFdtY3JNWm1jM2ZGdTB5MXJqSzB6Um4td0xkVmFtb0RqaDN0RU1hMDZORUYtTmtCNkd4QzNqN3c2dmZXWkp3Q3A3UjE5VGNIaWNfQWFnWXNvZ3dPVlRnVUtzSk1yREh1VzVQOFA0NmdNd0Q4TUM5YXR3QXZfMEJnbjJaZlNHcVJoamNBR08tZjRsNF9OS0JV?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777873048,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          }
+        ],
+        "generated_at": 1777887013,
+        "status": "ok",
+        "topic": "sector_banking",
+        "item_count": 261,
+        "bullish_items": 41,
+        "bearish_items": 39,
+        "label": "Banking sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22banking%20sector%22%20OR%20HDFC%20Bank%20OR%20ICICI%20Bank%20OR%20SBI%20OR%20Kotak%20OR%20Axis%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 52
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Bank%20OR%20%22bank%20stocks%22%20OR%20NPAs%20OR%20credit%20growth%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 50
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": -0.0066,
+        "type_counts": {
+          "earnings_positive": 8,
+          "uncategorized": 169,
+          "bearish": 12,
+          "bullish": 15,
+          "risk": 12,
+          "rumor": 8,
+          "news": 8,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "bullish",
+          "meme",
+          "bearish"
+        ],
+        "sample_headlines": [
+          "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+          "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% - Dailyhunt",
+          "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% - Dailyhunt",
+          "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News - Hindustan Times",
+            "summary": "Markets start May strong: NIFTY 50 tops 24,000; BSE Sensex gains 300 points amid voting results of 5 states | Business News Hindustan Times",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxPQ3loNXZsUGVWOEZ1R2pvc1BkVllEQXd2VUdxWENMd0ZMZE8tdTBJcE9JMkdKU25obE9KTG1kQ3Nvd2l3alF2RGV6cDg4dTcwWnZTY2RWTVFOUHNtMy1kYUd0VkttVi1sR0lSLTc5ZmY4R0hKQWF4N1pQZmxJYUJ2NWZiMHZ0cVlHUDZtTV9RZGExakVfVko3ZDZhREpsU3BmZkprcmxnTW42Y192REd6dkViS1ZRdWFzb2poRzdKVU5jMnpERFZSWFJUSFU3Y09LRWFFYkxQZmd3a1NhM2RER2NXV19xdzN6THlkbFZWSXFpZWdpaHFNUTZtQnJIaTTSAf8BQVVfeXFMT0N5aDV2bFBlVjhGdUdqb3NQZFZZREF3dlVHcVhDTHdGTGRPLXUwSXBPSTJHSlNuaGxPSkxtZENzb3dpd2pRdkRlenA4OHU3MFp2U2NkVk1RTlBzbTMtZGFHdFZLbVYtbEdJUi03OWZmOEdISkFheDdaUGZsSWFCdjVmYjB2dHFZR1A2bU1fUWRhMWpFX1ZKN2Q2YURKbFNwZmZKa3JsZ01uNmNfdkRHenZFYktWUXVhc29qaEc3SlVOYzJ6RERWUlhSVEhVN2NPS0VhRWJMUGZnd2tTYTNkREdjV1dfcXczekx5ZGxWVklxaWVnaWhxTVE2bUJySGk0?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869551,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "gains"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% - Dailyhunt",
+            "summary": "Pharma sector stocks today, March 12: Divi's Laboratories down 1.87%, Abbott India drops 1.51%, Aarti Drugs falls 1.36% Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMipgJBVV95cUxNVUI2VjgyZFgtdEM5eGRqWUp0UnZXeWYwa0tncWc4eGhtWXEydDk2akZzWGxWSWZLRDJjbi03dnpPamZkR0Y1MzYtVkRLdTBELURHd2VFcnlHdGpRaXplWE1qSTVkdW9oTkZZOGdBSHZmSjd2VTlnbS1QNHRLRVhGTGlFV1JmaThnUlJNQ2tvY0VzdXYwQnZ2N25pSFhnOHd3NWhPV1BlZVBZbEU5MHhIRnhNV2JKRVlFZUhJaDQ2MENtOWdBTWpHcGpiQ2hkeEcxQnJtUjVrclhoOC1aTUNGaXF3SjIxSExmOEhmTEdjbEtFN0Y3X2FoZUN1UUJqMHlGVUdHZDVuQkc0YWdfTWYwaW5hNk8yUGV6Z1JFZFktMFktY2dnWUE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777814880,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls",
+                  "drops"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% - Dailyhunt",
+            "summary": "Pharma sector stocks today, April 30: Biocon falls 1.01%, Torrent Pharma down 0.95%, Zydus Lifesciences drops 0.85% Dailyhunt",
+            "link": "https://news.google.com/rss/articles/CBMiogJBVV95cUxPVDdydGU3TWtSX1N4R2VsSUh2a3NoVnBfUHN5emVTeEwzZGJ4OUlIR3F2NnE2dEdkaVRrYVUxYVQ2VHdJeVdNN0h4RjVnX204VlFsLXUtdndEeHlwMzVjaW1DZFdtaU1OaFc0MDVlb3NBYzJvQmc0Ni1oZ2VlQTM4YUl3Ul9ycUZURmlOTTVOQVZfT1ZzNnluQWpqN3FjZzFfQzlXVHJZaTc4czJVd3BXYnlXU0RMdEU1SWFtOGJOVkRtU1dVUnhWZ1NmUEpnZ3lhQWoxdXFOUFpJc083ZmpUTERLMVBTVmx6bzh5Y1RDMlRMa1VreWhjelROY1Z3QjBTWUNMUjhuUWxUcmFpZkdIR3dORmFlQ0tocE1DaWRJYm9fdw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777658303,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls",
+                  "drops"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights - MSN",
+            "summary": "Stock market today, Feb 12: Sensex tumbles 559 points, Nifty slips 146 pts to 25807 - reasons behind the sell-off | Highlights MSN",
+            "link": "https://news.google.com/rss/articles/CBMitANBVV95cUxNVXN6QjNUTFQ3MjI1elZrd2l5UWluZE85OTdaakRCMDNNVGJ6S09ZWlc3VmFZNmdCYnJpSE9sODNfOTNxZTZITkozMDdwMTRVaG5EZ2diZDZEbkNVNEN1V0pMVEdoYnpKQU8teXo1UDAwUC1NZmVBQUhXWlIwRTlaV01lZGFRQWNHTVMxWUJMMnlFb3hNUFdWekUwUjFHWGV4X1RkYmtDVDNpQVZ3T1YwX1A0Qk9Bb3c0OFlEM0dmSnVkRE9YNTlPTlR1UTdKRGtuRzZkb3pOWktQVjQ0eXZQV3hTN2poWXhveEtWRHpaNEgxWEZtTXY4YW9VV3cxaG5RZEdENUFxM19FY2ZQYjhXdV9wNEJrdTBseG9QM1NmVV9WNGdrLWgtM2RrMHhwUlhpSlpqamt5R3NkR2NhUkQ1a1NZNVV2OXR5NnhtV0M3Mm1wcHNiYkYxd0RtaXhaYWstWU9remNTLW8wVm9CMG0tUWltWU9hcjJqRDBnSFgwaG5pcFk5SFMxWVV4Wi13MWw0OXRaSkhYaVdqNXlzX0xfX2VDX2ZPa05NVVJPTGc4SzlyQUd3?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777697816,
+            "classification": {
+              "types": [
+                "bearish"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell",
+                  "tumbles"
+                ]
+              },
+              "sentiment": -0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          }
+        ],
+        "generated_at": 1777887014,
+        "status": "ok",
+        "topic": "sector_pharma",
+        "item_count": 236,
+        "bullish_items": 28,
+        "bearish_items": 33,
+        "label": "Pharma sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22pharma%20sector%22%20OR%20Sun%20Pharma%20OR%20Dr%20Reddy%20OR%20Cipla%20OR%20Divis%20OR%20Lupin%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 51
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Pharma%20OR%20%22pharmaceutical%22%20OR%20%22drug%20approval%22%20OR%20FDA%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 28
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": -0.1054,
+        "type_counts": {
+          "uncategorized": 174,
+          "bullish": 8,
+          "bearish": 13,
+          "news": 17,
+          "risk": 75,
+          "regulatory": 5,
+          "earnings_positive": 5,
+          "rumor": 7,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "news",
+          "meme"
+        ],
+        "sample_headlines": [
+          "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday - BBN Times",
+          "High import dependence: India\u2019s crude oil production falls for 11th consecutive year; gas also sees a dip - MSN",
+          "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics - Whalesbook",
+          "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe - INDIA New England News",
+          "Amazon urges Sebi to probe Future Retail - Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday - BBN Times",
+            "summary": "BSE SENSEX: India's Benchmark Falls on Oil Shock and Hawkish Fed Before Maharashtra Day Holiday BBN Times",
+            "link": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxNaEVZNHdsVUgxbk0wTElwQUotOG1BREpwWUJuQ0E1cWFTb1ZwUVpoTHVuY1otS0NFcFV6aGF2TWtvV2w0cTJja01mU1pkblRaa0l2dGgyZ0JzTHBfM19xOGNCbU95N2F3VkhVN2hkTDV6RnItTkVVWlFHT01YVWxMdm9yVy1TUmtNcU5CcHZfQzZfbFlCNDhqVlJVOVlQVjM0VUxHYkx1V2gzOTR0Z0ZrM0txa1hZNlIxZWUzZnZXRE02Q2pZSUgwRQ?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777835316,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls"
+                ],
+                "risk": [
+                  "fed",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.7719
+          },
+          {
+            "title": "High import dependence: India\u2019s crude oil production falls for 11th consecutive year; gas also sees a dip - MSN",
+            "summary": "High import dependence: India\u2019s crude oil production falls for 11th consecutive year; gas also sees a dip MSN",
+            "link": "https://news.google.com/rss/articles/CBMivwNBVV95cUxQWjRpWmJwU1A1QUYySWxMS3pCcVpzYU5iQzBzRVFQSDNSTU5fa1N6WTJoUEsxTGFWalRLcUZaOF91cmV4VWhmRndYV0dpbkJnejg3MlBFa2hTN0p5U3daRzB3VWZ3V251Vmp5akRSbnNXdWtfbWk3TFcwVVRRaW9XTzJhMXlSS243bVN2QjhyV09lVEp1eUhFeGZEN19PUjdQSDhBNHNzRWY4T3llcUMxd01VUUxwUGowUDJsejBrV29UbmYtSUgySmpwMTJhRjRqYm00cWJfTWE1UTJ2YTRYaFNTTWtQRGdmclRFUS1WaTZwQ2hwZk1UZ0dObkFHSWR1NDloUlcxX0x0eHlzTmlqMlR2STA3a2NTeGRBOWJfTS1QeWM2Y29aTklYOEw5ZDdyUjhaVHR4dGg3Y1RJSGRGeHlBSG82YzNyVDhOV01TaTRxcW16TWRGWG1VWXBQRHlUZ1Jxb2N4THFscmZfbG1wd3IwZHBneXZ6RER4c19RMnlGLUVjcXphLTlqVFhTUHFzbzdhcXBoWUs3Um5sSDhieDAwZnR0ZUp0am9SN0FQakxDYjViZ1k5a3BIbVFCcW8?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777769850,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "falls"
+                ],
+                "risk": [
+                  "crude",
+                  "oil"
+                ]
+              },
+              "sentiment": -0.85,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics - Whalesbook",
+            "summary": "India Stocks Climb: Oil, Elections Up; FIIs Exit for AI, Geopolitics Whalesbook",
+            "link": "https://news.google.com/rss/articles/CBMi0wFBVV95cUxOd2M0bGROOTQwN2ZCVDVqOUxZWmpLdXh6V1BITEFEVnJGZzE2OVQ4aWU0bVg0MWRGUEN5eHYwdktYS3ZVNHlIdlVzNXRHSmlCSXZFa2xLUElXT2JLbm5Fcy1mU0UxUnJnZHExdURaWnhnOExSVnpTa3pWdkJOU1FrY0FrZ0l1VG5vdzAxVWhoNVBWZGdEcWk2QlRnallVMS1Mc1U0eW1VREFicVZXQWdkQlhwZHJxWlhCVzUxT1hwLTAxenlDTmlCYlV4R0lCa2drZzVF?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869473,
+            "classification": {
+              "types": [
+                "bearish",
+                "risk"
+              ],
+              "matches": {
+                "bearish": [
+                  "exit"
+                ],
+                "risk": [
+                  "oil"
+                ]
+              },
+              "sentiment": -0.65,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe - INDIA New England News",
+            "summary": "CBI Questions Anil Ambani for Hours in SBI-Linked Fraud Probe INDIA New England News",
+            "link": "https://news.google.com/rss/articles/CBMilAFBVV95cUxNWTZfSnVWdFJWNk84a1V4V1dXRWFoV1lWd1BtR0xaMURmbklFSDBMLVBmZnRqUVpYNTVFWHhBOTQteUlQQmtPSngwem53ZExxRzVZQ0VJTTlsUTdNMU03TGpXUldoUGlMMXRyV01uN0ZVd1JmUjMyOGFPcWh3N1FoM3l3NTQ5MVVOVEVSNU42OEJQME1t?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777632698,
+            "classification": {
+              "types": [
+                "regulatory"
+              ],
+              "matches": {
+                "regulatory": [
+                  "probe",
+                  "fraud"
+                ]
+              },
+              "sentiment": -0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          }
+        ],
+        "generated_at": 1777887016,
+        "status": "ok",
+        "topic": "sector_energy",
+        "item_count": 300,
+        "bullish_items": 28,
+        "bearish_items": 92,
+        "label": "Energy & Oil sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22oil%20and%20gas%22%20OR%20Reliance%20OR%20ONGC%20OR%20BPCL%20OR%20HPCL%20OR%20IOC%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 53
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28crude%20oil%20OR%20%22energy%20stocks%22%20OR%20NIFTY%20Energy%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 94
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0223,
+        "type_counts": {
+          "uncategorized": 132,
+          "bullish": 13,
+          "risk": 11,
+          "earnings_positive": 4,
+          "bearish": 6,
+          "news": 8,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand - MSN",
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - malaysiasun.com",
+          "Amazon urges Sebi to probe Future Retail - Economic Times",
+          "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+          "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors - MSN"
+        ],
+        "top_items": [
+          {
+            "title": "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand - MSN",
+            "summary": "Auto stocks to buy: Brokerage picks M&M, Hyundai, TVS Motor; sees up to 51% upside, expects rising SUV demand MSN",
+            "link": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxOQ3BFQS1lMG1iTkc5dG5QV29ka3BNbE42SlNOd2ZveFVXTE1ETnpEUGZBeVo4djhHSURfSjhnbWlBNkdMNXU4UWF0RHVXQzNsZjVGQ2dHQ01mZDNuM21YRmJyeDFmbFU4eXUyTngxVWdzUXZicGU1SUJCMm5NMnkzQ2pZcWdZZ0NKU01MUjdrVWtyaERBVFlTblRDWFFhUVp6VjZpODVRV2Z2aFJBWFJfVld0cUNoeVI5QlpZanhuWEtDeHFOd2xCUFZsamc2VWRHUFdqZVRtVlh0QWt3Rl91cUppMmFFNmc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777846530,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy",
+                  "upside"
+                ]
+              },
+              "sentiment": 0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - malaysiasun.com",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states malaysiasun.com",
+            "link": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxNNnlsaEdSSVdzUU1pa3RaOEh5emViMG9Ma25nc29vQXFzUkd1Um1RV0h0RUJONHBUX3A1LXV4dG9xbDNZSDRzMmpOTzlRRDMyUmdQNXVJV3ViejNuM1E4YkxkX2tobkFyMkx6Rm1qcUhDV2wwekRkMWlzSXQ0TTRiOFFWTUZncnFfWWRRaHhFMFNNZ3d1MEV2ZVdTZk5yRzNJeHdXX2cwNzltcmxRSVZncUtyZUxQVjVERTU0bEp1TUNZRXo2WUlLUHE4NWtITTVzeWc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777860660,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          },
+          {
+            "title": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k - HDFC Sky",
+            "summary": "Markets Open Strong as Sensex Jumps 600 Pts, Nifty Reclaims 24k HDFC Sky",
+            "link": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQenUyRy1ZaUUybUdkVk5yZk16RUhRQTExRVlCZmcwWDRlNjVYXzlTWTZDYS1wYUFvSkpzcDFaRjJZcWlFaVRyWmNhRzFMeE40cFNQTWFnX0l6SUxKZGttLTQtQUV3VmFRaGRtSG8xTURRajM0S1BvZDA5ZF8yU1lPTGtibnliamhaS3VMZnZR?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777870038,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          },
+          {
+            "title": "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors - MSN",
+            "summary": "Why is market rising today? Sensex surges 750 pts, Nifty tops 24,200. West Bengal election trends among 4 factors MSN",
+            "link": "https://news.google.com/rss/articles/CBMilwJBVV95cUxQaTBlRjd1OXQ2MkRvNG1UV0U5QnpaUzN6TFE5SUdUWU9oVEp5NGVuTl9iWkZ2RTJWQUZCZUhfcVJPRnFnRktTUWFoWVJGOEthS1dMck1FcnF5YjMtTTg5bUhDcS1LalNLRkwtT0lfaWxuU3RJSHBwWWE5WTkzOGlITXZYRmJ1T3FXdWs3bGllRG95a1RWUmt6eTBXRG4yXzBhXy1uRVpjaHRWS2Q2NjhoVlNkY2s0elNSV2FvRzdVMHF2VlA5TXdoeXlhano2UEhsSTg0X1lSQzA0czBRNEtOSzNGNGhwLTdYTEdiREZQd3JUNTdISE5SOURnd3U1R25UV2paRno5OUNXRldfem1KYk5XYnI3R2c?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777870982,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "surges"
+                ]
+              },
+              "sentiment": 0.45,
+              "confidence": 0.35
+            },
+            "weight": 0.551
+          }
+        ],
+        "generated_at": 1777887017,
+        "status": "ok",
+        "topic": "sector_auto",
+        "item_count": 186,
+        "bullish_items": 22,
+        "bearish_items": 26,
+        "label": "Auto sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22auto%20sector%22%20OR%20Maruti%20OR%20M%26M%20OR%20Tata%20Motors%20OR%20Bajaj%20Auto%20OR%20Hero%20Moto%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 4
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Auto%20OR%20%22car%20sales%22%20OR%20%22EV%22%20OR%20%22vehicle%20sales%22%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 24
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0366,
+        "type_counts": {
+          "bullish": 20,
+          "earnings_positive": 10,
+          "news": 10,
+          "uncategorized": 163,
+          "risk": 22,
+          "bearish": 8,
+          "regulatory": 4,
+          "rumor": 7,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "bullish",
+          "meme"
+        ],
+        "sample_headlines": [
+          "Metal sector stocks rally stoday, May 4: Vedanta surges 6.48%, Jindal Steel up 3.32%, Hindustan Zinc rises 2.30% - Business Upturn",
+          "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+          "JSW Steel vs Tata Steel vs NMDC: Goldman Sachs initiates coverage on sector\u2014check top picks - MSN",
+          "Amazon urges Sebi to probe Future Retail - Economic Times",
+          "Jindal Steel Q4 results: Co swings to profit of Rs 1,045 crore vs YoY loss on 23% revenue surge - The Economic Times"
+        ],
+        "top_items": [
+          {
+            "title": "Metal sector stocks rally stoday, May 4: Vedanta surges 6.48%, Jindal Steel up 3.32%, Hindustan Zinc rises 2.30% - Business Upturn",
+            "summary": "Metal sector stocks rally stoday, May 4: Vedanta surges 6.48%, Jindal Steel up 3.32%, Hindustan Zinc rises 2.30% Business Upturn",
+            "link": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxORVIwUzR4c3Z5TjYtejZtN0dFSVlnUGY1a1NFRDU0eDJyQ1ZIUDFxdDFLdUt2SEFzTkU3bHh3OW1NS3VwajJuSm1EUWRJV0FyZU9oM1VwUWdYc2VGa2pGcHRVNkNtVHRmQWl2TTlmSW9HUDBwdGktRWEwbXpQbWxoMlFuMkVDeGx1YTBFSWVteWw0NUdJWUhvZFkzS19kWXVnMnFYWUxfaW1QcHBhZFIxWVVfUHNpWXp4dHJlcGVhamZxNW9rU2xIYjNkLXNCbFZvcUdBS0IwUkE5aEwxTWE3YmZfNVN0VmtGOHhaNHlCYw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777873263,
+            "classification": {
+              "types": [
+                "bullish"
+              ],
+              "matches": {
+                "bullish": [
+                  "rises",
+                  "surges"
+                ]
+              },
+              "sentiment": 0.9,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states - ANI News",
+            "summary": "Green start to May, Nifty open above 24000, Sensex jumps 300 pts amid voting results of 5 states ANI News",
+            "link": "https://news.google.com/rss/articles/CBMi3gFBVV95cUxNY0FFcDNXYnJzVVhYQmRfd1lUNHMxQ2x3YXhEc1NILTFiUFNxS2lYMkkzdEN5VkZIMlU2RXRGVGdLZzAwSnl3SnkyUG5ESC12Q25DQ09WUFZYeHJLajlrMWNkcnhYTjFZX2ZMMUdBUFFIU2gtTG53dFY1Z0ZxWUpZcEJnSkpfSUxPQzhuTl9RMHRabVl0VEhrNnFzbklMRjlaUE9BOGFMaS01Wm5wblNMV2h2a2RjUUNGQmJIMU95WktIZGc4a3ZMTUFGcnl3SnpWdVdzamp0dVZZd0JCcHc?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777867680,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "jumps"
+                ],
+                "earnings_positive": [
+                  "results"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "JSW Steel vs Tata Steel vs NMDC: Goldman Sachs initiates coverage on sector\u2014check top picks - MSN",
+            "summary": "JSW Steel vs Tata Steel vs NMDC: Goldman Sachs initiates coverage on sector\u2014check top picks MSN",
+            "link": "https://news.google.com/rss/articles/CBMi5gFBVV95cUxNc21EWEo1QUJLdXluLS1hbVFXZEJmTmFNTXBzTDZWVEY5S2VXVHB5a3hSdGdibFlBS1FwSXlEWlF2cVZlb2YtMi1RdDdIeHFkSUhad2NEblBjMWlSZE9COUhBOEFiSms4Y08tNVp0Z2hneGZzUDltWldWMXVyVGo1VzlVSzYyYm1wd3FFYnFLdkxKRjF2aXVLZDgyRm9vYkY0NTQ2TDZWekF2bUFQeDVGTGR3X2R2RWpxZjJlUUtrYUZsMzJtRGJaTl9WSlY2a2VUeFBCbzlKNHFIV004YTB0YWNBZGp4dw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777869062,
+            "classification": {
+              "types": [
+                "bullish",
+                "news"
+              ],
+              "matches": {
+                "bullish": [
+                  "top picks"
+                ],
+                "news": [
+                  "top picks"
+                ]
+              },
+              "sentiment": 0.6,
+              "confidence": 0.5
+            },
+            "weight": 0.6887
+          },
+          {
+            "title": "Amazon urges Sebi to probe Future Retail - Economic Times",
+            "summary": "Amazon had challenged the deal to sell FRL assets to Reliance Industries' retail venture. The deal had fallen through after a majority of FRL's secured creditors voted against it. Prior to that, a Reliance unit had taken possession of hundreds of properties w\u2026",
+            "link": "https://economictimes.indiatimes.com/industry/services/retail/amazon-urges-sebi-to-probe-future-retail/articleshow/91294837.cms",
+            "source": "thetimesofindia",
+            "published_at": 1651601580,
+            "classification": {
+              "types": [
+                "bearish",
+                "regulatory"
+              ],
+              "matches": {
+                "bearish": [
+                  "sell"
+                ],
+                "regulatory": [
+                  "sebi",
+                  "probe"
+                ]
+              },
+              "sentiment": -1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.39
+          },
+          {
+            "title": "Jindal Steel Q4 results: Co swings to profit of Rs 1,045 crore vs YoY loss on 23% revenue surge - The Economic Times",
+            "summary": "Jindal Steel Q4 results: Co swings to profit of Rs 1,045 crore vs YoY loss on 23% revenue surge The Economic Times",
+            "link": "https://news.google.com/rss/articles/CBMi_wFBVV95cUxOeFVPMmZNYXR2aDBrbG5rb1p1SW1WUGpfVE50c01XQldaTlRtSlJfOGt0ZEFaUWZrZ29JRVRZdWxoZEZpSjFtRzU0YkdsODVic0RaYTFRSnRTdnc3MXJiSUljSVpqQlNGNUp2QW5Xbk1WY3ZVVjEybWdjUzNCRmRZVHJFS09EcWswbE5VZmxHRXdOYXRFSnR2bm5Nb0tqVW1WbldhNWpTWnlTZHg4UHpLbEhJX2E4U2JMaG42QUFzYnQ0TndYUUpKWWJlUzYwc1Y1ZUJEMDZIaUdNRnZKejNVazVocDMzaDhqeDY1eXJ4bnV3Z1NiUlpveDhqNmoyNmvSAYQCQVVfeXFMTjd3NlVPRllGVmFZZG9MX0xDZE4xa1AxbDhzeEFsNmlCc2Fsc1BXeHNlUFFzRHJIYUxKMTRiOUFhMllBUUU4ZWVXVnFzNkc5WUw5UWlvTG01MXIzMmpwQllJTFZOcW1hZ3gzeEl0bTNPZFBNYmFoU1NmMEVuSnBjdEFWLVdFcjZkbFpYVGtVVnBKSm01MTRiWkt3T0gzQ01jXzBYUE9UWGpubUhxUWhlczdRaldpYVNWR2ZiRlVjSUFBYjNYTnZTVWZwYzV6MlI5aE4xTmVzR0NvQ21ZOXhaeEE2QTE1UktaX2xNUThoR1YxN0QwZm5VTUVNS3o3MENleWZlUjA?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777646886,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          }
+        ],
+        "generated_at": 1777887019,
+        "status": "ok",
+        "topic": "sector_metals",
+        "item_count": 242,
+        "bullish_items": 36,
+        "bearish_items": 40,
+        "label": "Metals sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22metal%20stocks%22%20OR%20Tata%20Steel%20OR%20JSW%20Steel%20OR%20Hindalco%20OR%20Vedanta%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 56
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20Metal%20OR%20copper%20OR%20aluminium%20OR%20steel%20prices%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 29
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      },
+      {
+        "weighted_sentiment": 0.0434,
+        "type_counts": {
+          "uncategorized": 161,
+          "risk": 13,
+          "bearish": 8,
+          "earnings_positive": 18,
+          "bullish": 12,
+          "news": 9,
+          "rumor": 7,
+          "regulatory": 3,
+          "meme": 14
+        },
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "meme",
+          "risk"
+        ],
+        "sample_headlines": [
+          "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced - MSN",
+          "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+          "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? - MSN",
+          "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+          "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN"
+        ],
+        "top_items": [
+          {
+            "title": "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced - MSN",
+            "summary": "Nestle Q4 results: Profit beats estimates despite one-time loss; final dividend of Rs 5 announced MSN",
+            "link": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxQWGM1Uk5pWDdzX0c5T0diQ1F2ZER0RDNMeF9IdlMwdHFrSV93NnVsYWMwQ1lIUWpxQUxQV0JKUl9KUGlfWjZVMjN4RkdXclhrSW5MbDZYbHg4TWE5X3hPS1lBdHVrUFBSMkhDUExaVml6SnJXWktnMVB1WUtlREVqcEVORkFsSEZIekdTbHVaSUpzRG5ZcnppYTdBN1A1NG1LRGswR0tPYjRLTjlaWWRrelFkQjJZcWhiU2Q4a0w3ZHV2bFBYVEZDMW9wUXFqUjVCQzNrNEI2aFdqYTVHYThCbk95REY5ZnJo?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777783098,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "beats estimates"
+                ],
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 1.0,
+              "confidence": 0.65
+            },
+            "weight": 0.6484
+          },
+          {
+            "title": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+            "summary": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date MSN",
+            "link": "https://news.google.com/rss/articles/CBMinANBVV95cUxPemlHRzBFRWRIdzY3MTk1RjdGTHJuN1NpZWVGbFpJTnVqREpRSEJxT2dnZFFhLVNlbHN2aW1QQmxpa3JRd3dEZmZzNERmWmJieTljRjZwVkU2UVJhVUcwUnI2VnREdGF1Z0thQ0E3dGl5b1Nrd1ZFeXNUd3Y2bE1GZmxLaHlYeXVyMUd3dnZqUFljbnJEc05MVE5sX1U2UzlySXVGc0MtcUdHQ1BqRmZsS2FOa0RqRkl4M25HZktHZjVQQm1abHJ0NWhoM3drTU9FVEk3NVpJMldHWE5QYmVkelJKanUtWjRiMGlXMTVsbVJvS0kxM25vTlpEbVAzNkpOeFV0SmROOFFKRFY3TkMwaFVKTm5kTTFsckFBSm5Db1ZHUnNrcWJhR3pjWTZhOUUtU3EwbTdrRF9SaWdmZURUTGg3NnBraVo3M1QxQ1MtZU1ndU5QZWlyOHBKSkgyZEFJYUNXb2RGR0pFYk5YT3NuMkVkTWVKbmtyT1l4R3dsS25ZYlpzeXYtY3lWR3hlSGpIZEE5WlU2cllkV3dt?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777823904,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "record high"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? - MSN",
+            "summary": "Nestle Q4 review: All brokerages hike target prices on double-digit growth \u2014 should you buy? MSN",
+            "link": "https://news.google.com/rss/articles/CBMihgNBVV95cUxNamRuM25MZ2gzcGlrNHViX2dKa0ZCbUZWSmZJZG00VkY3bXlJdkxKN0NMOGFjZG5yWk1uWkNHYWJld3REZmJzUS1STy13TXdWTUtVcUlidlZ1MU1yam5Zd0ZYdUNGeDZPMjRvZTJqTHoyTFpFTDFMUWFvbUczV1liZ0E0dXU4cmJZWEJvazJLNm1hMmRnbUNTX3psLV9MMW1sZGNtLVI0N0hDUmtvTmtxWkhSdmV0TmNZQzdfREJiczBSMnYxamNWWVc3X0tKWElFVV9zdjhiTVNJbU9kRFladFUwN1JGZEFfaS0xNm1BQzFMcHdReUtZTW5pV2FTN0RlYUlaX1hCX185OGxwWXVYaXhFejFLZVRLNFFGenpTS19WWEZfWnlSdUJzdTR4NlJTUG8tZFVOWGtwU0RVRHAzZmJkTjE4RUVleENjNkFoZ2lLZjJMMU55WWRYaktzUDZncDlmTkVsRWpTZlJVTXU4Ym9TRlFfU0FhcVQ3anBBMVNyU2NZblE?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777822783,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "buy"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 - MSN",
+            "summary": "Q4 results tomorrow: HCLTech, Nestle India, CMPDI among firms to declare earnings on April 21 MSN",
+            "link": "https://news.google.com/rss/articles/CBMi_AJBVV95cUxQeVZmVXVYdUQta0RDR09rcC00b05vd2dKRm9sUzJmV2JaMnVKOHhoSjA5OFhSS0dtNmx0dXhZMVVaR19vZ0ExOHZLeWZGN0ZUekNXRXhjTlFTZjdpQlJqVnlpYklHdWxheURyNU82Y1dZTFZhLUZoRkxoanhTWEZ3RVByRFdVYW84aVFPMlNIVGFSdWo0bTEyQ3pRRnl2WVRZQktTMVlmRGlTX1E3SU44VmNrclRQNEJIak5ZYU9KalZiT0M5OEZGdGlaaXNPWFZTQUFMLUNqUlVaRThOYlc2NVNIT2NWMXprQkpsaGptR1g1R1VYYWFXWFlMYTh6S1ppRV9XVWhhSnpYcmV6cjM0aTBxNnBPc2tMaDBxQzZuZkQ1VEZGMUdlRWRRcVVHTzZZempQOFNDeXdkOHMwSDhUaVFCVFpidDZkc0E2QV90eG1NS1pOdWhIT2F4YkhkWFFmeE9tZjNveUcyTjczTjlmRnVPR3RWRFUwa05yNg?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777855829,
+            "classification": {
+              "types": [
+                "earnings_positive"
+              ],
+              "matches": {
+                "earnings_positive": [
+                  "results",
+                  "q4"
+                ]
+              },
+              "sentiment": 0.7,
+              "confidence": 0.5
+            },
+            "weight": 0.5938
+          },
+          {
+            "title": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date - MSN",
+            "summary": "Nestle stock hits record high on strong Q4 show, dividend announcement - check amount, record date MSN",
+            "link": "https://news.google.com/rss/articles/CBMilwNBVV95cUxNS2tjZER1N2labURRaExUbVJVYXh6R0NGM0prd29Talp3S1hNZTJTbmhQY2NHSm5XRWVYdGZaeXBwelE5VUtlenhaUnhxR2hkNW9DaDJqRE9EeTl1c05EaDFpQ05ydXYxZVFiVnF6VXk2dmFyUGNHSFFBSUJCZmI2OFFoaGUxbzM4V0l3U29vN192eUg1UXZSaGZfQVJUV2NSdnNrY3VVZjR6bkRUbmNxa1N4Tnhxc1BESTJGb0pMY0hjWjRmMTYxdTFndWJnVUdYUmVNOTJCN09KVTZ6bDJEdWRFYndSeVJzdFZCeGc0ZWVEclE2SVdDdWFwTUtGcGJrODRLeEQzVnBzampjazlZRHE3MFpNdnNGbThNa1N3ekVWYVdoUXBwMGRjU0NvU1NyWWlvcDVqb3hHM0REd2g4aHVEeXl5YkJUSGpRb21CaW51T3RjSjhyMzFPcWdpU1ZWR254d3E1d1MyYmV0WlRMSmwxR0d2Sml4OGd1M3ZJNFRYdUh1VmhuR2s4VkhkcXg4N2txTm9vaw?oc=5",
+            "source": "news.google.com",
+            "published_at": 1777694172,
+            "classification": {
+              "types": [
+                "bullish",
+                "earnings_positive"
+              ],
+              "matches": {
+                "bullish": [
+                  "record high"
+                ],
+                "earnings_positive": [
+                  "q4"
+                ]
+              },
+              "sentiment": 0.8,
+              "confidence": 0.5
+            },
+            "weight": 0.4987
+          }
+        ],
+        "generated_at": 1777887021,
+        "status": "ok",
+        "topic": "sector_fmcg",
+        "item_count": 232,
+        "bullish_items": 33,
+        "bearish_items": 30,
+        "label": "FMCG sector focus",
+        "feed_status": [
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28%22FMCG%20sector%22%20OR%20ITC%20OR%20HUL%20OR%20Nestle%20OR%20Britannia%20OR%20Dabur%29%20India%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 66
+          },
+          {
+            "feed_url": "https://news.google.com/rss/search?q=%28NIFTY%20FMCG%20OR%20%22consumer%20goods%22%20OR%20rural%20demand%29%20when%3A3d&hl=en-IN&gl=IN&ceid=IN:en",
+            "source": "news.google.com",
+            "status": "ok",
+            "error": null,
+            "entry_count": 8
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json",
+            "source": "newsapi_business",
+            "status": "ok",
+            "error": null,
+            "entry_count": 63
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/technology/in.json",
+            "source": "newsapi_technology",
+            "status": "ok",
+            "error": null,
+            "entry_count": 61
+          },
+          {
+            "feed_url": "https://saurav.tech/NewsAPI/top-headlines/category/science/in.json",
+            "source": "newsapi_science",
+            "status": "ok",
+            "error": null,
+            "entry_count": 35
+          }
+        ],
+        "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+      }
+    ],
+    "archive_dir": "/home/ubuntu/Auto_Trader/intermediary_files/news_sentiment/archive"
+  },
+  "sector_rotation": {
+    "generated_at": 1777887021,
+    "sector_ranking": [
+      {
+        "topic": "sector_banking",
+        "label": "Banking sector focus",
+        "weighted_sentiment": 0.0468,
+        "item_count": 261,
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "bullish",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "HDFCBANK",
+          "ICICIBANK",
+          "SBIN"
+        ]
+      },
+      {
+        "topic": "sector_fmcg",
+        "label": "FMCG sector focus",
+        "weighted_sentiment": 0.0434,
+        "item_count": 232,
+        "dominant_types": [
+          "uncategorized",
+          "earnings_positive",
+          "meme",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "ITC",
+          "HINDUNILVR",
+          "NESTLEIND"
+        ]
+      },
+      {
+        "topic": "sector_metals",
+        "label": "Metals sector focus",
+        "weighted_sentiment": 0.0366,
+        "item_count": 242,
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "bullish",
+          "meme"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "TATASTEEL",
+          "JSWSTEEL",
+          "HINDALCO"
+        ]
+      },
+      {
+        "topic": "sector_it",
+        "label": "IT sector focus",
+        "weighted_sentiment": 0.0314,
+        "item_count": 239,
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "earnings_positive",
+          "news"
+        ],
+        "bullish": true,
+        "bearish": false,
+        "top_picks": [
+          "TCS",
+          "INFY",
+          "WIPRO"
+        ]
+      },
+      {
+        "topic": "sector_auto",
+        "label": "Auto sector focus",
+        "weighted_sentiment": 0.0223,
+        "item_count": 186,
+        "dominant_types": [
+          "uncategorized",
+          "meme",
+          "bullish",
+          "risk"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "MARUTI",
+          "M&M",
+          "TATAMOTORS"
+        ]
+      },
+      {
+        "topic": "sector_pharma",
+        "label": "Pharma sector focus",
+        "weighted_sentiment": -0.0066,
+        "item_count": 236,
+        "dominant_types": [
+          "uncategorized",
+          "bullish",
+          "meme",
+          "bearish"
+        ],
+        "bullish": true,
+        "bearish": true,
+        "top_picks": [
+          "SUNPHARMA",
+          "DRREDDY",
+          "CIPLA"
+        ]
+      },
+      {
+        "topic": "sector_energy",
+        "label": "Energy & Oil sector focus",
+        "weighted_sentiment": -0.1054,
+        "item_count": 300,
+        "dominant_types": [
+          "uncategorized",
+          "risk",
+          "news",
+          "meme"
+        ],
+        "bullish": false,
+        "bearish": true,
+        "top_picks": [
+          "RELIANCE",
+          "ONGC",
+          "BPCL"
+        ]
+      }
+    ],
+    "hot_picks": []
+  }
+}
+Kite login blocked by CAPTCHA challenge before TOTP: status_code=400, api_status='error', message='Invalid CAPTCHA values.', data_keys=['captcha'], content_type='application/json'
+Kite login blocked by CAPTCHA challenge before TOTP: status_code=400, api_status='error', message='Invalid CAPTCHA values.', data_keys=['captcha'], content_type='application/json'
+Kite login blocked by CAPTCHA challenge before TOTP: status_code=400, api_status='error', message='Invalid CAPTCHA values.', data_keys=['captcha'], content_type='application/json'
