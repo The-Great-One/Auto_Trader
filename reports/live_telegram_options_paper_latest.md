@@ -1,6 +1,6 @@
 # Live Telegram Options Paper Ledger
 
-- Updated: `2026-05-03T10:59:08.038034+00:00`
+- Updated: `2026-05-04T15:00:39.175181+00:00`
 - Starting capital: `100000.0`
 - Cash: `100000.0`
 - Equity: `100000.0`
@@ -14,11 +14,10 @@
 - none
 
 ## Unresolved / not opened
-- INDIGO PE 4600.0 status skipped, reason channel_low_confidence
+- none
 
 ## Weekly returns
-- 2026-05-01: -3.3% (equity 100000.0)
-- 2026-05-08: 0.0% (equity 100000.0)
+- none
 
 ## Monthly returns
-- 2026-05-31: 0.0% (equity 100000.0)
+- none
