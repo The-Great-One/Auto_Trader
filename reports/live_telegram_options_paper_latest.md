@@ -1,24 +1,23 @@
 # Live Telegram Options Paper Ledger
 
-- Updated: `2026-05-04T10:47:10.019344+00:00`
+- Updated: `2026-05-05T09:52:25.699095+00:00`
 - Starting capital: `100000.0`
-- Cash: `100000.0`
-- Equity: `100000.0`
+- Cash: `78025.0`
+- Equity: `97577.5`
 - Realized PnL: `0.0`
-- Unrealized PnL: `0.0`
+- Unrealized PnL: `-2422.5`
 
 ## Open positions
-- none
+- LTM `LTM26MAY4250PE` entry 146.5 last 130.35 mtm -2422.5 (-11.02%), targets hit [], SL 110.0
 
 ## Closed positions
 - none
 
 ## Unresolved / not opened
-- INDIGO PE 4600.0 status unresolved, reason contract_not_found
+- none
 
 ## Weekly returns
-- 2026-05-01: -3.3% (equity 100000.0)
-- 2026-05-08: 0.0% (equity 100000.0)
+- none
 
 ## Monthly returns
-- 2026-05-31: 0.0% (equity 100000.0)
+- none
