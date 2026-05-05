@@ -20,6 +20,21 @@ _ALERTED_BUY_SYMBOLS = set()   # Symbols that have been BUY-alerted; cleared onl
 _ALERTED_SELL_SYMBOLS = set()   # Symbols that have been SELL-alerted; cleared only when they BUY
 
 
+def _load_paper_live_state() -> dict:
+    try:
+        with open("reports/paper_shadow_live_state.json") as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_paper_live_state(state: dict) -> None:
+    os.makedirs("reports", exist_ok=True)
+    with open("reports/paper_shadow_live_state.json", "w") as f:
+        json.dump(state, f, indent=2)
+
+
 def _publish_paper_decisions(message_queue, decisions):
     global _ALERTED_BUY_SYMBOLS, _ALERTED_SELL_SYMBOLS
 
@@ -31,18 +46,37 @@ def _publish_paper_decisions(message_queue, decisions):
     buy_symbols = sorted({d.get("Symbol") for d in buys[:20] if d.get("Symbol")})
     sell_symbols = sorted({d.get("Symbol") for d in sells[:20] if d.get("Symbol")})
 
+    state = _load_paper_live_state()
+    buy_datetimes = state.get("buy_datetimes") or {}
+    if not isinstance(buy_datetimes, dict):
+        buy_datetimes = {}
+
+    # Persist the first BUY timestamp per symbol until that symbol SELLs.
+    for symbol in buy_symbols:
+        buy_datetimes.setdefault(symbol, ts)
+    for symbol in sell_symbols:
+        buy_datetimes.pop(symbol, None)
+
+    state.update({
+        "updated_at": ts,
+        "buy_datetimes": buy_datetimes,
+        "open_buy_symbols": sorted(buy_datetimes),
+    })
+    _save_paper_live_state(state)
+
     decision_details = []
     for decision in decisions[:25]:
+        symbol = decision.get("Symbol")
         decision_details.append(
             {
-                "symbol": decision.get("Symbol"),
+                "symbol": symbol,
                 "decision": decision.get("Decision"),
                 "close": decision.get("Close"),
                 "asset_class": decision.get("AssetClass"),
                 "contributing_rules": decision.get("ContributingRules"),
                 "sentiment_overlay": decision.get("SentimentOverlay"),
                 "sentiment_overlays": decision.get("SentimentOverlays"),
-                "buy_datetime": decision.get("BuyDatetime"),
+                "buy_datetime": buy_datetimes.get(symbol),
             }
         )
 
@@ -53,6 +87,7 @@ def _publish_paper_decisions(message_queue, decisions):
         "sell_count": len(sells),
         "buys": buy_symbols,
         "sells": sell_symbols,
+        "buy_datetimes": buy_datetimes,
         "production_rule_model": "BUY=RULE_SET_7, SELL=RULE_SET_2",
         "decision_details": decision_details,
     }
@@ -82,20 +117,21 @@ def _publish_paper_decisions(message_queue, decisions):
         logger.debug(f"[PAPER] No new alerts (buys={buy_symbols}, sells={sell_symbols}, alerted_buy={_ALERTED_BUY_SYMBOLS}, alerted_sell={_ALERTED_SELL_SYMBOLS})")
         return
 
-    _LAST_PAPER_ALERT_AT = now
     buy_details = []
     for d in decisions[:25]:
-        if d.get("Symbol") in new_buys:
-            buy_details.append(f"{d.get('Symbol')}@{d.get('Close','?')}")
+        symbol = d.get("Symbol")
+        if symbol in new_buys:
+            buy_details.append(f"{symbol}@{d.get('Close', '?')} at {buy_datetimes.get(symbol, ts)}")
     sell_details = []
     for d in decisions[:25]:
-        if d.get("Symbol") in new_sells:
-            sell_details.append(f"{d.get('Symbol')}@{d.get('Close','?')}")
+        symbol = d.get("Symbol")
+        if symbol in new_sells:
+            sell_details.append(f"{symbol}@{d.get('Close', '?')} at {ts}")
     detail_line = ""
     if buy_details:
-        detail_line += f" BUY: {", ".join(buy_details)}"
+        detail_line += " BUY: " + ", ".join(buy_details)
     if sell_details:
-        detail_line += f" SELL: {", ".join(sell_details)}"
+        detail_line += " SELL: " + ", ".join(sell_details)
     msg = f"[PAPER] {ts} | BUY:{len(new_buys)} SELL:{len(new_sells)}{detail_line}"
     logger.info(msg)
     message_queue.put(msg)
