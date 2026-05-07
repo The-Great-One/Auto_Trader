@@ -1154,7 +1154,11 @@ def _set_temp_state(rule2_module, d: str):
     rule2_module.LOCK_FILE_PATH = os.path.join(d, "Holdings.lock")
 
 
-def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dict | None = None) -> dict[str, float]:
+def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dict | None = None, signal_start_date: pd.Timestamp | None = None, signal_end_date: pd.Timestamp | None = None) -> dict[str, float]:
+    """Per-symbol backtest. If signal_start_date/signal_end_date are set, only
+    generate BUY signals when the bar date falls within [signal_start, signal_end].
+    SELL signals for open positions are always processed regardless of date gate.
+    Only trades whose entry (BUY) falls within the signal window are counted."""
     cash = 100000.0
     qty = 0
     avg = 0.0
@@ -1162,6 +1166,7 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
     trades = 0
     wins = 0
     equity_curve = []
+    oos_entry = False  # track whether current position was entered in OOS window
     rnn_cfg = rnn_cfg or {"enabled": False}
     rnn_enabled = bool(rnn_cfg.get("enabled")) and rnn_model is not None
     buy_threshold = float(rnn_cfg.get("buy_threshold", 0.56))
@@ -1173,7 +1178,22 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
         row.setdefault("instrument_token", 1626369)
         price = float(part.iloc[-1]["Close"])
 
+        # Resolve bar date for signal gating
+        bar_date = pd.to_datetime(row.get("Date", part.iloc[-1].get("Date")))
+        in_signal_window = True
+        if signal_start_date is not None or signal_end_date is not None:
+            in_signal_window = True
+            if signal_start_date is not None and bar_date < signal_start_date:
+                in_signal_window = False
+            if signal_end_date is not None and bar_date > signal_end_date:
+                in_signal_window = False
+
         if qty == 0:
+            if not in_signal_window:
+                # Outside OOS window, skip buy signal generation
+                port = cash + (qty * price)
+                equity_curve.append(port)
+                continue
             hold_df = pd.DataFrame(
                 columns=[
                     "instrument_token",
@@ -1196,6 +1216,7 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
                     cash -= qty * price
                     avg = price
                     entry_idx = i
+                    oos_entry = True
                     trades += 1
         else:
             hold_df = pd.DataFrame(
@@ -1217,12 +1238,14 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
                     sig = "SELL"
             if str(sig).upper() == "SELL":
                 cash += qty * price
-                if price > avg:
+                if oos_entry and price > avg:
                     wins += 1
+                if oos_entry:
+                    trades += 1
                 qty = 0
                 avg = 0.0
                 entry_idx = None
-                trades += 1
+                oos_entry = False
 
         port = cash + (qty * price)
         equity_curve.append(port)
@@ -1773,20 +1796,32 @@ def run_walk_forward_validation(
                 if not test_data:
                     continue
 
-                from scripts import weekly_universe_cagr_check as parity_pack
+                # Use per-symbol simulation (same engine as IS testing) instead of
+                # run_baseline_detailed portfolio sim. This fixes the critical bug where
+                # the portfolio simulation produced 0 trades in all OOS folds due to
+                # regime filter + cash constraints + signal window gating interaction.
+                # Per-symbol sim is also much faster and apples-to-apples with IS results.
+                total_final_value = 0.0
+                total_trades = 0
+                total_wins = 0
+                worst_dd = 0.0
+                tested_symbols = []
+                for sym, sym_df in test_data.items():
+                    stats = _simulate_symbol(
+                        sym, sym_df,
+                        signal_start_date=test_start_date,
+                        signal_end_date=test_end_date,
+                    )
+                    total_final_value += stats["final_value"]
+                    total_trades += stats["trades"]
+                    total_wins += stats["wins"]
+                    worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+                    tested_symbols.append(sym)
 
-                with _temporary_env({
-                    "AT_BACKTEST_SIGNAL_START_DATE": str(test_start_date.date()),
-                    "AT_BACKTEST_SIGNAL_END_DATE": str(test_end_date.date()),
-                    "AT_BACKTEST_STARTING_CAPITAL": os.getenv("AT_BACKTEST_STARTING_CAPITAL", "100000"),
-                }):
-                    result, details, sim_meta = parity_pack.run_baseline_detailed(test_data)
-
-                total_trades = int(result.trades)
+                start_cap = 100000.0 * max(1, len(tested_symbols))
+                ret_pct = (total_final_value / start_cap - 1.0) * 100.0
                 round_trips = max(1, total_trades // 2)
-                ret_pct = float(result.total_return_pct)
-                wr = float(result.win_rate_pct)
-                worst_dd = float(result.max_drawdown_pct)
+                wr = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
                 fold_results.append({
                     "fold": fold_idx + 1,
                     "train_end": str(train_end_date.date()),
@@ -1796,7 +1831,7 @@ def run_walk_forward_validation(
                     "trades": total_trades,
                     "win_rate_pct": round(wr, 1),
                     "max_drawdown_pct": round(worst_dd, 2),
-                    "symbols_tested": len(getattr(result, "symbols_tested", []) or test_data),
+                    "symbols_tested": len(tested_symbols),
                 })
     finally:
         RULE_SET_2.CONFIG.clear()
