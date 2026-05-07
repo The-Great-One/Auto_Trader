@@ -68,6 +68,10 @@ def build_access_token():
 
     Returns:
         str: The new access token.
+
+    Raises:
+        Exception: Re-raises on failure so callers can decide retry/fallback.
+        Does NOT call sys.exit() — callers own that decision.
     """
     try:
         kite = KiteConnect(api_key=API_KEY)
@@ -89,21 +93,27 @@ def build_access_token():
         with open(temp_token_path, "w") as json_file:
             json.dump(session_data, json_file, indent=4)
         os.replace(temp_token_path, token_path)
+        logger.info("New access token saved successfully.")
         return data["access_token"]
     except Exception as e:
         logger.error(
             f"Error in generating session: {e}, Traceback: {traceback.format_exc()}"
         )
-        sys.exit()
-        return None
+        raise
 
 
 def read_session_data():
     """
-    Read the access token from a JSON file and validate its date.
+    Read the access token from a JSON file and validate it.
+
+    Validates the token with a lightweight Kite API call so a stale/invalid
+    token that happens to be dated today does not loop forever.
 
     Returns:
-        str: The valid access token, or None if a new one needs to be created.
+        str: The valid access token.
+
+    Raises:
+        Exception: If a new token cannot be built after cache miss/invalidation.
     """
     try:
         with open("intermediary_files/access_token.json", "r") as json_file:
@@ -111,8 +121,24 @@ def read_session_data():
         access_token = session_data.get("access_token")
         session_date = session_data.get("date")
 
-        if str(datetime.now().date()) == session_date:
-            return access_token
+        if str(datetime.now().date()) == session_date and access_token:
+            # Quick validation: try a cheap API call. If the token is
+            # invalid (e.g. revoked server-side), rebuild instead of
+            # trusting a broken token for the rest of the day.
+            try:
+                test_kite = KiteConnect(api_key=API_KEY)
+                test_kite.set_access_token(access_token)
+                # margins() is lightweight and fails fast on bad tokens
+                test_kite.margins()
+                return access_token
+            except Exception:
+                logger.warning(
+                    "Cached access token (dated %s) failed validation — "
+                    "deleting and rebuilding.",
+                    session_date,
+                )
+                os.remove("intermediary_files/access_token.json")
+                return build_access_token()
         else:
             return build_access_token()
 
@@ -127,6 +153,11 @@ def initialize_kite():
 
     Returns:
         KiteConnect: An instance of KiteConnect with a valid session.
+
+    Raises:
+        Exception: After exhausting all retries, including token rebuild
+            attempts. Recoverable failures (bad token, CAPTCHA) trigger
+            cache-clear + rebuild; only hard-fail after max_retries.
     """
     max_retries = 3
     for attempt in range(1, max_retries + 1):
@@ -134,6 +165,8 @@ def initialize_kite():
             kite = KiteConnect(api_key=API_KEY)
             access_token = read_session_data()
             kite.set_access_token(access_token)
+            # Validate immediately so we don't return a broken client
+            kite.margins()
             return kite
         except Exception:
             logger.exception(
@@ -143,8 +176,20 @@ def initialize_kite():
             )
             if attempt >= max_retries:
                 raise
-            build_access_token()
-            time.sleep(attempt)
+            # Clear any stale token cache before rebuilding
+            try:
+                os.remove("intermediary_files/access_token.json")
+            except FileNotFoundError:
+                pass
+            try:
+                build_access_token()
+            except Exception:
+                logger.exception(
+                    "Token rebuild also failed (attempt %s/%s) — will retry.",
+                    attempt,
+                    max_retries,
+                )
+            time.sleep(attempt * 2)
 
 
 def compute_supertrend(
