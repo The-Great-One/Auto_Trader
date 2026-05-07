@@ -23,7 +23,7 @@ os.environ["AT_MAX_SINGLE_SYMBOL_WEIGHT"] = "0.15"
 os.environ["AT_PORTFOLIO_BAND"] = "0.10"
 os.environ["AT_TARGET_EQUITY"] = "1.0"
 os.environ["AT_TARGET_ETF"] = "0.0"
-os.environ["AT_LAB_MATCH_LIVE"] = "1"
+os.environ["AT_LAB_MATCH_LIVE"] = "0"
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
