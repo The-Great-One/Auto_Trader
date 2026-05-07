@@ -1,24 +1,26 @@
 # Live Telegram Options Paper Ledger
 
-- Updated: `2026-05-04T10:47:10.019344+00:00`
+- Updated: `2026-05-07T06:40:13.878755+00:00`
 - Starting capital: `100000.0`
-- Cash: `100000.0`
-- Equity: `100000.0`
-- Realized PnL: `0.0`
-- Unrealized PnL: `0.0`
+- Cash: `74925.0`
+- Equity: `91470.0`
+- Realized PnL: `-3100.0`
+- Unrealized PnL: `-5430.0`
 
 ## Open positions
-- none
+- LTM `LTM26MAY4250PE` entry 146.5 last 110.3 mtm -5430.0 (-24.71%), targets hit [], SL 110.0
 
 ## Closed positions
-- none
+- SRF `SRF26MAY2640PE` pnl -3100.0 (-20.53%), reason stop_loss
 
 ## Unresolved / not opened
-- INDIGO PE 4600.0 status unresolved, reason contract_not_found
+- BSE PE 2850.0 status unresolved, reason contract_not_found
+- MAZDOCK PE 2440.0 status unresolved, reason contract_not_found
+- HDFCAMC PE 2700.0 status unresolved, reason contract_not_found
+- TRENT PE 4200.0 status unresolved, reason contract_not_found
 
 ## Weekly returns
-- 2026-05-01: -3.3% (equity 100000.0)
-- 2026-05-08: 0.0% (equity 100000.0)
+- none
 
 ## Monthly returns
-- 2026-05-31: 0.0% (equity 100000.0)
+- none
