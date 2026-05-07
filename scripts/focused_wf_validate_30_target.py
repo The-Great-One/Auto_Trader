@@ -36,15 +36,23 @@ from scripts.weekly_strategy_lab import load_data, run_variant, run_walk_forward
 OUT_DIR = ROOT / "reports"
 
 CANDIDATES = [
+    # Original focus_combo_169 family
     {"name": "focus_combo_169_ich_tim15", "buy": {"ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 15}},
     {"name": "focus_combo_ich_only", "buy": {"ich_cloud_bull": 1}, "sell": {}},
     {"name": "focus_combo_tim15_only", "buy": {}, "sell": {"equity_time_stop_bars": 15}},
     {"name": "baseline_no_ich", "buy": {"ich_cloud_bull": 0}, "sell": {"equity_time_stop_bars": 15}},
+    # ADX variants
     {"name": "adx18_tim15", "buy": {"adx_strong_min": 18}, "sell": {"equity_time_stop_bars": 15}},
     {"name": "adx18_baseline", "buy": {"adx_strong_min": 18}, "sell": {}},
     {"name": "adx18_ich", "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1}, "sell": {}},
-    {"name": "loose_adx10_tim15", "buy": {"adx_min": 10}, "sell": {"equity_time_stop_bars": 15}},
-    {"name": "adx15_tim15_ich", "buy": {"adx_strong_min": 15, "ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 15}},
+    # Tighter time stops (Telegram insight: financewithsunil 5d positive, 10d fades)
+    {"name": "ich_tim5", "buy": {"ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 5}},
+    {"name": "adx18_ich_tim5", "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 5}},
+    {"name": "adx18_ich_tim8", "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 8}},
+    {"name": "adx18_ich_tim10", "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 10}},
+    {"name": "ich_tim8", "buy": {"ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 8}},
+    {"name": "ich_tim10", "buy": {"ich_cloud_bull": 1}, "sell": {"equity_time_stop_bars": 10}},
+    # Baseline current
     {"name": "baseline_current", "buy": {}, "sell": {}},
 ]
 
