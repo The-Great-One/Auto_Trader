@@ -52,6 +52,14 @@ CONFIG = {
     "meanrev_adx_max": float(os.getenv("AT_BUY_MEANREV_ADX_MAX", "25")),
     "meanrev_cci_min": float(os.getenv("AT_BUY_MEANREV_CCI_MIN", "-150")),
     "meanrev_stoch_k_max": float(os.getenv("AT_BUY_MEANREV_STOCH_K_MAX", "30")),
+    # --- Chart-structure / support-resistance gates ---
+    "sr_bounce_enabled": float(os.getenv("AT_BUY_SR_BOUNCE_ENABLED", "0")),
+    "sr_breakout_enabled": float(os.getenv("AT_BUY_SR_BREAKOUT_ENABLED", "0")),
+    "sr_vpoc_reclaim_enabled": float(os.getenv("AT_BUY_SR_VPOC_RECLAIM_ENABLED", "0")),
+    "sr_near_support_pct": float(os.getenv("AT_BUY_SR_NEAR_SUPPORT_PCT", "0.015")),
+    "sr_breakout_buffer_pct": float(os.getenv("AT_BUY_SR_BREAKOUT_BUFFER_PCT", "0.002")),
+    "sr_resistance_room_pct": float(os.getenv("AT_BUY_SR_RESISTANCE_ROOM_PCT", "0")),
+    "sr_round_guard_pct": float(os.getenv("AT_BUY_SR_ROUND_GUARD_PCT", "0")),
 }
 
 
@@ -125,6 +133,12 @@ def evaluate_signal(df, row, holdings):
         "bb_pctb_ok",
         "bb_width_ok",
         "ema_cross_ok",
+        # --- Chart-structure gates ---
+        "sr_bounce_context",
+        "sr_breakout_context",
+        "sr_resistance_room_ok",
+        "sr_round_guard_ok",
+        "sr_vpoc_reclaim",
     ]
 
     if len(df) < 3:
@@ -314,6 +328,67 @@ def evaluate_signal(df, row, holdings):
     bb_width = latest.get("BB_Width", np.nan)
     bb_width_ok = (not np.isfinite(bb_width)) or (float(bb_width) >= CONFIG["bb_width_min"])
 
+    # --- Chart-structure / support-resistance context ---
+    sr_support = latest.get("SR_Support", np.nan)
+    sr_resistance = latest.get("SR_Resistance", np.nan)
+    prev_sr_resistance = prev.get("SR_Resistance", np.nan)
+    pivot_s1 = latest.get("Pivot_S1", np.nan)
+    pivot_s2 = latest.get("Pivot_S2", np.nan)
+    pivot_r1 = latest.get("Pivot_R1", np.nan)
+    pivot_r2 = latest.get("Pivot_R2", np.nan)
+    prev_5d_high = latest.get("Prev_5D_High", np.nan)
+    prev_5d_low = latest.get("Prev_5D_Low", np.nan)
+    round_resistance = latest.get("Round_Resistance", np.nan)
+    round_resistance_dist_pct = latest.get("Round_Resistance_Dist_Pct", np.nan)
+    vpoc = latest.get("Volume_Profile_POC", np.nan)
+    prev_vpoc = prev.get("Volume_Profile_POC", np.nan)
+    near_support_pct = CONFIG["sr_near_support_pct"]
+    breakout_buffer = CONFIG["sr_breakout_buffer_pct"]
+
+    sr_near_support = (
+        np.isfinite(sr_support)
+        and close >= float(sr_support) * (1.0 - breakout_buffer)
+        and min(float(latest["Low"]), close) <= float(sr_support) * (1.0 + near_support_pct)
+    )
+    sr_bounce_trigger = sr_near_support and close > float(prev["Close"]) and rsi_slope_up
+
+    pivot_support_candidates = [x for x in [pivot_s1, pivot_s2, prev_5d_low] if np.isfinite(x)]
+    pivot_support = max((x for x in pivot_support_candidates if x <= close * (1.0 + near_support_pct)), default=np.nan)
+    pivot_bounce_trigger = (
+        np.isfinite(pivot_support)
+        and min(float(latest["Low"]), close) <= float(pivot_support) * (1.0 + near_support_pct)
+        and close >= float(pivot_support)
+        and close > float(prev["Close"])
+        and rsi_slope_up
+    )
+
+    sr_breakout_trigger = False
+    if np.isfinite(sr_resistance):
+        prev_res = float(prev_sr_resistance) if np.isfinite(prev_sr_resistance) else float(sr_resistance)
+        sr_breakout_trigger = close > float(sr_resistance) * (1.0 + breakout_buffer) and float(prev["Close"]) <= prev_res * (1.0 + breakout_buffer)
+    pivot_breakout_trigger = False
+    pivot_breakout_candidates = [x for x in [pivot_r1, pivot_r2, prev_5d_high] if np.isfinite(x)]
+    pivot_breakout_level = min((x for x in pivot_breakout_candidates if x >= float(prev["Close"]) * (1.0 - near_support_pct)), default=np.nan)
+    if np.isfinite(pivot_breakout_level):
+        pivot_breakout_trigger = close > float(pivot_breakout_level) * (1.0 + breakout_buffer)
+
+    sr_resistance_room_ok = True
+    if CONFIG["sr_resistance_room_pct"] > 0 and np.isfinite(sr_resistance):
+        resistance_dist = (float(sr_resistance) - close) / max(close, 1e-9)
+        sr_resistance_room_ok = resistance_dist >= CONFIG["sr_resistance_room_pct"] or close > float(sr_resistance) * (1.0 + breakout_buffer)
+
+    sr_round_guard_ok = True
+    if CONFIG["sr_round_guard_pct"] > 0 and np.isfinite(round_resistance_dist_pct):
+        round_breakout = np.isfinite(round_resistance) and close > float(round_resistance) * (1.0 + breakout_buffer)
+        sr_round_guard_ok = float(round_resistance_dist_pct) >= CONFIG["sr_round_guard_pct"] or round_breakout
+
+    sr_vpoc_reclaim = (
+        np.isfinite(vpoc)
+        and np.isfinite(prev_vpoc)
+        and float(prev["Close"]) < float(prev_vpoc)
+        and close >= float(vpoc)
+    )
+
     stoch_pull_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_pull_max"])
     stoch_momo_ok = (not np.isfinite(stoch_k)) or (stoch_k <= CONFIG["stoch_momo_max"])
 
@@ -359,14 +434,36 @@ def evaluate_signal(df, row, holdings):
         "rsi_slope_up": bool(rsi_slope_up),
     }
 
+    structure_bounce_context = bool(sr_bounce_trigger or pivot_bounce_trigger or (CONFIG["sr_vpoc_reclaim_enabled"] >= 1 and sr_vpoc_reclaim))
+    structure_bounce_checks = {
+        "trend_or_ema50": bool(trend_ok or close >= ema50),
+        "structure_bounce_context": structure_bounce_context,
+        "volume_or_cmf": bool(vol_ok or cmf_ok),
+        "rsi_slope_up": bool(rsi_slope_up),
+        "resistance_room": bool(sr_resistance_room_ok),
+        "round_guard": bool(sr_round_guard_ok),
+    }
+    structure_breakout_context = bool(sr_breakout_trigger or pivot_breakout_trigger)
+    structure_breakout_checks = {
+        "trend_slope_ok": bool(trend_slope_ok),
+        "adx_ok": bool(adx_ok),
+        "volume_confirm": bool(vol_ok),
+        "structure_breakout_context": structure_breakout_context,
+        "macd_hist_rising": bool(macd_rising),
+    }
+
     pullback_mode = all(pullback_checks.values())
     breakout_mode = all(breakout_checks.values())
     # Mean-reversion: at least 4 of 7 conditions (allows some flexibility)
     meanrev_score = sum(meanrev_checks.values())
     meanrev_mode = CONFIG["meanrev_enabled"] >= 1 and meanrev_score >= 4 and meanrev_checks.get("rsi_oversold") and meanrev_checks.get("rsi_slope_up")
+    structure_bounce_mode = CONFIG["sr_bounce_enabled"] >= 1 and all(structure_bounce_checks.values())
+    structure_breakout_mode = CONFIG["sr_breakout_enabled"] >= 1 and all(structure_breakout_checks.values())
     pullback_missing = [name for name, ok in pullback_checks.items() if not ok]
     breakout_missing = [name for name, ok in breakout_checks.items() if not ok]
     meanrev_missing = [name for name, ok in meanrev_checks.items() if not ok]
+    structure_bounce_missing = [name for name, ok in structure_bounce_checks.items() if not ok]
+    structure_breakout_missing = [name for name, ok in structure_breakout_checks.items() if not ok]
     # Pick nearest mode
     candidates = [
         ("pullback", pullback_missing),
@@ -374,6 +471,10 @@ def evaluate_signal(df, row, holdings):
     ]
     if CONFIG["meanrev_enabled"] >= 1:
         candidates.append(("meanrev", meanrev_missing))
+    if CONFIG["sr_bounce_enabled"] >= 1:
+        candidates.append(("structure_bounce", structure_bounce_missing))
+    if CONFIG["sr_breakout_enabled"] >= 1:
+        candidates.append(("structure_breakout", structure_breakout_missing))
     nearest_mode, nearest_mode_missing = min(candidates, key=lambda x: len(x[1]))
 
     hard_blocks = []
@@ -431,8 +532,12 @@ def evaluate_signal(df, row, holdings):
         hard_blocks.append("bb_pctb")
     if not bb_width_ok and not meanrev_mode:
         hard_blocks.append("bb_width")
+    if not sr_resistance_room_ok and not (structure_breakout_mode or breakout_mode):
+        hard_blocks.append("sr_resistance_room")
+    if not sr_round_guard_ok and not (structure_breakout_mode or breakout_mode):
+        hard_blocks.append("sr_round_guard")
 
-    decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode or meanrev_mode)) else "HOLD"
+    decision = "BUY" if (not hard_blocks and (pullback_mode or breakout_mode or meanrev_mode or structure_bounce_mode or structure_breakout_mode)) else "HOLD"
     entry_gate_failures = _uniq(hard_blocks + nearest_mode_missing)
 
     gate_status = {
@@ -470,6 +575,14 @@ def evaluate_signal(df, row, holdings):
         "bb_pctb_ok": bool(bb_pctb_ok),
         "bb_width_ok": bool(bb_width_ok),
         "ema_cross_ok": bool(ema_cross_ok),
+        # --- Chart-structure / support-resistance gates ---
+        "sr_bounce_context": bool(structure_bounce_context),
+        "sr_breakout_context": bool(structure_breakout_context),
+        "sr_resistance_room_ok": bool(sr_resistance_room_ok),
+        "sr_round_guard_ok": bool(sr_round_guard_ok),
+        "sr_vpoc_reclaim": bool(sr_vpoc_reclaim),
+        "structure_bounce_mode": bool(structure_bounce_mode),
+        "structure_breakout_mode": bool(structure_breakout_mode),
         "stoch_pull_ok": bool(stoch_pull_ok),
         "stoch_momo_ok": bool(stoch_momo_ok),
         "meanrev_rsi_oversold": bool(meanrev_rsi_oversold),
@@ -510,6 +623,9 @@ def evaluate_signal(df, row, holdings):
         "stochrsi_gap": _safe_metric(max(0.0, float(stochrsi_k) - CONFIG["stochrsi_buy_max"])) if np.isfinite(stochrsi_k) else None,
         "aroon_gap": _safe_metric(max(0.0, CONFIG["aroon_osc_min"] - float(aroonosc))) if np.isfinite(aroonosc) else None,
         "roc_gap": _safe_metric(max(0.0, CONFIG["roc_buy_min"] - float(roc))) if np.isfinite(roc) else None,
+        "sr_support_distance_pct": _safe_metric((close - float(sr_support)) / max(close, 1e-9)) if np.isfinite(sr_support) else None,
+        "sr_resistance_distance_pct": _safe_metric((float(sr_resistance) - close) / max(close, 1e-9)) if np.isfinite(sr_resistance) else None,
+        "round_resistance_distance_pct": _safe_metric(round_resistance_dist_pct) if np.isfinite(round_resistance_dist_pct) else None,
     }
 
     metric_snapshot = {
@@ -553,6 +669,15 @@ def evaluate_signal(df, row, holdings):
         "bb_percent_b": _safe_metric(bb_pctb),
         "bb_width": _safe_metric(bb_width),
         "ema_cross_9_21": _safe_metric(ema_cross_921),
+        "sr_support": _safe_metric(sr_support),
+        "sr_resistance": _safe_metric(sr_resistance),
+        "pivot_s1": _safe_metric(pivot_s1),
+        "pivot_r1": _safe_metric(pivot_r1),
+        "prev_5d_high": _safe_metric(prev_5d_high),
+        "prev_5d_low": _safe_metric(prev_5d_low),
+        "round_resistance": _safe_metric(round_resistance),
+        "round_resistance_dist_pct": _safe_metric(round_resistance_dist_pct),
+        "volume_profile_poc": _safe_metric(vpoc),
         "mmi": _safe_metric(mmi),
         "cmf_gate": _safe_metric(cmf_gate),
         "rsi_pull_gate": _safe_metric(rsi_pull_gate),
@@ -598,6 +723,13 @@ def evaluate_signal(df, row, holdings):
         "meanrev_adx_max": CONFIG["meanrev_adx_max"],
         "meanrev_cci_min": CONFIG["meanrev_cci_min"],
         "meanrev_stoch_k_max": CONFIG["meanrev_stoch_k_max"],
+        "sr_bounce_enabled": CONFIG["sr_bounce_enabled"],
+        "sr_breakout_enabled": CONFIG["sr_breakout_enabled"],
+        "sr_vpoc_reclaim_enabled": CONFIG["sr_vpoc_reclaim_enabled"],
+        "sr_near_support_pct": CONFIG["sr_near_support_pct"],
+        "sr_breakout_buffer_pct": CONFIG["sr_breakout_buffer_pct"],
+        "sr_resistance_room_pct": CONFIG["sr_resistance_room_pct"],
+        "sr_round_guard_pct": CONFIG["sr_round_guard_pct"],
         "rsi_pull_gate": rsi_pull_gate,
         "rsi_momo_gate": rsi_momo_gate,
     }
@@ -610,6 +742,10 @@ def evaluate_signal(df, row, holdings):
             reason.append("breakout_mode")
         if meanrev_mode:
             reason.append("meanrev_mode")
+        if structure_bounce_mode:
+            reason.append("structure_bounce_mode")
+        if structure_breakout_mode:
+            reason.append("structure_breakout_mode")
     else:
         if hard_blocks:
             reason.extend(hard_blocks)
@@ -634,6 +770,8 @@ def evaluate_signal(df, row, holdings):
             "pullback_missing": pullback_missing,
             "breakout_missing": breakout_missing,
             "meanrev_missing": meanrev_missing,
+            "structure_bounce_missing": structure_bounce_missing,
+            "structure_breakout_missing": structure_breakout_missing,
         },
         "reason": reason,
     }

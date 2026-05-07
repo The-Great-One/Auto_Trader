@@ -856,6 +856,14 @@ def build_grids(scorecard_context: dict, tradebook_context: dict) -> tuple[dict,
         "ich_cloud_bull": prioritized_values([0, 1], buy_cfg["ich_cloud_bull"]),
         "vwap_buy_above": prioritized_values([0, 1], buy_cfg["vwap_buy_above"]),
         "cci_buy_min": prioritized_values([-175, -150, -125, -100, -75, -50], buy_cfg["cci_buy_min"]),
+        # Chart-structure / support-resistance gates
+        "sr_bounce_enabled": prioritized_values([0, 1], buy_cfg["sr_bounce_enabled"]),
+        "sr_breakout_enabled": prioritized_values([0, 1], buy_cfg["sr_breakout_enabled"]),
+        "sr_vpoc_reclaim_enabled": prioritized_values([0, 1], buy_cfg["sr_vpoc_reclaim_enabled"]),
+        "sr_near_support_pct": prioritized_values([0.01, 0.015, 0.02, 0.03], buy_cfg["sr_near_support_pct"]),
+        "sr_breakout_buffer_pct": prioritized_values([0.0, 0.002, 0.005, 0.01], buy_cfg["sr_breakout_buffer_pct"]),
+        "sr_resistance_room_pct": prioritized_values([0, 0.01, 0.02, 0.03], buy_cfg["sr_resistance_room_pct"]),
+        "sr_round_guard_pct": prioritized_values([0, 0.005, 0.01, 0.015], buy_cfg["sr_round_guard_pct"]),
     }
     sell_grid = {
         "momentum_exit_rsi": prioritized_values([35.0, 38.0, 40.0, 42.0, 45.0, 48.0], sell_cfg["momentum_exit_rsi"]),
@@ -942,6 +950,25 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
 
     add("baseline_current", {}, {}, {"enabled": False})
 
+    # High-priority chart-structure candidates: test support bounces and resistance
+    # breakouts early before broad one-factor sweeps can consume the variant cap.
+    priority_structure_buy = [
+        {"sr_bounce_enabled": 1, "sr_near_support_pct": 0.015, "sr_resistance_room_pct": 0.01, "sr_round_guard_pct": 0.005, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0},
+        {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "sr_resistance_room_pct": 0.0, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0},
+        {"sr_breakout_enabled": 1, "sr_breakout_buffer_pct": 0.002, "volume_confirm_mult": 0.9, "adx_min": 8, "ich_cloud_bull": 0},
+        {"sr_breakout_enabled": 1, "sr_breakout_buffer_pct": 0.005, "sr_round_guard_pct": 0.0, "volume_confirm_mult": 0.85, "adx_strong_min": 18, "ich_cloud_bull": 0},
+        {"sr_bounce_enabled": 1, "sr_breakout_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "sr_breakout_buffer_pct": 0.002, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+    ]
+    priority_structure_sell = [
+        {"equity_time_stop_bars": 12, "breakeven_trigger_pct": 4.0},
+        {"equity_time_stop_bars": 15, "fund_time_stop_bars": 22},
+    ]
+    structure_idx = 0
+    for buy_patch in priority_structure_buy:
+        for sell_patch in priority_structure_sell:
+            structure_idx += 1
+            add(f"priority_structure_{structure_idx:03d}", buy_patch, sell_patch, {"enabled": False})
+
     # High-priority structural candidates: ensure small AT_LAB_MAX_VARIANTS runs
     # actually test sideways-market mean-reversion before broad one-factor sweeps.
     priority_meanrev_buy = [
@@ -1016,6 +1043,10 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         "vwap_buy_above",
         "stoch_pull_max",
         "cci_buy_min",
+        "sr_bounce_enabled",
+        "sr_breakout_enabled",
+        "sr_resistance_room_pct",
+        "sr_round_guard_pct",
     ]
     focus_sell = [
         "equity_time_stop_bars",
@@ -1061,6 +1092,12 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         # Contrarian / mean-reversion adjacent
         {"adx_min": 6, "rsi_floor": 34, "stoch_pull_max": 95, "volume_confirm_mult": 0.7, "ich_cloud_bull": 0, "cci_buy_min": -175, "max_extension_atr": 3.5, "obv_min_zscore": 0.0, "cmf_base_min": 0.0},
         {"adx_min": 8, "rsi_floor": 36, "stoch_pull_max": 90, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0, "cci_buy_min": -150, "max_extension_atr": 3.2},
+        # Chart-structure / support-resistance variants
+        {"sr_bounce_enabled": 1, "sr_near_support_pct": 0.015, "sr_resistance_room_pct": 0.01, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0},
+        {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        {"sr_breakout_enabled": 1, "sr_breakout_buffer_pct": 0.002, "volume_confirm_mult": 0.9, "adx_min": 8, "ich_cloud_bull": 0},
+        {"sr_breakout_enabled": 1, "sr_breakout_buffer_pct": 0.005, "volume_confirm_mult": 0.85, "adx_strong_min": 18, "ich_cloud_bull": 0},
+        {"sr_bounce_enabled": 1, "sr_breakout_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "sr_breakout_buffer_pct": 0.002, "volume_confirm_mult": 0.8, "ich_cloud_bull": 0, "vwap_buy_above": 0},
     ]
     curated_sell = [
         # Original sell combos

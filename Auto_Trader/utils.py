@@ -262,6 +262,134 @@ def compute_fibonacci(
     }
 
 
+def _round_number_step(close: pd.Series) -> np.ndarray:
+    """Price-aware psychological round-number step for Indian equities."""
+    price = pd.to_numeric(close, errors="coerce").astype("float64").to_numpy()
+    step = np.select(
+        [price < 100, price < 500, price < 1000, price < 5000],
+        [5.0, 10.0, 25.0, 50.0],
+        default=100.0,
+    )
+    return np.where(np.isfinite(price) & (price > 0), step, np.nan)
+
+
+def compute_market_structure(
+    df: pd.DataFrame,
+    *,
+    swing_window: int = 5,
+    level_window: int = 20,
+    vpoc_window: int = 60,
+) -> dict[str, pd.Series | np.ndarray]:
+    """
+    Add deterministic chart-reading features without look-ahead bias.
+
+    Features:
+    - confirmed swing high/low levels (fractal pivots confirmed after `swing_window` bars)
+    - rolling prior support/resistance from the last `level_window` bars
+    - previous-bar pivot levels (PP/R1/R2/S1/S2)
+    - psychological round-number support/resistance
+    - approximate rolling volume-profile POC using daily OHLCV bars
+    """
+    high_s = pd.to_numeric(df["High"], errors="coerce").astype("float64")
+    low_s = pd.to_numeric(df["Low"], errors="coerce").astype("float64")
+    close_s = pd.to_numeric(df["Close"], errors="coerce").astype("float64")
+    vol_s = pd.to_numeric(df["Volume"], errors="coerce").astype("float64")
+
+    # Prior rolling S/R — only previous bars are visible to the current bar.
+    rolling_resistance = high_s.rolling(level_window, min_periods=max(5, level_window // 2)).max().shift(1)
+    rolling_support = low_s.rolling(level_window, min_periods=max(5, level_window // 2)).min().shift(1)
+
+    # Confirmed fractal swings. The shift ensures a pivot only becomes usable
+    # after the required right-side confirmation bars have completed.
+    pivot_window = swing_window * 2 + 1
+    centered_high = high_s.rolling(pivot_window, center=True, min_periods=pivot_window).max()
+    centered_low = low_s.rolling(pivot_window, center=True, min_periods=pivot_window).min()
+    swing_high_raw = high_s.where(
+        high_s.eq(centered_high) & high_s.gt(high_s.shift(1)) & high_s.gt(high_s.shift(-1))
+    )
+    swing_low_raw = low_s.where(
+        low_s.eq(centered_low) & low_s.lt(low_s.shift(1)) & low_s.lt(low_s.shift(-1))
+    )
+    last_swing_high = swing_high_raw.shift(swing_window + 1).ffill()
+    last_swing_low = swing_low_raw.shift(swing_window + 1).ffill()
+
+    sr_resistance = last_swing_high.combine_first(rolling_resistance)
+    sr_support = last_swing_low.combine_first(rolling_support)
+    sr_dist_support_pct = (close_s - sr_support) / close_s.replace(0, np.nan)
+    sr_dist_resistance_pct = (sr_resistance - close_s) / close_s.replace(0, np.nan)
+
+    # Classic previous-bar pivots. For daily bars this is previous-day PP/R/S.
+    prev_high = high_s.shift(1)
+    prev_low = low_s.shift(1)
+    prev_close = close_s.shift(1)
+    pivot_pp = (prev_high + prev_low + prev_close) / 3.0
+    pivot_r1 = (2.0 * pivot_pp) - prev_low
+    pivot_s1 = (2.0 * pivot_pp) - prev_high
+    pivot_r2 = pivot_pp + (prev_high - prev_low)
+    pivot_s2 = pivot_pp - (prev_high - prev_low)
+
+    # Weekly-ish prior high/low from the last 5 daily bars.
+    prev_5d_high = high_s.rolling(5, min_periods=5).max().shift(1)
+    prev_5d_low = low_s.rolling(5, min_periods=5).min().shift(1)
+
+    # Psychological round-number support/resistance.
+    round_step = _round_number_step(close_s)
+    close_arr = close_s.to_numpy()
+    round_support = np.floor(close_arr / round_step) * round_step
+    round_resistance = np.ceil(close_arr / round_step) * round_step
+    round_nearest = np.round(close_arr / round_step) * round_step
+    round_resistance_dist_pct = (round_resistance - close_arr) / np.where(close_arr > 0, close_arr, np.nan)
+    round_support_dist_pct = (close_arr - round_support) / np.where(close_arr > 0, close_arr, np.nan)
+
+    # Rolling volume profile POC approximation using prior bars only.
+    typical = ((high_s + low_s + close_s) / 3.0).to_numpy()
+    volume = vol_s.to_numpy()
+    vpoc = np.full(len(df), np.nan, dtype="float64")
+    for i in range(len(df)):
+        start = max(0, i - vpoc_window)
+        if i - start < max(10, vpoc_window // 3):
+            continue
+        prices = typical[start:i]
+        vols = volume[start:i]
+        mask = np.isfinite(prices) & np.isfinite(vols) & (vols > 0)
+        if not mask.any():
+            continue
+        ref_price = close_arr[i] if np.isfinite(close_arr[i]) and close_arr[i] > 0 else np.nanmedian(prices[mask])
+        bucket = max(ref_price * 0.005, 0.05)
+        price_bins = np.round(prices[mask] / bucket) * bucket
+        volume_by_bin: dict[float, float] = {}
+        for price_bin, v in zip(price_bins, vols[mask]):
+            volume_by_bin[float(price_bin)] = volume_by_bin.get(float(price_bin), 0.0) + float(v)
+        if volume_by_bin:
+            vpoc[i] = max(volume_by_bin.items(), key=lambda item: item[1])[0]
+    vpoc_s = pd.Series(vpoc, index=df.index)
+
+    return {
+        "SR_Rolling_Resistance_20": rolling_resistance,
+        "SR_Rolling_Support_20": rolling_support,
+        "SR_Last_Swing_High": last_swing_high,
+        "SR_Last_Swing_Low": last_swing_low,
+        "SR_Resistance": sr_resistance,
+        "SR_Support": sr_support,
+        "SR_Dist_Support_Pct": sr_dist_support_pct,
+        "SR_Dist_Resistance_Pct": sr_dist_resistance_pct,
+        "Pivot_PP": pivot_pp,
+        "Pivot_R1": pivot_r1,
+        "Pivot_R2": pivot_r2,
+        "Pivot_S1": pivot_s1,
+        "Pivot_S2": pivot_s2,
+        "Prev_5D_High": prev_5d_high,
+        "Prev_5D_Low": prev_5d_low,
+        "Round_Step": round_step,
+        "Round_Nearest": round_nearest,
+        "Round_Support": round_support,
+        "Round_Resistance": round_resistance,
+        "Round_Support_Dist_Pct": round_support_dist_pct,
+        "Round_Resistance_Dist_Pct": round_resistance_dist_pct,
+        "Volume_Profile_POC": vpoc_s,
+    }
+
+
 def compute_cmf(high, low, close, volume, period=20):
     idx = getattr(close, "index", None)
 
@@ -518,6 +646,9 @@ def Indicators(
         np.where(VORTEX_PLUS > VORTEX_MINUS, 1.0, -1.0),
     )
 
+    # Chart-structure / support-resistance features.
+    market_structure = compute_market_structure(df)
+
     # Collect into single dict for assign
     assign_kwargs = {
         # momentum
@@ -602,6 +733,8 @@ def Indicators(
         "VORTEX_PLUS": VORTEX_PLUS,
         "VORTEX_MINUS": VORTEX_MINUS,
         "VORTEX_BULL": VORTEX_BULL,
+        # --- Chart-structure / support-resistance indicators ---
+        **market_structure,
     }
 
     # Bulk assign
