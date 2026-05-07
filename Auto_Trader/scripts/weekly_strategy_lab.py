@@ -1568,33 +1568,40 @@ def run_walk_forward_validation(
                 test_start_date = all_dates[test_start]
                 test_end_date = all_dates[test_end - 1]
 
-                # Filter data to test period
+                # Keep warmup/training history through test_end, but do not allow
+                # signals before test_start. Slicing only the OOS window starves
+                # long indicators and can create artificial zero-trade folds.
                 test_data = {
-                    sym: df[pd.to_datetime(df["Date"]) >= test_start_date].copy()
+                    sym: df[pd.to_datetime(df["Date"]) <= test_end_date].copy()
                     for sym, df in data_map.items()
                 }
-                test_data = {k: v for k, v in test_data.items() if len(v) > 50}
+                test_data = {k: v for k, v in test_data.items() if len(v) > 260}
 
                 if not test_data:
                     continue
 
-                # Run simple sim on test period
-                total_final = 0.0
-                total_trades = 0
-                total_wins = 0
-                worst_dd = 0.0
-                for symbol, df in test_data.items():
-                    stats = _simulate_symbol(symbol, df)
-                    total_final += stats["final_value"]
-                    total_trades += stats["trades"]
-                    total_wins += stats["wins"]
-                    worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+                from scripts import weekly_universe_cagr_check as parity_pack
 
-                n_syms = len(test_data)
-                start_cap = 100000.0 * max(1, n_syms)
-                ret_pct = (total_final / start_cap - 1.0) * 100.0
-                round_trips = max(1, total_trades // 2)
-                wr = (total_wins / round_trips) * 100.0 if round_trips > 0 else 0.0
+                env_updates = {
+                    "AT_BACKTEST_SIGNAL_START_DATE": str(test_start_date.date()),
+                    "AT_BACKTEST_SIGNAL_END_DATE": str(test_end_date.date()),
+                    "AT_BACKTEST_STARTING_CAPITAL": os.getenv("AT_BACKTEST_STARTING_CAPITAL", "100000"),
+                }
+                old_env = {k: os.environ.get(k) for k in env_updates}
+                os.environ.update(env_updates)
+                try:
+                    result, details, sim_meta = parity_pack.run_baseline_detailed(test_data)
+                finally:
+                    for k, v in old_env.items():
+                        if v is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = v
+
+                total_trades = int(result.trades)
+                ret_pct = float(result.total_return_pct)
+                wr = float(result.win_rate_pct)
+                worst_dd = float(result.max_drawdown_pct)
                 fold_results.append({
                     "fold": fold_idx + 1,
                     "train_end": str(train_end_date.date()),
@@ -1604,7 +1611,7 @@ def run_walk_forward_validation(
                     "trades": total_trades,
                     "win_rate_pct": round(wr, 1),
                     "max_drawdown_pct": round(worst_dd, 2),
-                    "symbols_tested": n_syms,
+                    "symbols_tested": len(getattr(result, "symbols_tested", []) or test_data),
                 })
     finally:
         RULE_SET_2.CONFIG.clear()
