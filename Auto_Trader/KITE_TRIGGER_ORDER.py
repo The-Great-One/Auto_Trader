@@ -1,6 +1,6 @@
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY
-from Auto_Trader.utils import read_session_data, fetch_holdings, get_mmi_now
+from Auto_Trader.utils import get_kite_client, fetch_holdings, get_mmi_now
 from collections import defaultdict
 from math import floor
 import pandas as pd
@@ -21,9 +21,16 @@ import traceback
 import os
 from typing import Dict, List
 
-# Initialize KiteConnect
-kite = KiteConnect(api_key=API_KEY)
-kite.set_access_token(read_session_data())
+# Kite client is lazily initialized via get_kite_client() which includes
+# retry-with-backoff. This prevents import-time crashes when Cloudflare
+# rate-limits the login API during rapid systemd restarts.
+_kite = None
+
+def _get_kite():
+    global _kite
+    if _kite is None:
+        _kite = get_kite_client()
+    return _kite
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
@@ -221,7 +228,7 @@ def _has_recent_same_side_order(
     window_s = within_seconds if within_seconds is not None else _ORDER_DEDUPE_WINDOW_S
     cutoff = pd.Timestamp.now().tz_localize(None) - pd.Timedelta(seconds=window_s)
     try:
-        for order in kite.orders() or []:
+        for order in _get_kite().orders() or []:
             if (order.get("tradingsymbol") or "").upper() != symbol_upper:
                 continue
             if (order.get("transaction_type") or "").upper() != side_upper:
@@ -246,7 +253,7 @@ def get_active_order_symbols(side: str | None = None) -> set[str]:
     want_side = (side or "").upper() if side else None
     symbols: set[str] = set()
     try:
-        for order in kite.orders() or []:
+        for order in _get_kite().orders() or []:
             status = _norm_status(order.get("status"))
             if status not in _ACTIVE_ORDER_STATUSES:
                 continue
@@ -501,7 +508,7 @@ def trigger(
                 if order_type_k == kite.ORDER_TYPE_LIMIT:
                     kwargs["price"] = limit_price
 
-                order_id = kite.place_order(**kwargs)
+                order_id = _get_kite().place_order(**kwargs)
                 order_confirmed = True
 
                 # Notify
@@ -572,7 +579,7 @@ def get_positions() -> Dict[str, int]:
     Returns net quantities by tradingsymbol for current positions (non-zero only).
     """
     try:
-        pos = kite.positions()  # dict with 'net' and 'day' lists
+        pos = _get_kite().positions()  # dict with 'net' and 'day' lists
         net = pos.get("net", []) if isinstance(pos, dict) else []
         out = {}
         for p in net:
@@ -597,7 +604,7 @@ def get_holdings() -> Dict[str, int]:
         False  # set True if your broker allows/you want to include T1
     )
     try:
-        holds = kite.holdings()  # list of dicts
+        holds = _get_kite().holdings()  # list of dicts
         out = {}
         for h in holds or []:
             tsym = h.get("tradingsymbol")
@@ -619,7 +626,7 @@ def is_symbol_in_order_book(symbol: str) -> bool:
     True if symbol has any active (non-terminal) order in the order book.
     """
     try:
-        for o in kite.orders() or []:
+        for o in _get_kite().orders() or []:
             if (o.get("tradingsymbol") == symbol) and (
                 _norm_status(o.get("status")) in _ACTIVE_ORDER_STATUSES
             ):
@@ -815,7 +822,7 @@ def handle_decisions(message_queue, decisions: List[dict]):
             # Live funds
             try:
                 funds = _safe_float(
-                    kite.margins("equity")["available"]["live_balance"], 0.0
+                    _get_kite().margins("equity")["available"]["live_balance"], 0.0
                 )
             except Exception as e:
                 logger.error(f"Failed to fetch margins; skipping {symbol}: {e}")

@@ -1,5 +1,7 @@
 import requests
 import onetimepass as otp
+import time as _time
+import random
 from urllib.parse import urlparse, parse_qs
 from kiteconnect import KiteConnect
 from Auto_Trader.my_secrets import API_KEY, PASS, TOTP_KEY, USER_NAME
@@ -7,10 +9,10 @@ import logging
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
-# Chrome-on-Linux headers matching the actual server OS.
-# Previously we used Mac/Chrome headers here which caused daily CAPTCHA
-# challenges because Kite's bot detection flags OS-mismatched user agents
-# combined with non-browser Sec-Fetch hints.
+# Minimal browser-like headers — proven to work against Cloudflare
+# on this server. Adding Sec-Fetch-*, Upgrade-Insecure-Requests, or
+# Accept-Encoding triggers Cloudflare's bot detection and returns
+# empty-success (200 OK with {} body) instead of a request_id.
 _BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) "
@@ -22,26 +24,12 @@ _BROWSER_HEADERS = {
         "image/avif,image/webp,image/apng,*/*;q=0.8"
     ),
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-    "Cache-Control": "max-age=0",
-    "Connection": "keep-alive",
 }
 
-# Headers used only for the login/TOTP POST calls — must look like a
-# normal in-page form submission from the same origin, not an AJAX call.
 _API_HEADERS = {
     "Referer": "https://kite.zerodha.com/",
     "Origin": "https://kite.zerodha.com",
     "Content-Type": "application/x-www-form-urlencoded",
-    "Accept": (
-        "text/html,application/xhtml+xml,application/xml;q=0.9,"
-        "image/avif,image/webp,image/apng,*/*;q=0.8"
-    ),
 }
 
 
@@ -74,60 +62,72 @@ def _looks_like_captcha(payload: dict) -> bool:
     return "captcha" in message or "captcha" in data_keys
 
 
-def get_request_token(credentials: dict | None = None) -> str:
-    """Use provided credentials and return request token.
-    Args:
-        credentials: Login credentials for Kite
-    Returns:
-        Request token for the provided credentials
-    """
+def _do_kite_login(kite, auth):
+    """Perform the full Kite login dance with retry on transient CF blocks."""
 
-    auth = credentials or {
-        "api_key": API_KEY,
-        "username": USER_NAME,
-        "password": PASS,
-        "totp_key": TOTP_KEY,
-    }
-    kite = KiteConnect(api_key=auth["api_key"])
+    _max_login_attempts = 5
+    _login_attempt = 0
 
-    # Initialize session and fetch the login URL. A single request is
-    # enough to set cookies; two rapid GETs look automated to Kite.
-    session = requests.Session()
-    session.headers.update(_BROWSER_HEADERS)
-    session.get(kite.login_url(), timeout=10)
+    while True:
+        session = requests.Session()
+        session.headers.update(_BROWSER_HEADERS)
 
-    # User login POST request
-    login_payload = {
-        "user_id": auth["username"],
-        "password": auth["password"],
-    }
-    login_response = session.post(
-        "https://kite.zerodha.com/api/login",
-        data=login_payload,
-        headers=_API_HEADERS,
-        timeout=10,
-    )
-    login_payload_json = _json_or_empty(login_response)
-    login_data = login_payload_json.get("data", {}) or {}
+        # Small random initial delay to avoid synchronized hits
+        _time.sleep(random.uniform(1.0, 4.0))
 
-    # Check if login was successful.
-    if login_response.status_code != 200 or "request_id" not in login_data:
+        # Step 1: GET login page to set cookies
+        session.get(kite.login_url(), timeout=10)
+
+        # Step 2: POST credentials
+        login_payload = {
+            "user_id": auth["username"],
+            "password": auth["password"],
+        }
+        login_response = session.post(
+            "https://kite.zerodha.com/api/login",
+            data=login_payload,
+            headers=_API_HEADERS,
+            timeout=10,
+        )
+        login_payload_json = _json_or_empty(login_response)
+        login_data = login_payload_json.get("data", {}) or {}
+
+        if login_response.status_code == 200 and "request_id" in login_data:
+            break  # success
+
         summary = _response_summary(login_response, login_payload_json)
+        _login_attempt += 1
+
         if _looks_like_captcha(login_payload_json):
             logger.error(
                 "Kite login blocked by CAPTCHA challenge before TOTP: %s", summary
             )
-        else:
-            logger.error(
-                "Kite login failed before TOTP; no request_id returned: %s", summary
-            )
-        # Raise instead of sys.exit so initialize_kite's retry loop can handle it
-        raise RuntimeError(f"Kite login failed: {summary}")
+            raise RuntimeError(f"Kite login failed: {summary}")
 
-    # TOTP POST request
+        if _login_attempt >= _max_login_attempts:
+            logger.error(
+                "Kite login failed before TOTP after %d attempts: %s",
+                _max_login_attempts, summary,
+            )
+            raise RuntimeError(
+                f"Kite login failed after {_max_login_attempts} attempts: {summary}"
+            )
+
+        backoff = 5 * (2 ** (_login_attempt - 1))
+        jitter = backoff * 0.1 * random.random()
+        delay = backoff + jitter
+        logger.warning(
+            "Kite login transient failure (attempt %d/%d): %s - retrying in %.1fs",
+            _login_attempt, _max_login_attempts, summary, delay,
+        )
+        _time.sleep(delay)
+
+    request_id = login_data["request_id"]
+
+    # Step 3: POST TOTP
     totp_payload = {
         "user_id": auth["username"],
-        "request_id": login_data["request_id"],
+        "request_id": request_id,
         "twofa_value": otp.get_totp(auth["totp_key"]),
         "twofa_type": "totp",
         "skip_session": True,
@@ -139,14 +139,12 @@ def get_request_token(credentials: dict | None = None) -> str:
         timeout=10,
     )
 
-    # Check if TOTP verification was successful
     if totp_response.status_code != 200:
         summary = _response_summary(totp_response, _json_or_empty(totp_response))
         logger.error("TOTP verification failed: %s", summary)
         raise RuntimeError(f"TOTP verification failed: {summary}")
 
-    # Extract request token from the response by following the redirect
-    # naturally (allow_redirects=True), which is normal browser behavior.
+    # Step 4: Extract request token from redirect
     try:
         redirect_response = session.get(
             kite.login_url(), timeout=10, allow_redirects=True
@@ -163,3 +161,14 @@ def get_request_token(credentials: dict | None = None) -> str:
         )
 
     return tokens[0]
+
+
+def get_request_token(credentials: dict | None = None) -> str:
+    auth = credentials or {
+        "api_key": API_KEY,
+        "username": USER_NAME,
+        "password": PASS,
+        "totp_key": TOTP_KEY,
+    }
+    kite = KiteConnect(api_key=auth["api_key"])
+    return _do_kite_login(kite, auth)
