@@ -135,6 +135,7 @@ def score(full, recent) -> float:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol-limit", type=int, default=120)
+    ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0)
     # Use the last ~2 WF folds as a recent robustness proxy. A 2025-only window
     # can be too sparse on sampled universes and hide useful-but-weak candidates.
@@ -142,11 +143,17 @@ def main() -> int:
     ap.add_argument("--label", default="robust_oos_refiner")
     args = ap.parse_args()
 
-    variants = build_variants()
+    all_variants = build_variants()
+    variants = all_variants[args.offset:]
     if args.limit:
         variants = variants[: args.limit]
 
-    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Robust OOS refiner: variants={len(variants)} symbol_limit={args.symbol_limit}", flush=True)
+    print(
+        f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Robust OOS refiner: "
+        f"variants={len(variants)} offset={args.offset} total={len(all_variants)} "
+        f"symbol_limit={args.symbol_limit}",
+        flush=True,
+    )
     data_map = subset_data(load_kite_symbols(), args.symbol_limit)
     print(f"Using {len(data_map)} symbols", flush=True)
 
