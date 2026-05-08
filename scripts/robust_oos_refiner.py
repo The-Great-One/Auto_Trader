@@ -14,9 +14,12 @@ import json
 import os
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -38,12 +41,24 @@ from scripts.cagr_hunt_30_targeted import (  # noqa: E402
     ULTRA_LOOSE_BASE,
     ULTRA_LOOSE_REGIME_30_150,
     load_kite_symbols,
-    run_variant,
 )
+from scripts.weekly_strategy_lab import _simulate_symbol, RULE_SET_2, RULE_SET_7
 
 OUT_DIR = ROOT / "reports"
 OUT_DIR.mkdir(exist_ok=True)
 
+@dataclass
+class VariantResult:
+    name: str = ""
+    total_return_pct: float = 0.0
+    cagr_pct: float = 0.0
+    max_drawdown_pct: float = 0.0
+    trades: int = 0
+    win_rate_pct: float = 0.0
+    sharpe: float = 0.0
+    active_symbols: int = 0
+    selection_score: float = 0.0
+    error: str = ""
 
 def patch(base: dict, **kwargs) -> dict:
     out = dict(base)
@@ -98,30 +113,80 @@ def subset_data(data_map: dict, limit: int) -> dict:
 
 
 def run_with_window(data_map: dict, name: str, buy: dict, sell: dict, start: str | None, end: str | None):
-    """Run on a date-filtered view.
-
-    The cagr_hunt/weekly_universe engine does not reliably honor the signal
-    start/end env vars in this path, so build an explicit filtered data_map.
-    Indicators are already computed on full history before filtering, which
-    preserves warmup values better than re-indicatoring a tiny recent slice.
+    """Run per-symbol robust simulation with optional date gating.
+    
+    This replaces the problematic run_variant (portfolio sim) which produced 0 trades 
+    due to regime filter + cash constraints in OOS windows.
     """
-    if not start and not end:
-        return run_variant(data_map, buy, sell)
-    start_ts = None if not start else __import__("pandas").Timestamp(start)
-    end_ts = None if not end else __import__("pandas").Timestamp(end)
-    filtered = {}
-    for sym, df in data_map.items():
-        if "Date" not in df.columns:
-            continue
-        mask = __import__("pandas").Series(True, index=df.index)
-        if start_ts is not None:
-            mask &= df["Date"] >= start_ts
-        if end_ts is not None:
-            mask &= df["Date"] <= end_ts
-        sub = df.loc[mask].copy().reset_index(drop=True)
-        if len(sub) >= 20:
-            filtered[sym] = sub
-    return run_variant(filtered, buy, sell)
+    start_ts = None if not start else pd.Timestamp(start)
+    end_ts = None if not end else pd.Timestamp(end)
+    
+    total_final = 0.0
+    total_trades = 0
+    total_wins = 0
+    worst_dd = 0.0
+    active_symbols = 0
+    
+    old_r2 = dict(RULE_SET_2.CONFIG)
+    old_r7 = dict(RULE_SET_7.CONFIG)
+    try:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_2.CONFIG.update(sell)
+        
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+        RULE_SET_7.CONFIG.update(buy)
+        
+        # Override regime filter if requested via env
+        lab_regime = os.getenv("AT_LAB_REGIME_FILTER_ENABLED", "").strip()
+        if lab_regime:
+            RULE_SET_7.CONFIG["regime_filter_enabled"] = int(float(lab_regime))
+
+        for sym, df in data_map.items():
+            stats = _simulate_symbol(sym, df, signal_start_date=start_ts, signal_end_date=end_ts)
+            total_final += stats["final_value"]
+            total_trades += stats["trades"]
+            total_wins += stats["wins"]
+            worst_dd = min(worst_dd, stats["max_drawdown_pct"])
+            if stats["trades"] > 0:
+                active_symbols += 1
+    finally:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+        
+    start_cap = 100000.0 * max(1, len(data_map))
+    ret_pct = (total_final / start_cap - 1.0) * 100.0
+    
+    # CAGR calculation
+    if start_ts:
+        # For recent window, use the actual window span
+        last_date = pd.Timestamp.now()
+        # Find max date in data if possible
+        for df in data_map.values():
+            if not df.empty:
+                last_date = max(last_date, pd.to_datetime(df.iloc[-1]["Date"]))
+        days = (last_date - start_ts).days
+    else:
+        # For full history, assume 5 years (default Kite window)
+        days = 5 * 365.25
+        
+    years = max(0.1, days / 365.25)
+    cagr = ((total_final / start_cap) ** (1.0 / years) - 1.0) * 100.0 if total_final > 0 else -100.0
+    
+    win_rate = (total_wins / total_trades * 100.0) if total_trades > 0 else 0.0
+    
+    return VariantResult(
+        name=name,
+        total_return_pct=round(ret_pct, 2),
+        cagr_pct=round(cagr, 2),
+        max_drawdown_pct=round(worst_dd, 2),
+        trades=total_trades,
+        win_rate_pct=round(win_rate, 1),
+        active_symbols=active_symbols
+    )
 
 
 def score(full, recent) -> float:
@@ -140,8 +205,7 @@ def main() -> int:
     ap.add_argument("--symbol-limit", type=int, default=120)
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0)
-    # Use the last ~2 WF folds as a recent robustness proxy. A 2025-only window
-    # can be too sparse on sampled universes and hide useful-but-weak candidates.
+    # Use the last ~2 WF folds as a recent robustness proxy.
     ap.add_argument("--recent-start", default="2024-08-20")
     ap.add_argument("--label", default="robust_oos_refiner")
     args = ap.parse_args()
@@ -152,7 +216,7 @@ def main() -> int:
         variants = variants[: args.limit]
 
     print(
-        f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Robust OOS refiner: "
+        f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Robust OOS refiner (FIXED): "
         f"variants={len(variants)} offset={args.offset} total={len(all_variants)} "
         f"symbol_limit={args.symbol_limit}",
         flush=True,
@@ -164,8 +228,11 @@ def main() -> int:
     history_path = OUT_DIR / f"{args.label}_history.jsonl"
     for idx, bp in enumerate(variants, 1):
         t0 = time.time()
+        # Full history run (no gating)
         full = run_with_window(data_map, bp["name"], bp["buy"], bp.get("sell", {}), None, None)
+        # Recent OOS proxy run (gated)
         recent = run_with_window(data_map, bp["name"] + "_recent", bp["buy"], bp.get("sell", {}), args.recent_start, None)
+        
         row = {
             "name": bp["name"],
             "buy": bp["buy"],

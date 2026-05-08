@@ -34,7 +34,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader import utils as at_utils  # noqa: E402
-from Auto_Trader.StrongFundamentalsStockList import goodStocks  # noqa: E402
+try: from Auto_Trader.StrongFundamentalsStockList import goodStocks
+except ImportError: goodStocks = None  # noqa: E402
 
 lab = importlib.import_module("scripts.weekly_strategy_lab")
 
