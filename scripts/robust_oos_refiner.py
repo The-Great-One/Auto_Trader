@@ -98,27 +98,30 @@ def subset_data(data_map: dict, limit: int) -> dict:
 
 
 def run_with_window(data_map: dict, name: str, buy: dict, sell: dict, start: str | None, end: str | None):
-    old_start = os.environ.get("AT_BACKTEST_SIGNAL_START_DATE")
-    old_end = os.environ.get("AT_BACKTEST_SIGNAL_END_DATE")
-    try:
-        if start:
-            os.environ["AT_BACKTEST_SIGNAL_START_DATE"] = start
-        else:
-            os.environ.pop("AT_BACKTEST_SIGNAL_START_DATE", None)
-        if end:
-            os.environ["AT_BACKTEST_SIGNAL_END_DATE"] = end
-        else:
-            os.environ.pop("AT_BACKTEST_SIGNAL_END_DATE", None)
+    """Run on a date-filtered view.
+
+    The cagr_hunt/weekly_universe engine does not reliably honor the signal
+    start/end env vars in this path, so build an explicit filtered data_map.
+    Indicators are already computed on full history before filtering, which
+    preserves warmup values better than re-indicatoring a tiny recent slice.
+    """
+    if not start and not end:
         return run_variant(data_map, buy, sell)
-    finally:
-        if old_start is None:
-            os.environ.pop("AT_BACKTEST_SIGNAL_START_DATE", None)
-        else:
-            os.environ["AT_BACKTEST_SIGNAL_START_DATE"] = old_start
-        if old_end is None:
-            os.environ.pop("AT_BACKTEST_SIGNAL_END_DATE", None)
-        else:
-            os.environ["AT_BACKTEST_SIGNAL_END_DATE"] = old_end
+    start_ts = None if not start else __import__("pandas").Timestamp(start)
+    end_ts = None if not end else __import__("pandas").Timestamp(end)
+    filtered = {}
+    for sym, df in data_map.items():
+        if "Date" not in df.columns:
+            continue
+        mask = __import__("pandas").Series(True, index=df.index)
+        if start_ts is not None:
+            mask &= df["Date"] >= start_ts
+        if end_ts is not None:
+            mask &= df["Date"] <= end_ts
+        sub = df.loc[mask].copy().reset_index(drop=True)
+        if len(sub) >= 20:
+            filtered[sym] = sub
+    return run_variant(filtered, buy, sell)
 
 
 def score(full, recent) -> float:
