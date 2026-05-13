@@ -11,10 +11,20 @@ log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $*"; }
 
 log "Starting telegram learning pipeline"
 
-# Step 1: Fresh export. Best-effort: if the authenticated Telegram watcher has
-# the Telethon session locked, we keep using the latest export + live watcher feed.
+# Step 1: Fresh export. Use a private copy of the Telethon session DB so the
+# live watcher can keep the canonical session open without causing
+# sqlite3.OperationalError: database is locked in the fetcher.
 log "Step 1: Fetching fresh Telegram data"
-if ! "$VENV_PY" "$TOOL_DIR/telegram_reader.py" fetch \
+FETCH_SESSION_DIR="$(mktemp -d "${TMPDIR:-/tmp}/telegram-reader-session.XXXXXX")"
+FETCH_SESSION="$FETCH_SESSION_DIR/reader"
+cleanup_fetch_session() { rm -rf "$FETCH_SESSION_DIR"; }
+trap cleanup_fetch_session EXIT
+if [ -f "$HOME/.openclaw/telegram-user/reader.session" ]; then
+  cp "$HOME/.openclaw/telegram-user/reader.session" "$FETCH_SESSION.session"
+else
+  log "FETCH: canonical Telegram session missing; fetch may require login"
+fi
+if ! "$VENV_PY" "$TOOL_DIR/telegram_reader.py" --session "$FETCH_SESSION" fetch \
   --chat @FinanceWithSunil --chat @Shortterm01 --chat @DarkHorseOfStockMarket --chat @Milind4Profits \
   --days 14 \
   --output "$EXPORT_DIR/telegram_export_latest.json" 2>&1 | while IFS= read -r line; do log "FETCH: $line"; done; then
