@@ -38,6 +38,10 @@ import logging
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
+TOKEN_PATH = "intermediary_files/access_token.json"
+TOKEN_LOCK_PATH = "intermediary_files/access_token.lock"
+
+
 # Default rule set values
 DEFAULT_RULE_SETS = {
     "RULE_SET_2": RULE_SET_2,
@@ -87,12 +91,11 @@ def build_access_token():
         # intermediary state. Just ensure the directory exists and replace the
         # token file atomically.
         os.makedirs("intermediary_files", exist_ok=True)
-        token_path = "intermediary_files/access_token.json"
-        temp_token_path = f"{token_path}.tmp"
+        temp_token_path = f"{TOKEN_PATH}.tmp"
 
         with open(temp_token_path, "w") as json_file:
             json.dump(session_data, json_file, indent=4)
-        os.replace(temp_token_path, token_path)
+        os.replace(temp_token_path, TOKEN_PATH)
         logger.info("New access token saved successfully.")
         return data["access_token"]
     except Exception as e:
@@ -102,49 +105,74 @@ def build_access_token():
         raise
 
 
+def _build_access_token_locked(reason: str) -> str:
+    """Serialize token creation so concurrent callers do not trigger CAPTCHA storms."""
+    os.makedirs("intermediary_files", exist_ok=True)
+    try:
+        with FileLock(TOKEN_LOCK_PATH, timeout=180):
+            # Another process may have refreshed the token while we waited.
+            try:
+                with open(TOKEN_PATH, "r") as json_file:
+                    session_data = json.load(json_file)
+                access_token = session_data.get("access_token")
+                session_date = session_data.get("date")
+                if str(datetime.now().date()) == session_date and access_token:
+                    logger.info(
+                        "Using access token refreshed by another process; reason=%s",
+                        reason,
+                    )
+                    return access_token
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+
+            logger.warning("Creating a new Kite session; reason=%s", reason)
+            return build_access_token()
+    except Timeout:
+        raise RuntimeError("Timed out waiting for Kite access-token refresh lock")
+
+
+def _is_invalid_token_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(
+        marker in text
+        for marker in (
+            "invalid token",
+            "token is invalid",
+            "api_token",
+            "access_token",
+            "403",
+            "api_key",
+        )
+    )
+
+
 def read_session_data():
-    """
-    Read the access token from a JSON file and validate it.
+    """Read today's cached access token; create one only on true cache miss/stale.
 
-    Validates the token with a lightweight Kite API call so a stale/invalid
-    token that happens to be dated today does not loop forever.
-
-    Returns:
-        str: The valid access token.
-
-    Raises:
-        Exception: If a new token cannot be built after cache miss/invalidation.
+    This intentionally does not validate with a broker API call. Validation belongs
+    in initialize_kite(), after the token has been loaded, so transient network/API
+    errors do not delete a usable token and trigger automated login/CAPTCHA.
     """
     try:
-        with open("intermediary_files/access_token.json", "r") as json_file:
+        with open(TOKEN_PATH, "r") as json_file:
             session_data = json.load(json_file)
         access_token = session_data.get("access_token")
         session_date = session_data.get("date")
 
         if str(datetime.now().date()) == session_date and access_token:
-            # Quick validation: try a cheap API call. If the token is
-            # invalid (e.g. revoked server-side), rebuild instead of
-            # trusting a broken token for the rest of the day.
-            try:
-                test_kite = KiteConnect(api_key=API_KEY)
-                test_kite.set_access_token(access_token)
-                # margins() is lightweight and fails fast on bad tokens
-                test_kite.margins()
-                return access_token
-            except Exception:
-                logger.warning(
-                    "Cached access token (dated %s) failed validation — "
-                    "deleting and rebuilding.",
-                    session_date,
-                )
-                os.remove("intermediary_files/access_token.json")
-                return build_access_token()
-        else:
-            return build_access_token()
+            return access_token
+        return _build_access_token_locked("missing_or_stale_token")
 
-    except (FileNotFoundError, json.JSONDecodeError):
-        logger.warning("Creating a new session.")
-        return build_access_token()
+    except FileNotFoundError:
+        return _build_access_token_locked("token_file_missing")
+    except json.JSONDecodeError:
+        return _build_access_token_locked("token_file_corrupt")
+    except PermissionError as exc:
+        # Do not attempt login when the real issue is local filesystem state.
+        raise RuntimeError(
+            f"Cannot read Kite access token file {TOKEN_PATH}: {exc}. "
+            "Fix file ownership/permissions instead of creating a new token."
+        ) from exc
 
 
 def initialize_kite():
@@ -176,13 +204,18 @@ def initialize_kite():
             )
             if attempt >= max_retries:
                 raise
-            # Clear any stale token cache before rebuilding
+            exc = sys.exc_info()[1]
+            if not _is_invalid_token_error(exc):
+                # Network/API/permission/transient failures should not erase a
+                # possibly valid token or trigger browser-login/CAPTCHA.
+                time.sleep(attempt * 2)
+                continue
             try:
-                os.remove("intermediary_files/access_token.json")
+                os.remove(TOKEN_PATH)
             except FileNotFoundError:
                 pass
             try:
-                build_access_token()
+                _build_access_token_locked("invalid_token_validation")
             except Exception:
                 logger.exception(
                     "Token rebuild also failed (attempt %s/%s) — will retry.",
