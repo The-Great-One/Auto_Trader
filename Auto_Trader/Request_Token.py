@@ -65,7 +65,7 @@ def _looks_like_captcha(payload: dict) -> bool:
 def _do_kite_login(kite, auth):
     """Perform the full Kite login dance with retry on transient CF blocks."""
 
-    _max_login_attempts = 5
+    _max_login_attempts = 7
     _login_attempt = 0
 
     while True:
@@ -98,11 +98,15 @@ def _do_kite_login(kite, auth):
         summary = _response_summary(login_response, login_payload_json)
         _login_attempt += 1
 
-        if _looks_like_captcha(login_payload_json):
-            logger.error(
-                "Kite login blocked by CAPTCHA challenge before TOTP: %s", summary
+        captcha_like = _looks_like_captcha(login_payload_json)
+        if captcha_like:
+            logger.warning(
+                "Kite login returned CAPTCHA-like challenge before TOTP "
+                "(attempt %d/%d): %s",
+                _login_attempt,
+                _max_login_attempts,
+                summary,
             )
-            raise RuntimeError(f"Kite login failed: {summary}")
 
         if _login_attempt >= _max_login_attempts:
             logger.error(
@@ -113,12 +117,15 @@ def _do_kite_login(kite, auth):
                 f"Kite login failed after {_max_login_attempts} attempts: {summary}"
             )
 
-        backoff = 5 * (2 ** (_login_attempt - 1))
-        jitter = backoff * 0.1 * random.random()
+        # CAPTCHA-like failures need a cooler retry than empty/CF responses.
+        base = 15 if captcha_like else 5
+        backoff = min(180, base * (2 ** (_login_attempt - 1)))
+        jitter = backoff * 0.2 * random.random()
         delay = backoff + jitter
         logger.warning(
-            "Kite login transient failure (attempt %d/%d): %s - retrying in %.1fs",
-            _login_attempt, _max_login_attempts, summary, delay,
+            "Kite login retry scheduled (attempt %d/%d, captcha_like=%s): "
+            "%s - retrying in %.1fs",
+            _login_attempt, _max_login_attempts, captcha_like, summary, delay,
         )
         _time.sleep(delay)
 
