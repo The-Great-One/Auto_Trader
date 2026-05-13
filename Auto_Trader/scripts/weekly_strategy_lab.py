@@ -81,7 +81,7 @@ _WORKER_RNN_MODELS: dict | None = None
 
 
 def configured_history_period() -> str:
-    return os.getenv("AT_LAB_HISTORY_PERIOD", "3y").strip() or "3y"
+    return os.getenv("AT_LAB_HISTORY_PERIOD", "5y").strip() or "5y"
 
 
 def configured_min_history_bars(default: int = 260) -> int:

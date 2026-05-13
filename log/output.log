@@ -13614,3 +13614,51 @@
 [2026-05-05 14:18:09,501] {utils.py apply_trading_rules:717 MainThread} INFO - Decisions for OIL: {'SELL': [], 'BUY': [], 'HOLD': ['RULE_SET_2', 'RULE_SET_7']}
 [2026-05-05 14:18:09,576] {utils.py apply_trading_rules:717 MainThread} INFO - Decisions for SKIPPER: {'SELL': [], 'BUY': [], 'HOLD': ['RULE_SET_2', 'RULE_SET_7']}
 [2026-05-05 14:18:09,645] {utils.py apply_trading_rules:717 MainThread} INFO - Decisions for WHIRLPOOL: {'SELL': [], 'BUY': [], 'HOLD': ['RULE_SET_2', 'RULE_SET_7']}
+[2026-05-13 13:18:33,202] {utils.py build_access_token:102 MainThread} ERROR - Error in generating session: Playwright is unavailable for Kite browser login: No module named 'playwright', Traceback: Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 75, in _do_kite_login_browser
+    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+ModuleNotFoundError: No module named 'playwright'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/utils.py", line 83, in build_access_token
+    request_token=get_request_token(), api_secret=API_SECRET
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 285, in get_request_token
+    return _do_kite_login_browser(kite, auth)
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 77, in _do_kite_login_browser
+    raise RuntimeError(f"Playwright is unavailable for Kite browser login: {exc}") from exc
+RuntimeError: Playwright is unavailable for Kite browser login: No module named 'playwright'
+
+[2026-05-13 13:21:31,907] {Request_Token.py _do_kite_login_browser:98 MainThread} INFO - Starting Kite browser login flow.
+[2026-05-13 13:21:53,692] {utils.py build_access_token:102 MainThread} ERROR - Error in generating session: Kite browser login did not reach TOTP screen; screenshot=/tmp/kite_login_error_12081.png; body="Login to Wednesday\nPhone number or User ID\nPassword\nLogin to Kite Web also?\nNot recommended on shared or public systems\n\xa0 \nLogin\n\n Invalid CAPTCHA values.\n\nForgot user ID or password?\n\nDon't have an account? Sign up for free!\n\nZerodha Broking Limited: Member of NSE, BSE, MCX ‐ SEBI Reg. no. INZ000031633, CDSL ‐ SEBI Reg. no. IN-DP-431-2019 | Smart Online Dispute Resolution | SEBI SCORES\n\nv3.0.0", Traceback: Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 106, in _do_kite_login_browser
+    page.wait_for_selector("input#totp, input[name='totp']", timeout=20000)
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/sync_api/_generated.py", line 8525, in wait_for_selector
+    self._sync(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/_impl/_page.py", line 419, in wait_for_selector
+    return await self._main_frame.wait_for_selector(**locals_to_params(locals()))
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/_impl/_frame.py", line 369, in wait_for_selector
+    await self._channel.send(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+  File "/Users/sahilgoel/Desktop/Stocks/venv/lib/python3.10/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 20000ms exceeded.
+Call log:
+  - waiting for locator("input#totp, input[name='totp']") to be visible
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/utils.py", line 83, in build_access_token
+    request_token=get_request_token(), api_secret=API_SECRET
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 285, in get_request_token
+    return _do_kite_login_browser(kite, auth)
+  File "/Users/sahilgoel/Desktop/Stocks/Auto_Trader/Request_Token.py", line 110, in _do_kite_login_browser
+    raise RuntimeError(
+RuntimeError: Kite browser login did not reach TOTP screen; screenshot=/tmp/kite_login_error_12081.png; body="Login to Wednesday\nPhone number or User ID\nPassword\nLogin to Kite Web also?\nNot recommended on shared or public systems\n\xa0 \nLogin\n\n Invalid CAPTCHA values.\n\nForgot user ID or password?\n\nDon't have an account? Sign up for free!\n\nZerodha Broking Limited: Member of NSE, BSE, MCX ‐ SEBI Reg. no. INZ000031633, CDSL ‐ SEBI Reg. no. IN-DP-431-2019 | Smart Online Dispute Resolution | SEBI SCORES\n\nv3.0.0"
+

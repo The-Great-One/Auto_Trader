@@ -71,10 +71,32 @@ def _load_live_watchlist() -> pd.DataFrame | None:
     return df
 
 
+def _symbol_universe_from_env() -> pd.DataFrame | None:
+    raw = os.getenv("AT_LAB_SYMBOLS", "").strip() or os.getenv("AT_WEEKLY_CAGR_SYMBOLS", "").strip()
+    if not raw:
+        return None
+    symbols = []
+    seen = set()
+    for token in raw.replace("\n", ",").split(","):
+        symbol = str(token or "").upper().strip()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        symbols.append(symbol)
+    if not symbols:
+        return None
+    return pd.DataFrame({"Symbol": symbols, "AssetClass": "EQUITY", "ETFTheme": ""})
+
+
 def build_universe(limit: int | None = None) -> tuple[pd.DataFrame, dict]:
-    df = _load_live_watchlist()
-    universe_source = "live_instruments_feather"
+    df = _symbol_universe_from_env()
+    universe_source = "env_symbols"
     if df is None or df.empty:
+        df = _load_live_watchlist()
+        universe_source = "live_instruments_feather"
+    if df is None or df.empty:
+        if goodStocks is None:
+            raise RuntimeError("Strong fundamentals universe unavailable and no live/env universe provided")
         df = goodStocks()
         universe_source = "strong_fundamentals_screen"
     if df is None or df.empty:

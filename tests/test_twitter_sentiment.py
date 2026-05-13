@@ -7,17 +7,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / "Auto_Trader" / "twitter_sentiment.py"
-SPEC = importlib.util.spec_from_file_location("twitter_sentiment", MODULE_PATH)
-ts = importlib.util.module_from_spec(SPEC)
+MODULE_PATH = ROOT / "Auto_Trader" / "news_sentiment.py"
+SPEC = importlib.util.spec_from_file_location("news_sentiment", MODULE_PATH)
+ns = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
-sys.modules[SPEC.name] = ts
-SPEC.loader.exec_module(ts)
+sys.modules[SPEC.name] = ns
+SPEC.loader.exec_module(ns)
 
 
-class TwitterSentimentTests(unittest.TestCase):
-    def test_classify_tweet_detects_bearish_regulatory_flow(self):
-        out = ts.classify_tweet("SEBI investigation and weak guidance make this stock a sell")
+class NewsSentimentTests(unittest.TestCase):
+    def test_classify_text_detects_bearish_regulatory_flow(self):
+        out = ns.classify_text("SEBI investigation and weak guidance make this stock a sell")
         self.assertIn("bearish", out["types"])
         self.assertIn("regulatory", out["types"])
         self.assertLess(out["sentiment"], 0)
@@ -43,8 +43,8 @@ class TwitterSentimentTests(unittest.TestCase):
                 "status": "ok",
             }))
 
-            with patch.object(ts, "STATE_DIR", state_dir), patch.dict("os.environ", {"AT_TWITTER_SENTIMENT_ENABLED": "1", "AT_TWITTER_SENTIMENT_TTL_MINUTES": "90"}):
-                decision, overlay = ts.apply_sentiment_overlay("BUY", "ABC", holdings=None)
+            with patch.object(ns, "STATE_DIR", state_dir), patch.dict("os.environ", {"AT_NEWS_SENTIMENT_ENABLED": "1", "AT_NEWS_SENTIMENT_TTL_MINUTES": "90"}):
+                decision, overlay = ns.apply_news_overlay("BUY", "ABC", holdings=None)
 
             self.assertEqual(decision, "HOLD")
             self.assertEqual(overlay["action"], "blocked_buy")

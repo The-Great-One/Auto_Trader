@@ -204,8 +204,7 @@ def initialize_kite():
             )
             if attempt >= max_retries:
                 raise
-            exc = sys.exc_info()[1]
-            if not _is_invalid_token_error(exc):
+            if not _is_invalid_token_error(sys.exc_info()[1]):
                 # Network/API/permission/transient failures should not erase a
                 # possibly valid token or trigger browser-login/CAPTCHA.
                 time.sleep(attempt * 2)
@@ -272,8 +271,11 @@ def compute_supertrend(
     st = pd.Series(raw, index=df.index, dtype="float64").ffill().values
     direction = df["Close"].values > st
 
-    df[sup_col] = st
-    df[sup_dir] = direction
+    # Assign both columns in one operation to avoid fragmenting large lab frames.
+    df[[sup_col, sup_dir]] = pd.DataFrame(
+        {sup_col: st, sup_dir: direction},
+        index=df.index,
+    )
 
 
 def compute_fibonacci(
@@ -558,7 +560,12 @@ def Indicators(
     typical_price = (high + low + close) / 3.0
     cum_vol = np.cumsum(vol)
     cum_tp_vol = np.cumsum(typical_price * vol)
-    VWAP = np.where(cum_vol > 0, cum_tp_vol / cum_vol, typical_price)
+    VWAP = np.divide(
+        cum_tp_vol,
+        cum_vol,
+        out=np.asarray(typical_price, dtype="float64").copy(),
+        where=cum_vol > 0,
+    )
 
     # CCI (Commodity Channel Index)
     CCI = talib.CCI(high, low, close, timeperiod=20)
@@ -770,8 +777,11 @@ def Indicators(
         **market_structure,
     }
 
-    # Bulk assign
-    df = df.assign(**assign_kwargs)
+    # Bulk assign via concat to avoid pandas fragmentation from inserting many columns.
+    existing = [col for col in assign_kwargs if col in df.columns]
+    if existing:
+        df = df.drop(columns=existing)
+    df = pd.concat([df, pd.DataFrame(assign_kwargs, index=df.index)], axis=1)
 
     # Supertrend variants
     compute_supertrend(df, ATR, multiplier=2.0)

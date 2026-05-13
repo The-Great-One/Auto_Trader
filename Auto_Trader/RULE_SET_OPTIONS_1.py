@@ -10,6 +10,7 @@ CONFIG = {
     "underlying_rsi_bull_min": float(os.getenv("AT_OPTIONS_UL_RSI_BULL_MIN", "55")),
     "underlying_rsi_bear_max": float(os.getenv("AT_OPTIONS_UL_RSI_BEAR_MAX", "45")),
     "underlying_adx_min": float(os.getenv("AT_OPTIONS_UL_ADX_MIN", "18")),
+    "underlying_alignment_mode": os.getenv("AT_OPTIONS_UL_ALIGNMENT_MODE", "strict").strip().lower(),
     "option_rsi_min": float(os.getenv("AT_OPTIONS_RSI_MIN", "56")),
     "volume_confirm_mult": float(os.getenv("AT_OPTIONS_VOLUME_CONFIRM_MULT", "1.1")),
     "oi_sma_mult": float(os.getenv("AT_OPTIONS_OI_SMA_MULT", "1.02")),
@@ -112,7 +113,68 @@ def evaluate_signal(df, row, holdings):
             not ul_supertrend_dir,
         )
     )
-    underlying_ok = bullish_underlying or bearish_underlying
+    strict_underlying_ok = bullish_underlying or bearish_underlying
+
+    # Expiry-week option calls often work on short-term underlying bias before
+    # the full EMA20/EMA50 + supertrend stack flips. Keep strict as the live
+    # default, but let labs explicitly test less brittle alignment modes.
+    adx_floor = min(float(CONFIG["underlying_adx_min"]), 12.0)
+    bullish_bias = all(
+        (
+            side == "CE",
+            np.isfinite(ul_close),
+            np.isfinite(ul_ema20),
+            np.isfinite(ul_rsi),
+            np.isfinite(ul_adx),
+            ul_close > ul_ema20,
+            ul_rsi >= min(float(CONFIG["underlying_rsi_bull_min"]), 50.0),
+            ul_adx >= adx_floor,
+        )
+    )
+    bearish_bias = all(
+        (
+            side == "PE",
+            np.isfinite(ul_close),
+            np.isfinite(ul_ema20),
+            np.isfinite(ul_rsi),
+            np.isfinite(ul_adx),
+            ul_close < ul_ema20,
+            ul_rsi <= max(float(CONFIG["underlying_rsi_bear_max"]), 50.0),
+            ul_adx >= adx_floor,
+        )
+    )
+    bias_underlying_ok = bullish_bias or bearish_bias
+
+    bullish_momentum = all(
+        (
+            side == "CE",
+            np.isfinite(ul_rsi),
+            np.isfinite(ul_adx),
+            ul_rsi >= 50.0,
+            ul_adx >= adx_floor,
+            (not np.isfinite(ul_macd_hist)) or ul_macd_hist >= 0,
+        )
+    )
+    bearish_momentum = all(
+        (
+            side == "PE",
+            np.isfinite(ul_rsi),
+            np.isfinite(ul_adx),
+            ul_rsi <= 50.0,
+            ul_adx >= adx_floor,
+            (not np.isfinite(ul_macd_hist)) or ul_macd_hist <= 0,
+        )
+    )
+    momentum_underlying_ok = bias_underlying_ok or bullish_momentum or bearish_momentum
+
+    alignment_mode = str(CONFIG.get("underlying_alignment_mode", "strict") or "strict").strip().lower()
+    if alignment_mode in {"bias", "trend_bias", "short_bias"}:
+        underlying_ok = bias_underlying_ok
+    elif alignment_mode in {"momentum", "loose", "intraday"}:
+        underlying_ok = momentum_underlying_ok
+    else:
+        alignment_mode = "strict"
+        underlying_ok = strict_underlying_ok
 
     atr_pct = atr / close if np.isfinite(atr) and close > 0 else np.nan
     atr_available = np.isfinite(atr_pct)
@@ -164,6 +226,10 @@ def evaluate_signal(df, row, holdings):
 
     gate_status = {
         "underlying_alignment": bool(underlying_ok),
+        "underlying_strict_alignment": bool(strict_underlying_ok),
+        "underlying_bias_alignment": bool(bias_underlying_ok),
+        "underlying_momentum_alignment": bool(momentum_underlying_ok),
+        "underlying_alignment_mode": alignment_mode,
         "price_momentum": bool(price_momo),
         "ema_stack": bool(ema_stack),
         "rsi_ok": bool(rsi_ok),
@@ -221,6 +287,7 @@ def evaluate_signal(df, row, holdings):
         "underlying_rsi_bull_min": CONFIG["underlying_rsi_bull_min"],
         "underlying_rsi_bear_max": CONFIG["underlying_rsi_bear_max"],
         "underlying_adx_min": CONFIG["underlying_adx_min"],
+        "underlying_alignment_mode": alignment_mode,
     }
 
     holding = _holding_for_symbol(holdings, symbol)

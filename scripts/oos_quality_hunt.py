@@ -231,7 +231,87 @@ OOS_HUNT_VARIANTS = [
         "buy": {"adx_strong_min": 18, "ich_cloud_bull": 0},
         "sell": {"breakeven_trigger_pct": 4.0, "equity_time_stop_bars": 15},
     },
+
+    # === GROUP 8: Sentinel top-variant revalidation ===
+    # combo263_tight_ts8 was best headline (66.4%) but 2/5 OOS positive.
+    # Try its exact buy/sell params through the OOS hunt framework.
+    {
+        "name": "oos_combo263_tight_ts8",
+        "buy": {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "equity_time_stop_bars": 8},
+    },
+    {
+        "name": "oos_combo263_tight_ts5",
+        "buy": {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        "sell": {"momentum_exit_rsi": 40.0, "equity_review_rsi": 48.0, "equity_time_stop_bars": 5},
+    },
+
+    # === GROUP 9: ADX+Ichimoku combos (best OOS from focused WF) ===
+    # adx18_ich had 0.51% mean OOS, 3/5 positive. Try tighter time stops.
+    {
+        "name": "oos_adx18_ich_ts5",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "volume_confirm_mult": 0.75},
+        "sell": {"equity_time_stop_bars": 5},
+    },
+    {
+        "name": "oos_adx18_ich_ts8",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "volume_confirm_mult": 0.75},
+        "sell": {"equity_time_stop_bars": 8},
+    },
+    {
+        "name": "oos_adx18_ich_bep3_ts8",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "volume_confirm_mult": 0.75},
+        "sell": {"breakeven_trigger_pct": 3.0, "equity_time_stop_bars": 8},
+    },
+    {
+        "name": "oos_adx18_ich_bep5_ts10",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "volume_confirm_mult": 0.75},
+        "sell": {"breakeven_trigger_pct": 5.0, "equity_time_stop_bars": 10},
+    },
+
+    # === GROUP 10: Regime filter + ADX (best-of-breed from prior sweeps) ===
+    # The regime_30_150 filter combined with adx18 showed 22.49% headline.
+    # Try with different exits and tighter regime.
+    {
+        "name": "oos_regime30_150_adx18_ts8",
+        "buy": {"adx_strong_min": 18, "regime_filter_enabled": 1, "regime_ema_fast": 30, "regime_ema_slow": 150, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        "sell": {"equity_time_stop_bars": 8, "momentum_exit_rsi": 35.0},
+    },
+    {
+        "name": "oos_regime30_150_adx18_bep3_ts6",
+        "buy": {"adx_strong_min": 18, "regime_filter_enabled": 1, "regime_ema_fast": 30, "regime_ema_slow": 150, "volume_confirm_mult": 0.75, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        "sell": {"breakeven_trigger_pct": 3.0, "equity_time_stop_bars": 6, "momentum_exit_rsi": 38.0},
+    },
+    {
+        "name": "oos_regime20_100_adx18_ich_ts6",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "regime_filter_enabled": 1, "regime_ema_fast": 20, "regime_ema_slow": 100, "volume_confirm_mult": 0.75},
+        "sell": {"breakeven_trigger_pct": 3.0, "equity_time_stop_bars": 6},
+    },
+
+    # === GROUP 11: Telegram confluence v2 (learned from channel data) ===
+    # @darkhorseofstockmarket has 53.6 confidence with equity corroboration 57.5.
+    # Use a moderate boost — not full size, just better entry timing.
+    {
+        "name": "oos_adx18_telegram_conf_015",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 0, "volume_confirm_mult": 0.75},
+        "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "breakeven_trigger_pct": 3.0},
+        "rnn": {"enabled": False, "telegram_overlay": True, "telegram_watchlist_boost": 0.15},
+    },
+    {
+        "name": "oos_adx18_ich_telegram_conf_015",
+        "buy": {"adx_strong_min": 18, "ich_cloud_bull": 1, "volume_confirm_mult": 0.75},
+        "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "breakeven_trigger_pct": 3.0},
+        "rnn": {"enabled": False, "telegram_overlay": True, "telegram_watchlist_boost": 0.15},
+    },
 ]
+
+
+def _compute_cagr_from_return(total_return_pct: float, span_days: float) -> float:
+    """Compute CAGR from total return and calendar span."""
+    if span_days <= 0 or total_return_pct <= -100:
+        return 0.0
+    years = max(span_days / 252.0, 0.01)
+    return round((((1 + total_return_pct / 100.0) ** (1.0 / years)) - 1.0) * 100.0, 2)
 
 
 def run_variant_on_data(name: str, data_map: dict, buy_params: dict, sell_params: dict, rnn_params: dict | None = None) -> dict:
@@ -240,10 +320,13 @@ def run_variant_on_data(name: str, data_map: dict, buy_params: dict, sell_params
     result = run_variant(name, data_map, buy_params, sell_params, rnn_params=rnn_params)
     if result is None:
         return {"name": name, "error": "no_result"}
+    # BacktestResult doesn't have cagr_pct — compute it from total return + 5Y span
+    span_days = 5 * 252.0  # assume 5-year window
+    cagr = _compute_cagr_from_return(result.total_return_pct, span_days)
     return {
         "name": name,
         "total_return_pct": result.total_return_pct,
-        "cagr_pct": result.cagr_pct,
+        "cagr_pct": cagr,
         "max_drawdown_pct": result.max_drawdown_pct,
         "trades": result.trades,
         "win_rate_pct": result.win_rate_pct,

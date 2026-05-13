@@ -100,7 +100,7 @@ _WORKER_RNN_MODELS: dict | None = None
 
 
 def configured_history_period() -> str:
-    return os.getenv("AT_LAB_HISTORY_PERIOD", "3y").strip() or "3y"
+    return os.getenv("AT_LAB_HISTORY_PERIOD", "5y").strip() or "5y"
 
 
 def configured_min_history_bars(default: int = 260) -> int:
@@ -400,9 +400,119 @@ def _looks_etf_like(symbol: str) -> bool:
     return ("ETF" in text) or ("BEES" in text)
 
 
-def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> list[str]:
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _age_hours(value: str | None) -> float | None:
+    dt = _parse_dt(value)
+    if dt is None:
+        return None
+    now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
+    return max(0.0, (now - dt).total_seconds() / 3600.0)
+
+
+def load_telegram_context() -> dict:
+    """Load Telegram channel learning as a first-class lab input.
+
+    The lab uses this only for research variants and universe selection; it
+    never promotes a Telegram overlay directly into live trading.
+    """
+    max_age_hours = float(os.getenv("AT_LAB_TELEGRAM_MAX_AGE_HOURS", "36") or 36)
+    scores_path = OUT_DIR / "channel_learning_scores.json"
+    confluence_path = OUT_DIR / "telegram_confluence_analysis_latest.json"
+    audit_path = OUT_DIR / "telegram_trade_audit_latest.json"
+
+    context: dict[str, Any] = {
+        "enabled": os.getenv("AT_LAB_TELEGRAM_ENABLED", "1").strip().lower() not in {"0", "false", "no"},
+        "max_age_hours": max_age_hours,
+        "scores_path": str(scores_path),
+        "confluence_path": str(confluence_path),
+        "audit_path": str(audit_path),
+        "fresh": False,
+        "symbols": [],
+        "tradable_channels": [],
+        "avoid_channels": [],
+        "execution_profiles": {},
+        "notes": [],
+    }
+    if not context["enabled"]:
+        context["notes"].append("disabled_by_env")
+        return context
+
+    scores = {}
+    confluence = {}
+    try:
+        if scores_path.exists():
+            scores = json.loads(scores_path.read_text())
+    except Exception as exc:
+        context["notes"].append(f"scores_load_failed:{exc}")
+    try:
+        if confluence_path.exists():
+            confluence = json.loads(confluence_path.read_text())
+    except Exception as exc:
+        context["notes"].append(f"confluence_load_failed:{exc}")
+
+    generated_at = scores.get("generated_at") or confluence.get("generated_at")
+    age = _age_hours(generated_at)
+    context["generated_at"] = generated_at
+    context["age_hours"] = round(age, 2) if age is not None else None
+    context["fresh"] = bool(age is not None and age <= max_age_hours)
+    if not context["fresh"]:
+        context["notes"].append("telegram_learning_stale_or_missing")
+
+    symbols = set()
+    for sym in confluence.get("telegram_symbols", []) or []:
+        if str(sym).strip():
+            symbols.add(str(sym).strip().upper())
+
+    channels = scores.get("channels", {}) or {}
+    for channel, stats in channels.items():
+        conf = float(stats.get("confidence") or 0.0)
+        action = str(stats.get("action") or "").lower()
+        eq = stats.get("equity_audit", {}) or {}
+        opt = stats.get("options_audit", {}) or {}
+        profile = stats.get("execution_profile", {}) or {}
+        sizing = float(stats.get("sizing_mult") or 0.0)
+        eq_positive = float(eq.get("ret_5d_positive_rate") or 0.0)
+        eq_avg = float(eq.get("ret_5d_avg") or 0.0)
+        max_fav = float(eq.get("max_20d_avg") or opt.get("max_favorable_20d_avg") or 0.0)
+        opt_positive = float(opt.get("dir_ret_10d_positive_rate") or 0.0)
+        opt_avg = float(opt.get("dir_ret_10d_avg") or 0.0)
+        channel_row = {
+            "channel": channel,
+            "confidence": conf,
+            "action": stats.get("action"),
+            "sizing_mult": sizing,
+            "equity_ret_5d_avg": eq.get("ret_5d_avg"),
+            "equity_ret_5d_positive_rate": eq.get("ret_5d_positive_rate"),
+            "max_favorable_avg": max_fav,
+            "options_dir_10d_avg": opt.get("dir_ret_10d_avg"),
+            "options_dir_10d_positive_rate": opt.get("dir_ret_10d_positive_rate"),
+        }
+        context["execution_profiles"][channel] = profile
+        if ("enter" in action or conf >= 45) and (eq_positive >= 55 or eq_avg > 1.0 or max_fav >= 8 or opt_positive >= 60 or opt_avg > 3):
+            context["tradable_channels"].append(channel_row)
+        elif conf < 40 or eq_avg < -1.0 or opt_avg < -1.0:
+            context["avoid_channels"].append(channel_row)
+
+    # Keep the universe bounded and cache-backed; missing names are reported in
+    # data_context.skipped_symbols instead of silently forcing a yfinance fetch.
+    context["symbols"] = sorted(symbols)
+    context["symbol_count"] = len(context["symbols"])
+    return context
+
+
+def build_lab_symbols(tradebook_context: dict, fundamental_context: dict, telegram_context: dict | None = None) -> list[str]:
     explicit = os.getenv("AT_LAB_SYMBOLS", "").strip()
     use_approved_universe = os.getenv("AT_LAB_USE_APPROVED_UNIVERSE", "1").strip().lower() not in {"0", "false", "no"}
+    include_telegram = os.getenv("AT_LAB_INCLUDE_TELEGRAM_SYMBOLS", "1").strip().lower() not in {"0", "false", "no"}
+    telegram_symbols = set(str(x).upper().strip() for x in (telegram_context or {}).get("symbols", []) if str(x).strip())
 
     approved_equities_list = [str(x).upper().strip() for x in fundamental_context.get("approved_equities", []) if str(x).strip()]
     approved_etfs_list = [str(x).upper().strip() for x in fundamental_context.get("approved_etfs", []) if str(x).strip()]
@@ -418,6 +528,11 @@ def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> lis
         requested = list(DEFAULT_LAB_SYMBOLS)
         requested.extend(tradebook_context.get("top_symbols", [])[:8])
 
+    if include_telegram and (telegram_context or {}).get("fresh") and telegram_symbols:
+        # Put Telegram names first so small capped runs still test human-sourced
+        # momentum/structure ideas instead of consuming the cap on generic names.
+        requested = sorted(telegram_symbols) + requested
+
     out: list[str] = []
     seen = set()
     for symbol in requested:
@@ -426,7 +541,7 @@ def build_lab_symbols(tradebook_context: dict, fundamental_context: dict) -> lis
             continue
         seen.add(symbol)
 
-        if fundamental_context.get("fundamentals_found"):
+        if fundamental_context.get("fundamentals_found") and symbol not in telegram_symbols:
             if _looks_etf_like(symbol) or symbol in approved_etfs:
                 out.append(symbol)
                 continue
@@ -550,8 +665,8 @@ def _precache_histories(symbols: list[str]) -> dict:
     }
 
 
-def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[str, pd.DataFrame], dict]:
-    symbols = build_lab_symbols(tradebook_context, fundamental_context)
+def load_data(tradebook_context: dict, fundamental_context: dict, telegram_context: dict | None = None) -> tuple[dict[str, pd.DataFrame], dict]:
+    symbols = build_lab_symbols(tradebook_context, fundamental_context, telegram_context=telegram_context)
     data_map: dict[str, pd.DataFrame] = {}
     skipped: dict[str, str] = {}
     min_history_bars = configured_min_history_bars()
@@ -584,9 +699,18 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
     _try_load(symbols, "loading_history")
 
     fallback_symbols = []
-    if not data_map:
-        fallback_symbols = _candidate_fallback_symbols(limit=8)
-        _try_load(fallback_symbols, "loading_history_fallback")
+    min_loaded_symbols = max(1, int(os.getenv("AT_LAB_MIN_LOADED_SYMBOLS", "25") or 25))
+    if len(data_map) < min_loaded_symbols:
+        # Telegram names stay first, but a tiny cache-backed sample can produce
+        # fake comfort or fake pessimism. Top up from the freshest usable cache
+        # instead of silently falling back to yfinance.
+        extra_needed = max(8, min_loaded_symbols - len(data_map))
+        fallback_symbols = [
+            s for s in _candidate_fallback_symbols(limit=extra_needed + len(symbols))
+            if s not in data_map and s not in set(symbols)
+        ][:extra_needed]
+        if fallback_symbols:
+            _try_load(fallback_symbols, "loading_history_fallback")
 
     if not data_map:
         raise RuntimeError("Could not load any lab symbols with usable history")
@@ -602,6 +726,17 @@ def load_data(tradebook_context: dict, fundamental_context: dict) -> tuple[dict[
         "min_history_bars": min_history_bars,
         "use_approved_universe": os.getenv("AT_LAB_USE_APPROVED_UNIVERSE", "1").strip().lower() not in {"0", "false", "no"},
         "precache": precache_stats,
+        "telegram_context": {
+            "enabled": bool((telegram_context or {}).get("enabled")),
+            "fresh": bool((telegram_context or {}).get("fresh")),
+            "generated_at": (telegram_context or {}).get("generated_at"),
+            "age_hours": (telegram_context or {}).get("age_hours"),
+            "symbol_count": (telegram_context or {}).get("symbol_count", 0),
+            "loaded_telegram_symbols": [s for s in data_map.keys() if s in set((telegram_context or {}).get("symbols", []))],
+            "tradable_channels": (telegram_context or {}).get("tradable_channels", []),
+            "avoid_channels": (telegram_context or {}).get("avoid_channels", []),
+            "notes": (telegram_context or {}).get("notes", []),
+        },
     }
 
 
@@ -931,7 +1066,7 @@ def build_rnn_models(data_map: dict[str, pd.DataFrame], config):
 
 
 
-def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict, dict, dict]]:
+def variants(scorecard_context: dict, tradebook_context: dict, telegram_context: dict | None = None) -> list[tuple[str, dict, dict, dict]]:
     buy_grid, sell_grid = build_grids(scorecard_context, tradebook_context)
     base_buy = _current_param_values(buy_grid, RULE_SET_7.CONFIG)
     base_sell = _current_param_values(sell_grid, RULE_SET_2.CONFIG)
@@ -949,6 +1084,75 @@ def variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str
         out.append((name, buy_patch, sell_patch, rnn_patch))
 
     add("baseline_current", {}, {}, {"enabled": False})
+
+    # Focused refinements around the current best Telegram candidate. The first
+    # successful 5Y live-parity batch found telegram_strategy_001 just below the
+    # 30% target, so keep these immediately after baseline for small capped runs.
+    if (telegram_context or {}).get("fresh"):
+        best_like_buy_templates = [
+            {"adx_min": 8, "adx_strong_min": 18, "volume_confirm_mult": 0.6, "rsi_floor": 36, "stoch_pull_max": 95, "max_extension_atr": 4.0, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            {"adx_min": 8, "adx_strong_min": 18, "volume_confirm_mult": 0.65, "rsi_floor": 36, "stoch_pull_max": 95, "max_extension_atr": 4.25, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            {"adx_min": 7, "adx_strong_min": 18, "volume_confirm_mult": 0.65, "rsi_floor": 38, "stoch_pull_max": 95, "max_extension_atr": 4.0, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        ]
+        best_like_sell_templates = [
+            {"equity_time_stop_bars": 3, "fund_time_stop_bars": 7, "breakeven_trigger_pct": 1.25, "momentum_exit_rsi": 38.0},
+            {"equity_time_stop_bars": 4, "fund_time_stop_bars": 8, "breakeven_trigger_pct": 1.0, "momentum_exit_rsi": 40.0},
+            {"partial_exit_enabled": 1, "partial_exit_ladder": [(4.0, 0.5, 1.005), (8.0, 0.3, 1.04)], "breakeven_trigger_pct": 1.5, "equity_time_stop_bars": 5, "fund_time_stop_bars": 9},
+        ]
+        refine_idx = 0
+        for buy_patch in best_like_buy_templates:
+            for sell_patch in best_like_sell_templates:
+                refine_idx += 1
+                add(f"telegram_refine_{refine_idx:03d}", buy_patch, sell_patch, {"enabled": False, "telegram_overlay": True})
+
+        # Risk-focused refinements around telegram_refine_005/008, which were
+        # just below 30% with materially better drawdown than the top return
+        # candidate. These try to cross the target without accepting the
+        # higher -10% drawdown profile.
+        risk_refine_buy_templates = [
+            {"adx_min": 7, "adx_strong_min": 18, "volume_confirm_mult": 0.63, "rsi_floor": 37, "stoch_pull_max": 95, "max_extension_atr": 4.15, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            {"adx_min": 8, "adx_strong_min": 18, "volume_confirm_mult": 0.62, "rsi_floor": 36, "stoch_pull_max": 95, "max_extension_atr": 4.35, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            {"adx_min": 7, "adx_strong_min": 18, "volume_confirm_mult": 0.65, "rsi_floor": 37, "stoch_pull_max": 95, "max_extension_atr": 4.25, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+        ]
+        risk_refine_sell_templates = [
+            {"equity_time_stop_bars": 4, "fund_time_stop_bars": 8, "breakeven_trigger_pct": 0.9, "momentum_exit_rsi": 40.0},
+            {"equity_time_stop_bars": 4, "fund_time_stop_bars": 8, "breakeven_trigger_pct": 1.1, "momentum_exit_rsi": 41.0},
+            {"equity_time_stop_bars": 5, "fund_time_stop_bars": 9, "breakeven_trigger_pct": 1.0, "momentum_exit_rsi": 40.0},
+        ]
+        risk_idx = 0
+        for buy_patch in risk_refine_buy_templates:
+            for sell_patch in risk_refine_sell_templates:
+                risk_idx += 1
+                add(f"telegram_risk_refine_{risk_idx:03d}", buy_patch, sell_patch, {"enabled": False, "telegram_overlay": True})
+
+    # Telegram-derived trader variants. Channel learning says the useful edge is
+    # not another strict confirmation gate; it is (a) fresh small/mid-cap
+    # watchlist selection, (b) faster profit capture, and (c) structure/momentum
+    # entries with relaxed volume. Keep these early so capped lab runs test them.
+    if (telegram_context or {}).get("fresh"):
+        telegram_buy_templates = [
+            # Milind-style: momentum continuation with 5d follow-through.
+            {"adx_min": 8, "adx_strong_min": 18, "volume_confirm_mult": 0.65, "rsi_floor": 38, "stoch_pull_max": 95, "max_extension_atr": 4.0, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            # Darkhorse-style: max-favourable move capture; enter structure/breakout, exit quickly.
+            {"sr_breakout_enabled": 1, "sr_breakout_buffer_pct": 0.002, "volume_confirm_mult": 0.7, "adx_min": 6, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "sr_resistance_room_pct": 0.0, "volume_confirm_mult": 0.65, "rsi_floor": 36, "ich_cloud_bull": 0},
+            # Telegram often identifies attention/momentum before our trend gate; test a loose but risk-managed version.
+            {"adx_min": 6, "volume_confirm_mult": 0.6, "rsi_floor": 34, "stoch_pull_max": 95, "cci_buy_min": -175, "max_extension_atr": 4.5, "ich_cloud_bull": 0, "vwap_buy_above": 0},
+            # Mean-reversion watchlist bounce for sideways NSE tape.
+            {"meanrev_enabled": 1, "meanrev_rsi_oversold": 38, "meanrev_adx_max": 28, "meanrev_bb_pctb_max": 0.35, "meanrev_stoch_k_max": 40, "rsi_floor": 45, "adx_min": 6, "volume_confirm_mult": 0.65, "ich_cloud_bull": 0},
+        ]
+        telegram_sell_templates = [
+            # Channel audits show high MFE but weak close returns: take money faster.
+            {"equity_time_stop_bars": 4, "fund_time_stop_bars": 8, "breakeven_trigger_pct": 1.5, "momentum_exit_rsi": 38.0},
+            {"equity_time_stop_bars": 6, "fund_time_stop_bars": 10, "breakeven_trigger_pct": 2.0, "equity_review_rsi": 45.0},
+            {"equity_time_stop_bars": 8, "fund_time_stop_bars": 12, "breakeven_trigger_pct": 3.0, "relative_volume_exit": 1.2},
+            {"partial_exit_enabled": 1, "partial_exit_ladder": [(4.0, 0.5, 1.005), (8.0, 0.3, 1.04), (12.0, 0.5, 1.08)], "breakeven_trigger_pct": 2.0, "equity_time_stop_bars": 10},
+        ]
+        tg_idx = 0
+        for buy_patch in telegram_buy_templates:
+            for sell_patch in telegram_sell_templates:
+                tg_idx += 1
+                add(f"telegram_strategy_{tg_idx:03d}", buy_patch, sell_patch, {"enabled": False, "telegram_overlay": True})
 
     # High-priority chart-structure candidates: test support bounces and resistance
     # breakouts early before broad one-factor sweeps can consume the variant cap.
@@ -1389,19 +1593,27 @@ def run_variant(name: str, data_map: dict[str, pd.DataFrame], buy_params: dict, 
 
     try:
         if match_live and not rnn_params.get("enabled"):
-            from scripts import weekly_universe_cagr_check as parity_pack
+            try:
+                from scripts import weekly_universe_cagr_check as parity_pack
 
-            result, _, _ = parity_pack.run_baseline_detailed(data_map)
-            result.name = name
-            result.params = {
-                "buy": buy_params,
-                "sell": sell_params,
-                "rnn": rnn_params,
-                **({"simulation": result.params.get("simulation", {})} if getattr(result, "params", None) else {}),
-            }
-            result.rnn_enabled = False
-            result.rnn_avg_test_accuracy = 0.0
-            return result
+                result, _, _ = parity_pack.run_baseline_detailed(data_map)
+                result.name = name
+                result.params = {
+                    "buy": buy_params,
+                    "sell": sell_params,
+                    "rnn": rnn_params,
+                    **({"simulation": result.params.get("simulation", {})} if getattr(result, "params", None) else {}),
+                }
+                result.rnn_enabled = False
+                result.rnn_avg_test_accuracy = 0.0
+                return result
+            except ModuleNotFoundError as exc:
+                # Local macOS research env is missing the third-party Fundamentals
+                # package's broken `Base` import. Do not kill the lab; fall back
+                # to the internal simulator and record the fallback in params.
+                rnn_params = {**rnn_params, "live_parity_fallback": f"module_missing:{exc.name}"}
+            except Exception as exc:
+                rnn_params = {**rnn_params, "live_parity_fallback": f"{type(exc).__name__}:{str(exc)[:120]}"}
 
         with tempfile.TemporaryDirectory(prefix="at_state_") as td:
             _set_temp_state(RULE_SET_2, td)
@@ -1891,12 +2103,86 @@ def run_walk_forward_validation(
     }
 
 
+def diagnose_buy_blockers(data_map: dict[str, pd.DataFrame], sample_bars: int = 90, max_symbols: int = 120) -> dict:
+    """Explain why the current BUY rule is not producing enough trades."""
+    from collections import Counter
+
+    failure_counts: Counter[str] = Counter()
+    hard_block_counts: Counter[str] = Counter()
+    mode_missing_counts: Counter[str] = Counter()
+    readiness_scores: list[float] = []
+    score_gaps: list[float] = []
+    evaluated = 0
+    buys = 0
+    samples = []
+    hold_df = pd.DataFrame(columns=["instrument_token", "tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
+
+    old_get_mmi = getattr(at_utils, "get_mmi_now", None)
+    at_utils.get_mmi_now = lambda: None
+    try:
+        for symbol, df in list(data_map.items())[:max_symbols]:
+            if df is None or len(df) < 260:
+                continue
+            start = max(250, len(df) - sample_bars)
+            for i in range(start, len(df)):
+                part = df.iloc[: i + 1].copy()
+                row = part.iloc[-1].to_dict()
+                row.setdefault("instrument_token", 1626369)
+                try:
+                    sig, diag = RULE_SET_7.evaluate_signal(part, row, hold_df)
+                except Exception as exc:
+                    failure_counts[f"diagnostic_failed:{type(exc).__name__}"] += 1
+                    continue
+                evaluated += 1
+                if str(sig).upper() == "BUY":
+                    buys += 1
+                for item in diag.get("entry_gate_failures", []) or []:
+                    failure_counts[str(item)] += 1
+                for item in diag.get("hard_blocks", []) or []:
+                    hard_block_counts[str(item)] += 1
+                for item in diag.get("nearest_mode_missing", []) or []:
+                    mode_missing_counts[str(item)] += 1
+                if diag.get("readiness_score_pct") is not None:
+                    readiness_scores.append(float(diag.get("readiness_score_pct") or 0.0))
+                if diag.get("score_gap_to_buy") is not None:
+                    score_gaps.append(float(diag.get("score_gap_to_buy") or 0.0))
+                if len(samples) < 12 and str(sig).upper() != "BUY":
+                    samples.append({
+                        "symbol": symbol,
+                        "date": str(part.iloc[-1].get("Date", "")),
+                        "nearest_mode": diag.get("nearest_mode"),
+                        "nearest_mode_missing": diag.get("nearest_mode_missing", [])[:6],
+                        "entry_gate_failures": diag.get("entry_gate_failures", [])[:6],
+                        "readiness_score_pct": diag.get("readiness_score_pct"),
+                    })
+    finally:
+        if old_get_mmi is not None:
+            at_utils.get_mmi_now = old_get_mmi
+
+    return {
+        "enabled": True,
+        "sample_bars": sample_bars,
+        "symbols_sampled": min(len(data_map), max_symbols),
+        "evaluated_windows": evaluated,
+        "buy_windows": buys,
+        "buy_window_rate_pct": round((buys / evaluated * 100.0), 3) if evaluated else 0.0,
+        "avg_readiness_score_pct": round(float(np.mean(readiness_scores)), 2) if readiness_scores else None,
+        "avg_score_gap_to_buy": round(float(np.mean(score_gaps)), 3) if score_gaps else None,
+        "top_entry_gate_failures": failure_counts.most_common(12),
+        "top_hard_blocks": hard_block_counts.most_common(12),
+        "top_nearest_mode_missing": mode_missing_counts.most_common(12),
+        "sample_blocked_setups": samples,
+    }
+
+
 def main():
     write_status(status="running", phase="initializing", message="starting weekly strategy lab")
     scorecard_context = load_scorecard_context()
     tradebook_context = load_tradebook_context()
     fundamental_context = load_fundamental_context()
-    data_map, data_context = load_data(tradebook_context, fundamental_context)
+    telegram_context = load_telegram_context()
+    data_map, data_context = load_data(tradebook_context, fundamental_context, telegram_context=telegram_context)
+    blocker_diagnostics = diagnose_buy_blockers(data_map)
     rnn_config = load_rnn_config()
     write_status(
         phase="training_rnn",
@@ -1906,7 +2192,7 @@ def main():
         universe_symbols=list(data_map.keys()),
     )
     rnn_models = build_rnn_models(data_map, config=rnn_config)
-    full_variant_list = variants(scorecard_context, tradebook_context)
+    full_variant_list = variants(scorecard_context, tradebook_context, telegram_context=telegram_context)
     batch_offset, batch_limit = configured_variant_batch()
     if batch_limit is None:
         variant_list = full_variant_list[batch_offset:]
@@ -2032,6 +2318,8 @@ def main():
             if k != "sector_map"
         },
         "data_context": data_context,
+        "telegram_context": telegram_context,
+        "blocker_diagnostics": blocker_diagnostics,
         "rnn_context": {
             "enabled": bool(rnn_config.enabled),
             "models_built": int(len(rnn_models)),

@@ -1,6 +1,6 @@
 # 📊 Portfolio Tracker
 
-_Updated: 2026-05-06T07:57:05.028082+00:00_
+_Updated: 2026-05-11T05:43:06.449138+00:00_
 
 ## Summary
 - **Total Value:** ₹549,748
@@ -29,40 +29,28 @@ _Updated: 2026-05-06T07:57:05.028082+00:00_
 - **HIGH / pause_fresh_sip:** QUANT ELSS TAX SAVER FUND - DIRECT PLAN — ELSS is 44.0% of the MF sleeve; extra money here reduces flexibility and can trap future rebalancing behind lock-ins. _Keep existing locked units; route new tax-saving only up to 80C need, otherwise redirect SIP to flexible core/international._
 - **HIGH / pause_fresh_sip:** PARAG PARIKH ELSS TAX SAVER FUND - DIRECT PLAN — ELSS is 44.0% of the MF sleeve; extra money here reduces flexibility and can trap future rebalancing behind lock-ins. _Keep existing locked units; route new tax-saving only up to 80C need, otherwise redirect SIP to flexible core/international._
 - **HIGH / top_up:** ICICI PRUDENTIAL NASDAQ 100 INDEX FUND - DIRECT PLAN — Underweight Index/NASDAQ holding with buy signal; fresh money has more XIRR impact here than adding to already-heavy winners. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
-- **HIGH / top_up:** MOTILAL OSWAL MIDCAP FUND - DIRECT PLAN — Underweight Mid Cap holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **HIGH / top_up:** HDFC FOCUSED FUND - DIRECT PLAN — Underweight Focused holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **HIGH / top_up:** JIOBLACKROCK FLEXI CAP FUND - DIRECT PLAN — Underweight Flexi Cap holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
+- **HIGH / top_up:** AXIS GREATER CHINA EQUITY FUND OF FUND - DIRECT PLAN — Underweight Unknown holding with buy signal; fresh money has more XIRR impact here than adding to already-heavy winners. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **HIGH / top_up:** HDFC FLEXI CAP FUND - DIRECT PLAN — Underweight Flexi Cap holding is below average cost; adding now can lower cost basis and improve future XIRR if thesis holds. _Route fresh SIP/top-up here in tranches; prefer dips instead of lump-sum chase._
 - **MEDIUM / increase_global_diversifier:** ICICI PRUDENTIAL NASDAQ 100 INDEX FUND - DIRECT PLAN — International exposure is only 0.9% of MF sleeve; a small global sleeve can smooth India-only drawdowns and help risk-adjusted XIRR. _Build gradually toward ~5–8% MF sleeve; avoid Taiwan concentration unless explicitly desired._
 
 ## 🎯 Recommended MF Portfolio
 
 - Current portfolio XIRR: 7.78%
-- Current predicted forward return: 17.79%
-- Recommended predicted XIRR/return: 21.16%
-- Predicted uplift: 3.38pp
-- 20.0% — **Parag Parikh Flexi Cap Fund - Direct Plan - Growth** | predicted 15.32% | core diversified equity allocator
-- 12.5% — **HDFC Flexi Cap Fund - Growth Option - Direct Plan** | predicted 17.04% | large/flexi core with long NAV history
-- 7.5% — **ICICI Prudential Focused Equity Fund - Direct Plan - Growth** | predicted 18.23% | focused alpha sleeve replacement candidate
-- 15.0% — **Edelweiss Mid Cap Fund - Direct Plan - Growth Option** | predicted 23.2% | best current midcap replacement score
-- 10.0% — **HDFC Mid Cap Fund - Growth Option - Direct Plan** | predicted 21.4% | second midcap diversifier
-- 7.5% — **BANDHAN SMALL CAP FUND - DIRECT PLAN GROWTH** | predicted 27.41% | small-cap sleeve with stronger 3Y score than current weak smallcap
-- 7.5% — **Nippon India Small Cap Fund - Direct Plan Growth Plan - Growth Option** | predicted 20.65% | retain best existing small-cap exposure
-- 7.5% — **ICICI Prudential Equity & Debt Fund - Direct Plan - Growth** | predicted 16.4% | drawdown stabilizer
-- 7.5% — **ICICI Prudential NASDAQ 100 Index Fund - Direct Plan - Growth** | predicted 40.18% | global diversifier / non-India growth
-- 5.0% — **HDFC Infrastructure Fund - Growth Option - Direct Plan** | predicted 22.67% | cap thematic exposure; replace oversized infra/banking sleeve
-
-## 🔁 MF Replacement Shortlist
-
-- **HIGH** replace/watch **MOTILAL OSWAL MIDCAP FUND - DIRECT PLAN** → **Edelweiss Mid Cap Fund - Direct Plan - Growth Option** | est 3Y CAGR uplift +4.49pp. Current XIRR: -7.18; replacement 3Y CAGR: 26.39%
-- **HIGH** replace/watch **MOTILAL OSWAL MIDCAP FUND - DIRECT PLAN** → **HDFC Mid Cap Fund - Growth Option - Direct Plan** | est 3Y CAGR uplift +2.07pp. Current XIRR: -7.18; replacement 3Y CAGR: 23.97%
-- **HIGH** replace/watch **ICICI PRUDENTIAL INFRASTRUCTURE FUND - DIRECT PLAN** → **HDFC Infrastructure Fund - Growth Option - Direct Plan** | est 3Y CAGR uplift +0.75pp. Current XIRR: 3.81; replacement 3Y CAGR: 25.42%
-- **HIGH** replace/watch **NIPPON INDIA SMALL CAP FUND - DIRECT PLAN** → **BANDHAN SMALL CAP FUND - DIRECT PLAN GROWTH** | est 3Y CAGR uplift +10.26pp. Current XIRR: 2.97; replacement 3Y CAGR: 32.14%
-- **HIGH** replace/watch **HDFC FOCUSED FUND - DIRECT PLAN** → **SBI FOCUSED FUND - DIRECT PLAN -GROWTH** | est 3Y CAGR uplift +0.80pp. Current XIRR: -4.47; replacement 3Y CAGR: 19.89%
-- **HIGH** replace/watch **HDFC FOCUSED FUND - DIRECT PLAN** → **ICICI Prudential Focused Equity Fund - Direct Plan - Growth** | est 3Y CAGR uplift +2.28pp. Current XIRR: -4.47; replacement 3Y CAGR: 21.37%
-- **HIGH** replace/watch **JIOBLACKROCK FLEXI CAP FUND - DIRECT PLAN** → **HDFC Flexi Cap Fund - Growth Option - Direct Plan**. Current XIRR: -4.19; replacement 3Y CAGR: 19.51%
-- **HIGH** replace/watch **JIOBLACKROCK FLEXI CAP FUND - DIRECT PLAN** → **JM Flexicap Fund (Direct) - Growth Option**. Current XIRR: -4.19; replacement 3Y CAGR: 19.89%
-- **HIGH** replace/watch **JIOBLACKROCK FLEXI CAP FUND - DIRECT PLAN** → **Parag Parikh Flexi Cap Fund - Direct Plan - Growth**. Current XIRR: -4.19; replacement 3Y CAGR: 17.75%
+- Current predicted forward return: None%
+- Recommended predicted XIRR/return: None%
+- Predicted uplift: Nonepp
+- 20.0% — **Parag Parikh Flexi Cap Fund Direct Growth** | predicted None% | core diversified equity allocator
+- 12.5% — **HDFC Flexi Cap Fund Direct Growth** | predicted None% | large/flexi core with long NAV history
+- 7.5% — **ICICI Prudential Focused Equity Fund Direct Growth** | predicted None% | focused alpha sleeve replacement candidate
+- 15.0% — **Edelweiss Mid Cap Fund Direct Growth** | predicted None% | best current midcap replacement score
+- 10.0% — **HDFC Mid-Cap Opportunities Fund Direct Growth** | predicted None% | second midcap diversifier
+- 7.5% — **Bandhan Small Cap Fund Direct Growth** | predicted None% | small-cap sleeve with stronger 3Y score than current weak smallcap
+- 7.5% — **Nippon India Small Cap Fund Direct Growth** | predicted None% | retain best existing small-cap exposure
+- 7.5% — **ICICI Prudential Equity & Debt Fund Direct Growth** | predicted None% | drawdown stabilizer
+- 7.5% — **ICICI Prudential Nasdaq 100 Index Fund Direct Growth** | predicted None% | global diversifier / non-India growth
+- 5.0% — **HDFC Infrastructure Fund Direct Growth** | predicted None% | cap thematic exposure; replace oversized infra/banking sleeve
 
 ## 📈 Mutual Funds
 
@@ -71,15 +59,15 @@ _Updated: 2026-05-06T07:57:05.028082+00:00_
   - Value: ₹125,332 | Cost: ₹99,995 | Gain: +25.34% | XIRR: +25.42% | Weight: 22.8%
   - _up 25.3% — high-risk fund gains worth booking partially; ELSS outlook is positive; heavy weight at 22.8% — consider trimming; ELSS with 3yr lock-in — hold for tax benefit_
 
-**PARAG PARIKH ELSS TAX SAVER FUND - DIRECT PLAN** 🟢 **BUY**
+**PARAG PARIKH ELSS TAX SAVER FUND - DIRECT PLAN** 🟡 **HOLD**
   - Category: ELSS | Risk: moderate
   - Value: ₹116,511 | Cost: ₹99,995 | Gain: +16.52% | XIRR: +16.57% | Weight: 21.2%
-  - _up 16.5% from avg; ELSS outlook is positive; heavy weight at 21.2% — consider trimming; ELSS with 3yr lock-in — hold for tax benefit_
+  - _up 16.5% from avg; ELSS outlook is positive; heavy weight at 21.2% — consider trimming; ELSS with 3yr lock-in — hold for tax benefit; overweight ELSS with lock-in → hold, don't add more_
 
-**MOTILAL OSWAL MIDCAP FUND - DIRECT PLAN** 🟢 **BUY**
+**MOTILAL OSWAL MIDCAP FUND - DIRECT PLAN** 🟡 **HOLD**
   - Category: Mid Cap | Risk: high
   - Value: ₹60,340 | Cost: ₹64,997 | Gain: -7.17% | XIRR: -7.18% | Weight: 11.0%
-  - _down 7.2% from avg; good SIP candidate — keep adding systematically_
+  - _down 7.2% from avg; Mid Cap outlook is cautious; high risk + cautious outlook = reduce exposure; good SIP candidate — keep adding systematically_
 
 **SBI BANKING u0026 FINANCIAL SERVICES FUND - DIRECT PLAN** 🟢 **BUY**
   - Category: Sectoral/Banking | Risk: high
@@ -111,10 +99,10 @@ _Updated: 2026-05-06T07:57:05.028082+00:00_
   - Value: ₹13,812 | Cost: ₹13,856 | Gain: -0.32% | XIRR: -0.43% | Weight: 2.5%
   - _down 0.3% from avg; Flexi Cap outlook is positive; good SIP candidate — keep adding systematically_
 
-**NIPPON INDIA GROWTH MID CAP FUND - DIRECT PLAN** 🟡 **HOLD**
+**NIPPON INDIA GROWTH MID CAP FUND - DIRECT PLAN** 🔴 **SELL**
   - Category: Mid Cap | Risk: high
-  - Value: ₹13,477 | Cost: ₹12,705 | Gain: +6.08% | XIRR: +8.56% | Weight: 2.5%
-  - _up 6.1% from avg_
+  - Value: ₹13,477 | Cost: ₹12,705 | Gain: +6.08% | XIRR: +8.40% | Weight: 2.5%
+  - _up 6.1% from avg; Mid Cap outlook is cautious; high risk + cautious outlook = reduce exposure_
 
 **BANDHAN SMALL CAP FUND - DIRECT PLAN** 🟡 **HOLD**
   - Category: Small Cap | Risk: very_high
@@ -138,14 +126,15 @@ _Updated: 2026-05-06T07:57:05.028082+00:00_
 
 **NIPPON INDIA TAIWAN EQUITY FUND - DIRECT PLAN** 🟡 **HOLD**
   - Category: International/Taiwan | Risk: high
-  - Value: ₹1,602 | Cost: ₹1,500 | Gain: +6.79% | XIRR: +287.95% | Weight: 0.3%
+  - Value: ₹1,602 | Cost: ₹1,500 | Gain: +6.79% | XIRR: +187.74% | Weight: 0.3%
   - _up 6.8% from avg; International/Taiwan outlook is cautious; high risk + cautious outlook = reduce exposure; tiny position at 0.3% — consider topping up; geopolitical concentration risk — small allocation ok_
 
 **AXIS GREATER CHINA EQUITY FUND OF FUND - DIRECT PLAN** 🟢 **BUY**
   - Category: Unknown | Risk: moderate
-  - Value: ₹1,106 | Cost: ₹1,100 | Gain: +0.53% | XIRR: +22.58% | Weight: 0.2%
+  - Value: ₹1,106 | Cost: ₹1,100 | Gain: +0.53% | XIRR: +14.19% | Weight: 0.2%
   - _up 0.5% from avg; tiny position at 0.2% — consider topping up_
 
 ## ⚡ Action Summary
-**🟢 BUY (10):** INF109K018M4, INF109KC1U50, INF247L01445, INF22M001093, INF846K01Y39, INF179K01VK7, INF109K01Y07, INF879O01100, INF200KA1507, INF179K01UT0
-**🟡 HOLD (6):** INF194KB1AL4, INF204K01E54, INF204KC1303, INF204K01K15, INF966L01986, INF966L01689
+**🔴 SELL (1):** INF204K01E54
+**🟢 BUY (8):** INF109K018M4, INF109KC1U50, INF22M001093, INF846K01Y39, INF179K01VK7, INF109K01Y07, INF200KA1507, INF179K01UT0
+**🟡 HOLD (7):** INF194KB1AL4, INF247L01445, INF204KC1303, INF204K01K15, INF879O01100, INF966L01986, INF966L01689

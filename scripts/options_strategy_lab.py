@@ -16,6 +16,7 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -52,6 +53,7 @@ BASE_CONFIG_KEYS = [
     "underlying_rsi_bull_min",
     "underlying_rsi_bear_max",
     "underlying_adx_min",
+    "underlying_alignment_mode",
     "option_rsi_min",
     "volume_confirm_mult",
     "oi_sma_mult",
@@ -121,6 +123,74 @@ def load_option_data() -> tuple[dict[str, pd.DataFrame], dict]:
 
 
 
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _age_hours(value: str | None) -> float | None:
+    dt = _parse_dt(value)
+    if dt is None:
+        return None
+    now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
+    return max(0.0, (now - dt).total_seconds() / 3600.0)
+
+
+def load_telegram_context() -> dict[str, Any]:
+    scores_path = OUT_DIR / "channel_learning_scores.json"
+    max_age_hours = float(os.getenv("AT_OPTIONS_LAB_TELEGRAM_MAX_AGE_HOURS", os.getenv("AT_LAB_TELEGRAM_MAX_AGE_HOURS", "36")) or 36)
+    context: dict[str, Any] = {
+        "enabled": os.getenv("AT_OPTIONS_LAB_TELEGRAM_ENABLED", os.getenv("AT_LAB_TELEGRAM_ENABLED", "1")).strip().lower() not in {"0", "false", "no"},
+        "scores_path": str(scores_path),
+        "fresh": False,
+        "max_age_hours": max_age_hours,
+        "tradable_channels": [],
+        "avoid_channels": [],
+        "notes": [],
+    }
+    if not context["enabled"]:
+        context["notes"].append("disabled_by_env")
+        return context
+    try:
+        scores = json.loads(scores_path.read_text()) if scores_path.exists() else {}
+    except Exception as exc:
+        context["notes"].append(f"scores_load_failed:{exc}")
+        scores = {}
+    generated_at = scores.get("generated_at")
+    age = _age_hours(generated_at)
+    context["generated_at"] = generated_at
+    context["age_hours"] = round(age, 2) if age is not None else None
+    context["fresh"] = bool(age is not None and age <= max_age_hours)
+    if not context["fresh"]:
+        context["notes"].append("telegram_learning_stale_or_missing")
+
+    for channel, stats in (scores.get("channels", {}) or {}).items():
+        opt = stats.get("options_audit", {}) or {}
+        eq = stats.get("equity_audit", {}) or {}
+        conf = float(stats.get("confidence") or 0.0)
+        opt_avg = float(opt.get("dir_ret_10d_avg") or 0.0)
+        opt_pos = float(opt.get("dir_ret_10d_positive_rate") or 0.0)
+        max_fav = float(opt.get("max_favorable_20d_avg") or eq.get("max_20d_avg") or 0.0)
+        row = {
+            "channel": channel,
+            "confidence": conf,
+            "action": stats.get("action"),
+            "options_dir_10d_avg": opt.get("dir_ret_10d_avg"),
+            "options_dir_10d_positive_rate": opt.get("dir_ret_10d_positive_rate"),
+            "max_favorable_avg": max_fav,
+            "execution_profile": stats.get("execution_profile", {}),
+        }
+        if opt_pos >= 60 or opt_avg >= 3 or (conf >= 45 and max_fav >= 5):
+            context["tradable_channels"].append(row)
+        elif conf < 40 or opt_avg < -1:
+            context["avoid_channels"].append(row)
+    return context
+
+
 def base_params() -> dict:
     return {k: RULE_SET_OPTIONS_1.CONFIG[k] for k in BASE_CONFIG_KEYS}
 
@@ -165,7 +235,7 @@ def _variant_key(params: dict) -> str:
 
 
 
-def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tuple[str, dict]]:
+def option_variants(scorecard_context: dict, tradebook_context: dict, telegram_context: dict | None = None) -> list[tuple[str, dict]]:
     base = base_params()
     grid = build_grids(scorecard_context, tradebook_context)
 
@@ -180,6 +250,32 @@ def option_variants(scorecard_context: dict, tradebook_context: dict) -> list[tu
         out.append((name, patch))
 
     add("baseline_current", {})
+    add("underlying_alignment_bias", {"underlying_alignment_mode": "bias"})
+    add("underlying_alignment_momentum", {"underlying_alignment_mode": "momentum"})
+
+    if (telegram_context or {}).get("fresh"):
+        # Telegram options calls are short-lived, high-MFE trades. Test lower
+        # entry friction + faster exits before broad one-factor sweeps. The
+        # alignment-mode variants are research-only; live remains strict unless
+        # explicitly configured.
+        telegram_entry_templates = [
+            {"underlying_alignment_mode": "bias", "underlying_adx_min": 10, "underlying_rsi_bull_min": 50, "underlying_rsi_bear_max": 50, "option_rsi_min": 48, "volume_confirm_mult": 0.85, "oi_sma_mult": 1.0, "oi_change_min_pct": -1.0, "buy_score_min": 4.5},
+            {"underlying_alignment_mode": "momentum", "underlying_adx_min": 10, "underlying_rsi_bull_min": 50, "underlying_rsi_bear_max": 50, "option_rsi_min": 48, "volume_confirm_mult": 0.85, "oi_sma_mult": 1.0, "oi_change_min_pct": -1.0, "buy_score_min": 4.5},
+            {"underlying_alignment_mode": "bias", "underlying_adx_min": 12, "underlying_rsi_bull_min": 50, "underlying_rsi_bear_max": 48, "option_rsi_min": 50, "volume_confirm_mult": 0.9, "oi_sma_mult": 1.0, "oi_change_min_pct": 0.0, "buy_score_min": 5.0},
+            {"underlying_alignment_mode": "momentum", "underlying_adx_min": 12, "underlying_rsi_bull_min": 50, "underlying_rsi_bear_max": 48, "option_rsi_min": 50, "volume_confirm_mult": 0.9, "oi_sma_mult": 1.0, "oi_change_min_pct": 0.0, "buy_score_min": 5.0},
+            {"underlying_alignment_mode": "bias", "underlying_adx_min": 14, "underlying_rsi_bull_min": 52, "underlying_rsi_bear_max": 48, "option_rsi_min": 48, "volume_confirm_mult": 0.85, "oi_change_min_pct": -1.0, "atr_pct_min": 0.0, "atr_pct_max": 2.0, "buy_score_min": 5.0},
+            {"underlying_alignment_mode": "momentum", "underlying_adx_min": 14, "underlying_rsi_bull_min": 52, "underlying_rsi_bear_max": 48, "option_rsi_min": 48, "volume_confirm_mult": 0.85, "oi_change_min_pct": -1.0, "atr_pct_min": 0.0, "atr_pct_max": 2.0, "buy_score_min": 5.0},
+        ]
+        telegram_exit_templates = [
+            {"take_profit_pct": 12.0, "stop_loss_pct": 8.0, "max_hold_bars": 1, "exit_rsi": 45.0},
+            {"take_profit_pct": 18.0, "stop_loss_pct": 10.0, "max_hold_bars": 2, "exit_rsi": 42.0},
+            {"take_profit_pct": 25.0, "stop_loss_pct": 10.0, "max_hold_bars": 3, "exit_rsi": 45.0},
+        ]
+        tg_idx = 0
+        for entry_patch in telegram_entry_templates:
+            for exit_patch in telegram_exit_templates:
+                tg_idx += 1
+                add(f"telegram_options_{tg_idx:03d}", {**entry_patch, **exit_patch})
 
     for key, values in grid.items():
         for value in values:
@@ -635,13 +731,76 @@ def load_tradebook_context() -> dict:
 
 
 
+def diagnose_option_blockers(data_map: dict[str, pd.DataFrame], sample_bars: int = 80, max_symbols: int = 160) -> dict:
+    from collections import Counter
+
+    failure_counts: Counter[str] = Counter()
+    reason_counts: Counter[str] = Counter()
+    alignment_pass_counts: Counter[str] = Counter()
+    score_gaps: list[float] = []
+    evaluated = 0
+    buys = 0
+    hold_df = pd.DataFrame(columns=["tradingsymbol", "average_price", "quantity", "t1_quantity", "bars_in_trade"])
+    samples = []
+    warmup = max(8, int(os.getenv("AT_OPTIONS_LAB_WARMUP_BARS", "10")))
+    for symbol, df in list(data_map.items())[:max_symbols]:
+        if df is None or len(df) <= warmup:
+            continue
+        start = max(warmup, len(df) - sample_bars)
+        for i in range(start, len(df)):
+            part = df.iloc[: i + 1].copy().reset_index(drop=True)
+            row = part.iloc[-1].to_dict()
+            try:
+                sig, diag = RULE_SET_OPTIONS_1.evaluate_signal(part, row, hold_df)
+            except Exception as exc:
+                failure_counts[f"diagnostic_failed:{type(exc).__name__}"] += 1
+                continue
+            evaluated += 1
+            if str(sig).upper() == "BUY":
+                buys += 1
+            for item in diag.get("entry_gate_failures", []) or []:
+                failure_counts[str(item)] += 1
+            for item in diag.get("reason", []) or []:
+                reason_counts[str(item)] += 1
+            gate_status = diag.get("gate_status", {}) or {}
+            for key in ["underlying_strict_alignment", "underlying_bias_alignment", "underlying_momentum_alignment"]:
+                if gate_status.get(key):
+                    alignment_pass_counts[key] += 1
+            if diag.get("score_gap_to_buy") is not None:
+                score_gaps.append(float(diag.get("score_gap_to_buy") or 0.0))
+            if len(samples) < 12 and str(sig).upper() != "BUY":
+                samples.append({
+                    "symbol": symbol,
+                    "side": diag.get("side"),
+                    "entry_gate_failures": diag.get("entry_gate_failures", [])[:6],
+                    "score": diag.get("score"),
+                    "score_gap_to_buy": diag.get("score_gap_to_buy"),
+                    "reasons_present": diag.get("reason", [])[:6],
+                })
+    return {
+        "enabled": True,
+        "sample_bars": sample_bars,
+        "symbols_sampled": min(len(data_map), max_symbols),
+        "evaluated_windows": evaluated,
+        "buy_windows": buys,
+        "buy_window_rate_pct": round((buys / evaluated * 100.0), 3) if evaluated else 0.0,
+        "avg_score_gap_to_buy": round(float(pd.Series(score_gaps).mean()), 3) if score_gaps else None,
+        "top_entry_gate_failures": failure_counts.most_common(12),
+        "top_reasons_present": reason_counts.most_common(12),
+        "underlying_alignment_pass_counts": alignment_pass_counts.most_common(),
+        "sample_blocked_setups": samples,
+    }
+
+
 def main():
     scorecard_context = load_scorecard_context()
     tradebook_context = load_tradebook_context()
+    telegram_context = load_telegram_context()
     data_map, data_context = load_option_data()
+    blocker_diagnostics = diagnose_option_blockers(data_map)
 
     results = []
-    for name, params in option_variants(scorecard_context, tradebook_context):
+    for name, params in option_variants(scorecard_context, tradebook_context, telegram_context=telegram_context):
         results.append(run_variant(name, data_map, params))
 
     rank = sorted(
@@ -662,6 +821,8 @@ def main():
         "scorecard_context": scorecard_context,
         "tradebook_context": tradebook_context,
         "data_context": data_context,
+        "telegram_context": telegram_context,
+        "blocker_diagnostics": blocker_diagnostics,
         "baseline": asdict(baseline),
         "best": asdict(best),
         "tested_variants": len(rank),
