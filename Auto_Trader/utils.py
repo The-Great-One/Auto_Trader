@@ -40,6 +40,7 @@ logger = logging.getLogger("Auto_Trade_Logger")
 
 TOKEN_PATH = "intermediary_files/access_token.json"
 TOKEN_LOCK_PATH = "intermediary_files/access_token.lock"
+KITE_MANUAL_LOGIN_FLAG = "intermediary_files/kite_manual_login_required.json"
 
 
 # Default rule set values
@@ -96,6 +97,10 @@ def build_access_token():
         with open(temp_token_path, "w") as json_file:
             json.dump(session_data, json_file, indent=4)
         os.replace(temp_token_path, TOKEN_PATH)
+        try:
+            os.remove(KITE_MANUAL_LOGIN_FLAG)
+        except FileNotFoundError:
+            pass
         logger.info("New access token saved successfully.")
         return data["access_token"]
     except Exception as e:
@@ -105,9 +110,48 @@ def build_access_token():
         raise
 
 
+def _manual_login_cooldown_seconds() -> int:
+    return int(os.getenv("AT_KITE_MANUAL_LOGIN_COOLDOWN_SECONDS", "1800"))
+
+
+def _raise_if_manual_login_cooldown_active() -> None:
+    try:
+        with open(KITE_MANUAL_LOGIN_FLAG, "r") as fh:
+            payload = json.load(fh)
+        created_at = payload.get("created_at")
+        created_ts = datetime.fromisoformat(created_at).timestamp() if created_at else 0
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        return
+
+    age = time.time() - created_ts
+    cooldown = _manual_login_cooldown_seconds()
+    if age < cooldown:
+        raise RuntimeError(
+            "Kite login is in manual-intervention cooldown after CAPTCHA/TOTP failure; "
+            f"retry_after_seconds={int(cooldown - age)}. Run a manual Kite refresh or wait."
+        )
+
+
+def _mark_manual_login_required(reason: str, exc: Exception) -> None:
+    try:
+        with open(KITE_MANUAL_LOGIN_FLAG, "w") as fh:
+            json.dump(
+                {
+                    "created_at": datetime.now().isoformat(),
+                    "reason": reason,
+                    "error": str(exc)[:500],
+                },
+                fh,
+                indent=2,
+            )
+    except OSError:
+        logger.exception("Could not write Kite manual-login cooldown flag")
+
+
 def _build_access_token_locked(reason: str) -> str:
     """Serialize token creation so concurrent callers do not trigger CAPTCHA storms."""
     os.makedirs("intermediary_files", exist_ok=True)
+    _raise_if_manual_login_cooldown_active()
     for lock_attempt in range(2):
         try:
             with FileLock(TOKEN_LOCK_PATH, timeout=180):
@@ -127,7 +171,12 @@ def _build_access_token_locked(reason: str) -> str:
                     pass
 
                 logger.warning("Creating a new Kite session; reason=%s", reason)
-                return build_access_token()
+                try:
+                    return build_access_token()
+                except Exception as exc:
+                    if any(marker in str(exc).lower() for marker in ("captcha", "totp", "manual intervention")):
+                        _mark_manual_login_required(reason, exc)
+                    raise
         except PermissionError as exc:
             if lock_attempt == 0:
                 try:
