@@ -174,7 +174,17 @@ def _build_access_token_locked(reason: str) -> str:
                 try:
                     return build_access_token()
                 except Exception as exc:
-                    if any(marker in str(exc).lower() for marker in ("captcha", "totp", "manual intervention")):
+                    if any(
+                        marker in str(exc).lower()
+                        for marker in (
+                            "captcha",
+                            "totp",
+                            "manual intervention",
+                            "invalid username",
+                            "invalid password",
+                            "invalid credentials",
+                        )
+                    ):
                         _mark_manual_login_required(reason, exc)
                     raise
         except PermissionError as exc:

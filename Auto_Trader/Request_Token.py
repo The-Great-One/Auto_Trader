@@ -63,6 +63,18 @@ def _looks_like_captcha(payload: dict) -> bool:
     return "captcha" in message or "captcha" in data_keys
 
 
+def _looks_like_bad_credentials(payload: dict) -> bool:
+    message = str(payload.get("message") or "").lower()
+    data = payload.get("data")
+    data_keys = set(data.keys()) if isinstance(data, dict) else set()
+    return (
+        "invalid username" in message
+        or "invalid password" in message
+        or "invalid credentials" in message
+        or "locked" in data_keys
+    )
+
+
 def _do_kite_login(kite, auth):
     """Perform the full Kite login dance with retry on transient CF blocks."""
 
@@ -100,6 +112,13 @@ def _do_kite_login(kite, auth):
 
         summary = _response_summary(login_response, login_payload_json)
         _login_attempt += 1
+
+        bad_credentials = _looks_like_bad_credentials(login_payload_json)
+        if bad_credentials:
+            raise RuntimeError(
+                "Kite login requires manual intervention: broker rejected credentials "
+                f"before TOTP: {summary}"
+            )
 
         captcha_like = _looks_like_captcha(login_payload_json)
         if captcha_like:
