@@ -338,6 +338,9 @@ def main():
         result.name = name
         row = asdict(result)
         row["shard"] = shard_label
+        row["variant_index"] = args.offset + idx - 1
+        row["buy"] = buy
+        row["sell"] = sell
         ranked.append(row)
 
         if HISTORY_FILE.exists() or idx == 1:
@@ -352,9 +355,12 @@ def main():
         print(f"{ts} {idx}/{len(all_variants)} {name} cagr={result.cagr_pct}% ret={result.total_return_pct}% "
               f"dd={result.max_drawdown_pct}% trades={result.trades} sharpe={result.sharpe} [{elapsed:.0f}s]", flush=True)
 
+        now_iso = datetime.now().isoformat()
         STATUS_FILE.write_text(json.dumps({
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": now_iso,
+            "updated_at": now_iso,
             "status": "running",
+            "pid": os.getpid(),
             "shard": shard_label,
             "universe": args.universe,
             "variants_done": idx,
@@ -390,9 +396,12 @@ def main():
         print(f"  {i}. {r['name']}: CAGR={r.get('cagr_pct',0)}% Ret={r.get('total_return_pct',0)}% "
               f"DD={r.get('max_drawdown_pct',0)}% Trades={r.get('trades',0)} Sharpe={r.get('sharpe',0)}")
 
+    now_iso = datetime.now().isoformat()
     STATUS_FILE.write_text(json.dumps({
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": now_iso,
+        "updated_at": now_iso,
         "status": "completed",
+        "pid": os.getpid(),
         "shard": shard_label,
         "universe": args.universe,
         "variants_total": len(all_variants),
@@ -411,17 +420,8 @@ def main():
     wf_results = []
     for cand in top5:
         name = cand["name"]
-        buy = {k: v for k, v in cand.items() if k in [
-            "adx_min", "adx_strong_min", "volume_confirm_mult", "rsi_floor",
-            "ich_cloud_bull", "vwap_buy_above", "sr_bounce_enabled", "sr_vpoc_reclaim_enabled",
-            "sr_near_support_pct", "sr_breakout_enabled", "sr_breakout_buffer_pct",
-            "regime_filter_enabled", "regime_ema_fast", "regime_ema_slow",
-            "max_extension_atr", "cmf_base_min", "obv_min_zscore", "sar_buy_enabled",
-            "di_cross_enabled", "stoch_pull_max", "stoch_momo_max",
-        ] and v not in (None, 0, 0.0)}
-        sell_keys = ["breakeven_trigger_pct", "equity_time_stop_bars", "momentum_exit_rsi",
-                     "equity_review_rsi", "fund_time_stop_bars", "trailing_stop_atr_mult"]
-        sell = {k: v for k, v in cand.items() if k in sell_keys and v not in (None, 0)}
+        buy = cand.get("buy", {}) or {}
+        sell = cand.get("sell", {}) or {}
 
         try:
             wf = run_walk_forward_validation(data_map, buy, sell, n_splits=5)

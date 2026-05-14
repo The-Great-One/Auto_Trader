@@ -1,3 +1,4 @@
+import os
 import requests
 import onetimepass as otp
 import time as _time
@@ -65,8 +66,10 @@ def _looks_like_captcha(payload: dict) -> bool:
 def _do_kite_login(kite, auth):
     """Perform the full Kite login dance with retry on transient CF blocks."""
 
-    _max_login_attempts = 7
+    _max_login_attempts = int(os.getenv("AT_KITE_LOGIN_MAX_ATTEMPTS", "3"))
+    _max_captcha_attempts = int(os.getenv("AT_KITE_CAPTCHA_MAX_ATTEMPTS", "2"))
     _login_attempt = 0
+    _captcha_attempt = 0
 
     while True:
         session = requests.Session()
@@ -100,13 +103,21 @@ def _do_kite_login(kite, auth):
 
         captcha_like = _looks_like_captcha(login_payload_json)
         if captcha_like:
+            _captcha_attempt += 1
             logger.warning(
                 "Kite login returned CAPTCHA-like challenge before TOTP "
-                "(attempt %d/%d): %s",
+                "(attempt %d/%d, captcha_attempt %d/%d): %s",
                 _login_attempt,
                 _max_login_attempts,
+                _captcha_attempt,
+                _max_captcha_attempts,
                 summary,
             )
+            if _captcha_attempt >= _max_captcha_attempts:
+                raise RuntimeError(
+                    "Kite login requires manual intervention: CAPTCHA challenge "
+                    f"persisted before TOTP after {_captcha_attempt} attempts: {summary}"
+                )
 
         if _login_attempt >= _max_login_attempts:
             logger.error(

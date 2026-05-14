@@ -108,27 +108,45 @@ def build_access_token():
 def _build_access_token_locked(reason: str) -> str:
     """Serialize token creation so concurrent callers do not trigger CAPTCHA storms."""
     os.makedirs("intermediary_files", exist_ok=True)
-    try:
-        with FileLock(TOKEN_LOCK_PATH, timeout=180):
-            # Another process may have refreshed the token while we waited.
-            try:
-                with open(TOKEN_PATH, "r") as json_file:
-                    session_data = json.load(json_file)
-                access_token = session_data.get("access_token")
-                session_date = session_data.get("date")
-                if str(datetime.now().date()) == session_date and access_token:
-                    logger.info(
-                        "Using access token refreshed by another process; reason=%s",
+    for lock_attempt in range(2):
+        try:
+            with FileLock(TOKEN_LOCK_PATH, timeout=180):
+                # Another process may have refreshed the token while we waited.
+                try:
+                    with open(TOKEN_PATH, "r") as json_file:
+                        session_data = json.load(json_file)
+                    access_token = session_data.get("access_token")
+                    session_date = session_data.get("date")
+                    if str(datetime.now().date()) == session_date and access_token:
+                        logger.info(
+                            "Using access token refreshed by another process; reason=%s",
+                            reason,
+                        )
+                        return access_token
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass
+
+                logger.warning("Creating a new Kite session; reason=%s", reason)
+                return build_access_token()
+        except PermissionError as exc:
+            if lock_attempt == 0:
+                try:
+                    os.remove(TOKEN_LOCK_PATH)
+                    logger.warning(
+                        "Removed inaccessible Kite token lock and retrying; path=%s reason=%s",
+                        TOKEN_LOCK_PATH,
                         reason,
                     )
-                    return access_token
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass
-
-            logger.warning("Creating a new Kite session; reason=%s", reason)
-            return build_access_token()
-    except Timeout:
-        raise RuntimeError("Timed out waiting for Kite access-token refresh lock")
+                    continue
+                except OSError:
+                    pass
+            raise RuntimeError(
+                f"Cannot acquire Kite access-token lock {TOKEN_LOCK_PATH}: {exc}. "
+                "Fix file ownership/permissions instead of creating a new token."
+            ) from exc
+        except Timeout:
+            raise RuntimeError("Timed out waiting for Kite access-token refresh lock")
+    raise RuntimeError("Unable to acquire Kite access-token refresh lock")
 
 
 def _is_invalid_token_error(exc: Exception) -> bool:
