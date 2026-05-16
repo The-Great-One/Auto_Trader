@@ -32,10 +32,104 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader.utils import Indicators
-from scripts.sentinel_30_targeted_v2 import run_variant as sentinel_run_variant, _compute_cagr, load_kite_symbols as sentinel_load_kite, VariantResult
 from scripts.weekly_strategy_lab import run_variant as lab_run_variant, run_walk_forward_validation
+import Auto_Trader.lab as lab
+from Auto_Trader.RULE_SET_2 import RULE_SET_2
+from Auto_Trader.RULE_SET_7 import RULE_SET_7
+from Auto_Trader.backtest_engine import run_baseline_detailed
 
 OUT_DIR = ROOT / "reports"
+MIN_ROWS = 400
+MIN_SPAN_DAYS = 500
+
+
+def load_kite_symbols(min_rows=MIN_ROWS, min_span=MIN_SPAN_DAYS):
+    """Load Kite cached feather data and enrich with Indicators."""
+    hist_dir = ROOT / "intermediary_files" / "Hist_Data"
+    data_map = {}
+    skipped = 0
+    for fp in sorted(hist_dir.glob("*.feather")):
+        sym = fp.stem
+        try:
+            df = pd.read_feather(fp)
+            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+            df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+            if len(df) < min_rows:
+                skipped += 1
+                continue
+            span = (df["Date"].max() - df["Date"].min()).days
+            if span < min_span:
+                skipped += 1
+                continue
+            enriched = Indicators(df)
+            if enriched is not None and len(enriched) >= min_rows:
+                data_map[sym] = enriched
+        except Exception:
+            skipped += 1
+    print(f"[WF-VALIDATE] Loaded {len(data_map)} symbols (skipped {skipped})")
+    return data_map
+
+
+def _compute_cagr(equity_curve):
+    if len(equity_curve) < 20:
+        return 0.0, 0.0, 0.0
+    s = pd.Series(equity_curve, dtype=float)
+    final = s.iloc[-1]
+    total_days = len(s)
+    years = total_days / 252.0
+    cagr = ((final / s.iloc[0]) ** (1.0 / max(years, 0.01)) - 1.0) * 100.0
+    peak = s.cummax()
+    dd = ((s - peak) / peak * 100.0).min()
+    rets = s.pct_change().dropna()
+    sharpe = float(rets.mean() / rets.std() * np.sqrt(252)) if len(rets) > 5 and rets.std() > 0 else 0.0
+    return round(cagr, 2), round(sharpe, 2), round(float(dd), 2)
+
+
+def run_variant_direct(data_map, buy, sell, name="variant"):
+    """Run a single variant by patching RULE_SET configs."""
+    from dataclasses import dataclass
+    @dataclass
+    class VR:
+        total_return_pct: float = 0.0
+        cagr_pct: float = 0.0
+        max_drawdown_pct: float = 0.0
+        trades: int = 0
+        win_rate_pct: float = 0.0
+        sharpe: float = 0.0
+        active_symbols: int = 0
+        selection_score: float = 0.0
+        universe: str = ""
+        error: str = ""
+    old_r2 = dict(RULE_SET_2.CONFIG)
+    old_r7 = dict(RULE_SET_7.CONFIG)
+    try:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_2.CONFIG.update(sell)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
+        RULE_SET_7.CONFIG.update(buy)
+        result, details, sim_meta = run_baseline_detailed(data_map)
+        eq = sim_meta.get("portfolio_equity")
+        cagr, sharpe, dd = _compute_cagr(eq) if eq is not None and len(eq) > 20 else (0.0, 0.0, 0.0)
+        return VR(
+            total_return_pct=round(result.total_return_pct, 2),
+            cagr_pct=cagr,
+            max_drawdown_pct=dd,
+            trades=result.trade_count if hasattr(result, 'trade_count') else 0,
+            win_rate_pct=round(result.win_rate_pct, 2) if hasattr(result, 'win_rate_pct') else 0.0,
+            sharpe=sharpe,
+            error="",
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return VR(error=str(e))
+    finally:
+        RULE_SET_2.CONFIG.clear()
+        RULE_SET_2.CONFIG.update(old_r2)
+        RULE_SET_7.CONFIG.clear()
+        RULE_SET_7.CONFIG.update(old_r7)
 
 # ── Top candidates from telegram_confluence_full sweep ──
 # combo263 variants (headline 37.42% CAGR on full universe)
@@ -112,8 +206,8 @@ def main():
     print(f"[WF-VALIDATE] Starting walk-forward validation of top candidates")
     print(f"[WF-VALIDATE] {len(CANDIDATES)} candidates to validate")
 
-    # Load data using sentinel's loader (includes Indicators enrichment)
-    all_data = sentinel_load_kite_symbols()
+    # Load data with Indicators enrichment
+    all_data = load_kite_symbols()
     print(f"[WF-VALIDATE] Loaded {len(all_data)} symbols from Kite cache")
 
     telegram_syms = load_telegram_symbols()
@@ -140,9 +234,9 @@ def main():
 
         print(f"\n[WF-VALIDATE] {i+1}/{len(CANDIDATES)}: {name} (universe={universe_label}, symbols={len(data_map)})")
 
-        # Run full-universe backtest using sentinel's run_variant
+        # Run full-universe backtest
         try:
-            vr = sentinel_run_variant(data_map, buy, sell, universe_label=universe_label)
+            vr = run_variant_direct(data_map, buy, sell, name=name)
             full_result = {
                 "name": name,
                 "total_return_pct": vr.total_return_pct,
