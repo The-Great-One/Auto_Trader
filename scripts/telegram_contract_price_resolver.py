@@ -168,9 +168,17 @@ def main() -> int:
             "captured_at": args.captured_at,
         }
 
-    kite = KiteConnect(api_key=API_KEY)
-    kite.set_access_token(read_access_token())
-    print(json.dumps(resolve_contract(kite, call), default=str))
+    try:
+        kite = KiteConnect(api_key=API_KEY)
+        kite.set_access_token(read_access_token())
+        result = resolve_contract(kite, call)
+    except Exception as exc:
+        result = {
+            "status": "drop",
+            "reason": "resolver_unavailable",
+            "error": str(exc)[:500],
+        }
+    print(json.dumps(result, default=str))
     return 0
 
 
