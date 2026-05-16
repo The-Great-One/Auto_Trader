@@ -31,6 +31,13 @@ CHANNEL_LEARNING_SCRIPT = ROOT / 'scripts' / 'generate_channel_learning.py'
 
 TARGET_FRACTIONS = [0.5, 0.3, 0.2]
 FIXED_TARGET_PCT = float(os.getenv('AT_TELEGRAM_FIXED_TARGET_PCT', '10.0'))
+DROP_CONTRACT_REASONS = {
+    'contract_not_found',
+    'contract_expired',
+    'symbol_missing',
+    'invalid_or_missing_side',
+    'invalid_or_missing_strike',
+}
 
 
 def fixed_targets_for_entry(entry_price: float) -> list[float]:
@@ -151,6 +158,11 @@ def repair_position_placeholders(state: dict[str, Any]) -> None:
             # Low-confidence calls used to be skipped. Reprocess them now that
             # observe-mode paper sizing is enabled, so they contribute outcomes.
             to_delete.append(pos_key)
+        if status == 'skipped' and pos.get('reason') == 'contract_resolver_unavailable':
+            # Retry these later; a missing Kite token/network blip is not proof
+            # the suggested contract does not exist.
+            to_delete.append(pos_key)
+            continue
     for pos_key in to_delete:
         positions.pop(pos_key, None)
 
@@ -269,9 +281,10 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
 
     resolved = fetch_contract_price(call)
     if resolved.get('status') != 'ok':
+        reason = resolved.get('reason') or 'contract_not_found'
         positions[pos_key] = {
-            'status': 'dropped',
-            'reason': resolved.get('reason') or 'contract_not_found',
+            'status': 'dropped' if reason in DROP_CONTRACT_REASONS else 'skipped',
+            'reason': reason if reason in DROP_CONTRACT_REASONS else 'contract_resolver_unavailable',
             'call': call,
             'created_at': now_utc().isoformat(),
             'resolver': resolved,
