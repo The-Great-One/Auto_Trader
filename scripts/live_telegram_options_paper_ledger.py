@@ -21,8 +21,6 @@ WORKSPACE_TOOLS = Path(os.getenv('AT_WORKSPACE_TOOLS', os.path.expanduser('~/.op
 if str(WORKSPACE_TOOLS) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_TOOLS))
 
-from telegram_trade_audit import fetch_option_chain_snapshot  # type: ignore
-
 STATE_PATH = REPORTS / 'live_telegram_options_paper_state.json'
 HISTORY_PATH = REPORTS / 'live_telegram_options_paper_equity_history.jsonl'
 LATEST_JSON = REPORTS / 'live_telegram_options_paper_latest.json'
@@ -52,6 +50,50 @@ def target_policy_for_entry(call: dict[str, Any], entry_price: float) -> tuple[l
     chat = call.get('source_chat', '')
     return call.get('targets') or _extract_targets(call), target_fractions_for(chat), {'mode': 'message_or_channel'}
 
+
+
+
+def _python_bin() -> str:
+    py = ROOT / 'venv' / 'bin' / 'python'
+    return str(py) if py.exists() else sys.executable
+
+
+def _ssh_target() -> tuple[str, str] | None:
+    host = os.getenv('AT_SERVER_HOST') or os.getenv('AT_ORACLE') or ''
+    key = os.getenv('AT_SERVER_KEY') or ''
+    if not host or not key:
+        return None
+    if '@' not in host:
+        host = f'ubuntu@{host}'
+    return host, key
+
+
+def fetch_contract_price(call: dict[str, Any]) -> dict[str, Any]:
+    """Resolve/price one Telegram contract through the dedicated resolver.
+
+    Local/server mode runs the resolver directly. Laptop mode uses the primary
+    Auto_Trader host when AT_SERVER_HOST/AT_SERVER_KEY are available.
+    """
+    payload = json.dumps(call, ensure_ascii=False)
+    local_script = ROOT / 'scripts' / 'telegram_contract_price_resolver.py'
+    use_local = os.getenv('AT_CONTRACT_RESOLVER_MODE') == 'local' or str(ROOT).startswith('/home/ubuntu/Auto_Trader')
+    if use_local or not _ssh_target():
+        cmd = [_python_bin(), str(local_script), '--json', '-']
+    else:
+        host, key = _ssh_target() or ('', '')
+        cmd = [
+            'ssh', '-i', key, '-o', 'StrictHostKeyChecking=no', host,
+            '/home/ubuntu/Auto_Trader/venv/bin/python',
+            '/home/ubuntu/Auto_Trader/scripts/telegram_contract_price_resolver.py',
+            '--json', '-',
+        ]
+    try:
+        result = subprocess.run(cmd, input=payload, capture_output=True, text=True, timeout=45)
+        if result.returncode != 0:
+            return {'status': 'drop', 'reason': 'resolver_failed', 'stderr': result.stderr[-500:]}
+        return json.loads(result.stdout.strip() or '{}')
+    except Exception as exc:
+        return {'status': 'drop', 'reason': 'resolver_exception', 'error': str(exc)[:500]}
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -96,7 +138,8 @@ def repair_position_placeholders(state: dict[str, Any]) -> None:
                 pos['status_note'] = 'converted_from_unresolved_non_option'
                 continue
             if pos.get('reason') == 'contract_not_found':
-                to_delete.append(pos_key)
+                pos['status'] = 'dropped'
+                pos['status_note'] = 'converted_from_unresolved_contract_not_found'
                 continue
         if status == 'skipped' and pos.get('reason') == 'insufficient_cash_for_one_lot' and call.get('option_side') and call.get('option_strike'):
             to_delete.append(pos_key)
@@ -224,16 +267,17 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
     max_pct = 0.40
     adjusted_pct = min(adjusted_pct, max_pct)
 
-    snap = fetch_option_chain_snapshot(call['symbol'], call['option_side']) or {}
-    contract = match_contract(call, snap)
-    if not contract:
+    resolved = fetch_contract_price(call)
+    if resolved.get('status') != 'ok':
         positions[pos_key] = {
-            'status': 'unresolved',
-            'reason': 'contract_not_found',
+            'status': 'dropped',
+            'reason': resolved.get('reason') or 'contract_not_found',
             'call': call,
             'created_at': now_utc().isoformat(),
+            'resolver': resolved,
         }
         return
+    contract = resolved.get('contract') or {}
 
     cash = float(state.get('cash', 0.0))
     entry_price = float(call.get('entry_ref') or contract.get('last_price') or 0.0)
@@ -299,7 +343,7 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'contract': {
             'tradingsymbol': contract.get('tradingsymbol'),
             'lot_size': lot_size,
-            'expiry': contract.get('expiry') or snap.get('nearest_expiry'),
+            'expiry': contract.get('expiry') or resolved.get('nearest_expiry'),
             'strike': contract.get('strike'),
             'side': contract.get('side'),
         },
@@ -314,8 +358,8 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'target_fractions': target_fractions,
         'target_policy': target_policy,
         'target_hits': [],
-        'last_price': round(float(contract.get('last_price') or 0.0), 2),
-        'last_underlying_price': round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None,
+        'last_price': round(float(contract.get('last_price') or resolved.get('last_price') or 0.0), 2),
+        'last_underlying_price': None,
         'last_snapshot_at': now_utc().isoformat(),
         'sizing_note': 'one_lot_floor_applied' if lot_floor_applied else None,
         'channel_learning': {
@@ -343,22 +387,39 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
     if pos.get('status') != 'open':
         return
     call = pos.get('call') or {}
-    snap = fetch_option_chain_snapshot(call.get('symbol'), call.get('option_side')) or {}
-    contract = match_contract({
-        'option_strike': call.get('option_strike'),
+    resolved = fetch_contract_price({
+        'symbol': call.get('symbol'),
         'option_side': call.get('option_side'),
-    }, snap)
-    if not contract:
+        'option_strike': call.get('option_strike'),
+        'captured_at': call.get('captured_at') or call.get('tracking_started_at') or pos.get('entry_time'),
+    })
+    if resolved.get('status') != 'ok':
         pos['last_snapshot_at'] = now_utc().isoformat()
-        pos['status_note'] = 'contract_not_found_on_refresh'
+        pos['status_note'] = resolved.get('reason') or 'contract_not_found_on_refresh'
+        if resolved.get('reason') == 'contract_expired':
+            close_price = float(pos.get('last_price') or 0.0)
+            remaining_qty = int(pos.get('remaining_qty') or 0)
+            realized_cash = float(pos.get('realized_cash') or 0.0)
+            realized_value = realized_cash + remaining_qty * close_price
+            pnl = realized_value - float(pos.get('invested') or 0.0)
+            state['cash'] = round(float(state.get('cash', 0.0)) + realized_value, 2)
+            pos['status'] = 'closed'
+            pos['exit_reason'] = 'contract_expired_dropped'
+            pos['exit_time'] = now_utc().isoformat()
+            pos['exit_price'] = round(close_price, 2)
+            pos['realized_value'] = round(realized_value, 2)
+            pos['pnl'] = round(pnl, 2)
+            pos['return_pct'] = round((realized_value / float(pos.get('invested') or 1.0) - 1.0) * 100.0, 2)
+            pos['remaining_qty'] = 0
         return
+    contract = resolved.get('contract') or {}
 
     price = float(contract.get('last_price') or 0.0)
     pos['last_price'] = round(price, 2)
-    pos['last_underlying_price'] = round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None
+    pos['last_underlying_price'] = None
     pos['last_snapshot_at'] = now_utc().isoformat()
     pos['contract']['tradingsymbol'] = contract.get('tradingsymbol')
-    pos['contract']['expiry'] = contract.get('expiry') or pos['contract'].get('expiry') or snap.get('nearest_expiry')
+    pos['contract']['expiry'] = contract.get('expiry') or pos['contract'].get('expiry') or resolved.get('nearest_expiry')
 
     chat = str(call.get('source_chat') or '')
     target_fractions = [float(x) for x in (pos.get('target_fractions') or target_fractions_for(chat)) if float(x) > 0]
@@ -439,6 +500,7 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
     open_rows = []
     closed_rows = []
     unresolved_rows = []
+    dropped_rows = []
     for pos_key, pos in positions.items():
         invested = float(pos.get('invested') or 0.0)
         realized_value = float(pos.get('realized_value') or 0.0)
@@ -456,7 +518,7 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
             })
             continue
         if status != 'open':
-            unresolved_rows.append({
+            row = {
                 'key': pos_key,
                 'status': status,
                 'reason': pos.get('reason'),
@@ -467,7 +529,11 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
                 'source_message_id': pos.get('call', {}).get('source_message_id'),
                 'created_at': pos.get('created_at'),
                 'channel_update': pos.get('call', {}).get('text') or pos.get('channel_confidence_note'),
-            })
+            }
+            if status == 'dropped':
+                dropped_rows.append(row)
+            else:
+                unresolved_rows.append(row)
             continue
         current_value = float(pos.get('realized_cash') or 0.0) + float(pos.get('remaining_qty') or 0) * float(pos.get('last_price') or 0.0)
         pnl = current_value - invested
@@ -497,6 +563,7 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
         'open_positions': open_rows,
         'closed_positions': closed_rows,
         'unresolved_positions': unresolved_rows,
+        'dropped_positions': dropped_rows,
     }
 
 
@@ -558,6 +625,12 @@ def render_md(summary: dict[str, Any]) -> str:
     if summary['closed_positions']:
         for row in summary['closed_positions']:
             lines.append(f"- {row['symbol']} `{row['tradingsymbol']}` pnl {row['pnl']} ({row['return_pct']}%), reason {row['exit_reason']}")
+    else:
+        lines.append('- none')
+    lines += ['', '## Dropped suggestions']
+    if summary.get('dropped_positions'):
+        for row in summary['dropped_positions']:
+            lines.append(f"- {row['symbol']} {row.get('option_side') or ''} {row.get('option_strike') or ''} dropped, reason {row.get('reason') or '-'}")
     else:
         lines.append('- none')
     lines += ['', '## Unresolved / not opened']
