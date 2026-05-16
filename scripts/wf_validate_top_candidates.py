@@ -32,7 +32,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader.utils import Indicators
-from scripts.weekly_strategy_lab import load_data, run_variant, run_walk_forward_validation
+from scripts.sentinel_30_targeted_v2 import run_variant as sentinel_run_variant, _compute_cagr, load_kite_symbols as sentinel_load_kite, VariantResult
+from scripts.weekly_strategy_lab import run_variant as lab_run_variant, run_walk_forward_validation
 
 OUT_DIR = ROOT / "reports"
 
@@ -70,25 +71,6 @@ CANDIDATES = [
     # Baseline for comparison
     {"name": "baseline_adx18", "buy": {"adx_strong_min": 18}, "sell": {}},
 ]
-
-
-def load_kite_symbols(min_rows=400, min_span_days=500):
-    """Load Kite cached feather data."""
-    hist_dir = ROOT / "intermediary_files" / "Hist_Data"
-    data_map = {}
-    for fp in sorted(hist_dir.glob("*.feather")):
-        sym = fp.stem
-        try:
-            df = pd.read_feather(fp)
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-            df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
-            if len(df) >= min_rows:
-                span = (df["Date"].max() - df["Date"].min()).days
-                if span >= min_span_days:
-                    data_map[sym] = df
-        except Exception:
-            continue
-    return data_map
 
 
 def load_telegram_symbols():
@@ -130,8 +112,8 @@ def main():
     print(f"[WF-VALIDATE] Starting walk-forward validation of top candidates")
     print(f"[WF-VALIDATE] {len(CANDIDATES)} candidates to validate")
 
-    # Load data
-    all_data = load_kite_symbols()
+    # Load data using sentinel's loader (includes Indicators enrichment)
+    all_data = sentinel_load_kite_symbols()
     print(f"[WF-VALIDATE] Loaded {len(all_data)} symbols from Kite cache")
 
     telegram_syms = load_telegram_symbols()
@@ -158,20 +140,33 @@ def main():
 
         print(f"\n[WF-VALIDATE] {i+1}/{len(CANDIDATES)}: {name} (universe={universe_label}, symbols={len(data_map)})")
 
-        # Run full-universe backtest
+        # Run full-universe backtest using sentinel's run_variant
         try:
-            full_result = run_variant(name=name, data_map=data_map, buy_params=buy, sell_params=sell)
-            full_result["name"] = name
+            vr = sentinel_run_variant(data_map, buy, sell, universe_label=universe_label)
+            full_result = {
+                "name": name,
+                "total_return_pct": vr.total_return_pct,
+                "cagr_pct": vr.cagr_pct,
+                "max_drawdown_pct": vr.max_drawdown_pct,
+                "trades": vr.trades,
+                "win_rate_pct": vr.win_rate_pct,
+                "sharpe": vr.sharpe,
+                "active_symbols": vr.active_symbols,
+                "selection_score": vr.selection_score,
+                "error": vr.error,
+            }
         except Exception as e:
             print(f"[WF-VALIDATE] ERROR running {name}: {e}")
+            import traceback; traceback.print_exc()
             full_result = {"name": name, "total_return_pct": 0, "cagr_pct": 0, "max_drawdown_pct": 0, "trades": 0, "error": str(e)}
 
-        # Run walk-forward validation (5-fold)
+        # Run walk-forward validation (5-fold) using weekly_strategy_lab
         try:
             wf_result = run_walk_forward_validation(data_map=data_map, buy_params=buy, sell_params=sell, n_splits=5)
             wf_result["name"] = name
         except Exception as e:
             print(f"[WF-VALIDATE] ERROR in WF for {name}: {e}")
+            import traceback; traceback.print_exc()
             wf_result = {"name": name, "n_folds": 5, "mean_oos_return_pct": 0, "min_oos_return_pct": 0, "positive_folds": 0, "error": str(e)}
 
         result = {
