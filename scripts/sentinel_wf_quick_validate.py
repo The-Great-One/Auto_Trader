@@ -21,20 +21,19 @@ import numpy as np
 import pandas as pd
 from scripts.sentinel_30_targeted_v2 import (
     load_kite_symbols,
-    VariantSpec,
-    backtest_variant,
-    N_FOLDS,
+    VariantResult,
+    run_variant,
+    VARIANTS,
 )
 from Auto_Trader.utils import Indicators
 
 OUT_DIR = ROOT / "reports"
 
 # Best candidates from full universe sweep
-CANDIDATES = [
-    {"name": "combo263_bep2.0_ts4", "buy": {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0}, "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "breakeven_trigger_pct": 2.0, "equity_time_stop_bars": 4}},
-    {"name": "combo263_bep2.5_ts4", "buy": {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0}, "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "breakeven_trigger_pct": 2.5, "equity_time_stop_bars": 4}},
-    {"name": "combo263_bep1.5_ts4", "buy": {"sr_bounce_enabled": 1, "sr_vpoc_reclaim_enabled": 1, "sr_near_support_pct": 0.02, "volume_confirm_mult": 0.75, "rsi_floor": 38, "ich_cloud_bull": 0, "vwap_buy_above": 0}, "sell": {"momentum_exit_rsi": 38.0, "equity_review_rsi": 45.0, "breakeven_trigger_pct": 1.5, "equity_time_stop_bars": 4}},
-]
+# Pick top 3 combo263 variants from VARIANTS
+CANDIDATES = [v for v in VARIANTS if v["name" in ("combo263_bep2.0_ts4", "combo263_bep2.5_ts4", "combo263_bep1.5_ts4")]
+if not CANDIDATES:
+    CANDIDATES = [v for v in VARIANTS if "combo263" in v["name"]][:3]
 
 
 def main():
@@ -48,16 +47,14 @@ def main():
     results = []
     for cand in CANDIDATES:
         name = cand["name"]
-        variant = VariantSpec(
-            name=name,
-            buy=cand["buy"],
-            sell=cand["sell"],
-        )
+        buy_cfg = cand["buy"]
+        sell_cfg = cand["sell"]
         print(f"\nRunning full backtest for {name}...")
-        full_result = backtest_variant(variant, data_map)
+        full_result = run_variant(name, buy_cfg, sell_cfg, data_map)
         print(f"  Full: cagr={full_result.get('cagr_pct', '?')}%, ret={full_result.get('total_return_pct', '?')}%, dd={full_result.get('max_drawdown_pct', '?')}%, trades={full_result.get('trades', '?')}")
 
         # Walk-forward
+        N_FOLDS = 5
         print(f"  Running {N_FOLDS}-fold WF validation...")
         all_dates = sorted(data_map[list(data_map.keys())[0]].index)
         total_days = len(all_dates)
@@ -76,7 +73,7 @@ def main():
             train_map = {s: df[df.index <= train_cutoff] for s, df in data_map.items()}
             test_map = {s: df[(df.index > train_cutoff) & (df.index <= test_cutoff)] for s, df in data_map.items()}
 
-            test_result = backtest_variant(variant, test_map)
+            test_result = run_variant(name, buy_cfg, sell_cfg, test_map)
             wf_folds.append({
                 "fold": fold_i + 1,
                 "train_end": str(train_cutoff.date()) if hasattr(train_cutoff, 'date') else str(train_cutoff),
