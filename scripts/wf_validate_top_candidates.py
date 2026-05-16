@@ -32,11 +32,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from Auto_Trader.utils import Indicators
-from scripts.weekly_strategy_lab import run_variant as lab_run_variant, run_walk_forward_validation
-import Auto_Trader.lab as lab
-from Auto_Trader.RULE_SET_2 import RULE_SET_2
-from Auto_Trader.RULE_SET_7 import RULE_SET_7
-from Auto_Trader.backtest_engine import run_baseline_detailed
+from scripts.weekly_strategy_lab import run_variant as lab_run_variant, run_walk_forward_validation, RULE_SET_2, RULE_SET_7
+from scripts.weekly_universe_cagr_check import run_baseline_detailed
 
 OUT_DIR = ROOT / "reports"
 MIN_ROWS = 400
@@ -115,16 +112,17 @@ def run_variant_direct(data_map, buy, sell, name="variant"):
         return VR(
             total_return_pct=round(result.total_return_pct, 2),
             cagr_pct=cagr,
-            max_drawdown_pct=dd,
-            trades=result.trade_count if hasattr(result, 'trade_count') else 0,
-            win_rate_pct=round(result.win_rate_pct, 2) if hasattr(result, 'win_rate_pct') else 0.0,
+            max_drawdown_pct=dd or round(result.max_drawdown_pct, 2),
+            trades=result.trades if hasattr(result, 'trades') else 0,
+            win_rate_pct=round(result.win_rate_pct, 1) if hasattr(result, 'win_rate_pct') else 0.0,
             sharpe=sharpe,
-            error="",
+            active_symbols=sum(1 for v in details.values() if int(v.get("trades", 0) or 0) > 0) if isinstance(details, dict) else 0,
+            selection_score=round(result.selection_score, 3) if hasattr(result, 'selection_score') else 0.0,
         )
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return VR(error=str(e))
+        return VR(error=str(e)[:200])
     finally:
         RULE_SET_2.CONFIG.clear()
         RULE_SET_2.CONFIG.update(old_r2)
