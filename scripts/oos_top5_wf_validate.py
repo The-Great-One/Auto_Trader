@@ -63,16 +63,16 @@ def main():
         try:
             wf_result = run_walk_forward_validation(
                 data_map=data_map,
-                buy_overrides=buy,
-                sell_overrides=sell,
+                buy_params=buy,
+                sell_params=sell,
                 n_splits=5,
             )
             # Also get headline
             is_result = run_variant(
-                data_map=data_map,
                 name=name,
-                buy_overrides=buy,
-                sell_overrides=sell,
+                data_map=data_map,
+                buy_params=buy,
+                sell_params=sell,
             )
             headline = {
                 "name": name,
