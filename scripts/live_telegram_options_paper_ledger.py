@@ -32,6 +32,25 @@ TELEGRAM_AUDIT_PATH = REPORTS / 'telegram_trade_audit_latest.json'
 CHANNEL_LEARNING_SCRIPT = ROOT / 'scripts' / 'generate_channel_learning.py'
 
 TARGET_FRACTIONS = [0.5, 0.3, 0.2]
+FIXED_TARGET_PCT = float(os.getenv('AT_TELEGRAM_FIXED_TARGET_PCT', '10.0'))
+
+
+def fixed_targets_for_entry(entry_price: float) -> list[float]:
+    if FIXED_TARGET_PCT <= 0 or entry_price <= 0:
+        return []
+    return [round(float(entry_price) * (1.0 + FIXED_TARGET_PCT / 100.0), 2)]
+
+
+def target_policy_for_entry(call: dict[str, Any], entry_price: float) -> tuple[list[float], list[float], dict[str, Any]]:
+    fixed_targets = fixed_targets_for_entry(entry_price)
+    if fixed_targets:
+        return fixed_targets, [1.0], {
+            'mode': 'fixed_pct',
+            'target_pct': FIXED_TARGET_PCT,
+            'source': 'AT_TELEGRAM_FIXED_TARGET_PCT',
+        }
+    chat = call.get('source_chat', '')
+    return call.get('targets') or _extract_targets(call), target_fractions_for(chat), {'mode': 'message_or_channel'}
 
 
 def now_utc() -> datetime:
@@ -261,6 +280,7 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
 
     qty = lots * lot_size
     invested = qty * entry_price
+    targets, target_fractions, target_policy = target_policy_for_entry(call, entry_price)
     state['cash'] = round(cash - invested, 2)
     positions[pos_key] = {
         'status': 'open',
@@ -290,7 +310,9 @@ def maybe_open_position(state: dict[str, Any], call: dict[str, Any], capital_per
         'invested': round(invested, 2),
         'realized_cash': 0.0,
         'stop_loss': float(call.get('stop_loss') or _extract_stop(call) or 0.0) or None,
-        'targets': call.get('targets') or _extract_targets(call),
+        'targets': targets,
+        'target_fractions': target_fractions,
+        'target_policy': target_policy,
         'target_hits': [],
         'last_price': round(float(contract.get('last_price') or 0.0), 2),
         'last_underlying_price': round(float(snap.get('underlying_price') or 0.0), 2) if snap.get('underlying_price') is not None else None,
@@ -339,7 +361,7 @@ def refresh_position(state: dict[str, Any], pos_key: str, pos: dict[str, Any], t
     pos['contract']['expiry'] = contract.get('expiry') or pos['contract'].get('expiry') or snap.get('nearest_expiry')
 
     chat = str(call.get('source_chat') or '')
-    target_fractions = target_fractions_for(chat)
+    target_fractions = [float(x) for x in (pos.get('target_fractions') or target_fractions_for(chat)) if float(x) > 0]
     move_stop_to_entry_after_hits, move_stop_to_last_target_after_hits = stop_profile_for(chat)
     targets = pos.get('targets') or []
     hits = list(pos.get('target_hits') or [])
@@ -458,6 +480,8 @@ def mark_to_market(state: dict[str, Any]) -> dict[str, Any]:
             'last_price': pos.get('last_price'),
             'qty': pos.get('qty'),
             'remaining_qty': pos.get('remaining_qty'),
+            'targets': pos.get('targets') or [],
+            'target_policy': pos.get('target_policy') or {},
             'targets_hit': [int(x) + 1 for x in pos.get('target_hits') or []],
             'target_hit_times': pos.get('target_hit_times') or [],
             'stop_loss': pos.get('stop_loss'),
@@ -519,13 +543,14 @@ def render_md(summary: dict[str, Any]) -> str:
         f"- Equity: `{summary['equity']}`",
         f"- Realized PnL: `{summary['realized_pnl']}`",
         f"- Unrealized PnL: `{summary['unrealized_pnl']}`",
+        f"- Target policy: `{summary.get('target_policy', {}).get('target_pct', 0)}% fixed from entry`" if (summary.get('target_policy') or {}).get('mode') == 'fixed_pct' else "- Target policy: `message/channel targets`",
         '',
         '## Open positions',
     ]
     if summary['open_positions']:
         for row in summary['open_positions']:
             lines.append(
-                f"- {row['symbol']} `{row['tradingsymbol']}` entry {row['entry_price']} last {row['last_price']} mtm {row['mtm_pnl']} ({row['mtm_return_pct']}%), targets hit {row['targets_hit']}, SL {row['stop_loss']}"
+                f"- {row['symbol']} `{row['tradingsymbol']}` entry {row['entry_price']} target {row.get('targets') or []} last {row['last_price']} mtm {row['mtm_pnl']} ({row['mtm_return_pct']}%), targets hit {row['targets_hit']}, SL {row['stop_loss']}"
             )
     else:
         lines.append('- none')
@@ -574,6 +599,7 @@ def main() -> int:
         'updated_at': now_utc().isoformat(),
         'starting_capital': round(float(state['starting_capital']), 2),
         'positions_tracked': len(state.get('positions') or {}),
+        'target_policy': {'mode': 'fixed_pct', 'target_pct': FIXED_TARGET_PCT} if FIXED_TARGET_PCT > 0 else {'mode': 'message_or_channel'},
     })
 
     append_jsonl(HISTORY_PATH, {'timestamp': summary['updated_at'], 'equity': summary['equity'], 'cash': summary['cash']})

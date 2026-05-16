@@ -33,6 +33,15 @@ OPTION_CALL_RE = re.compile(
 SL_RE = re.compile(r'SL-\s*(?P<sl>\d+(?:\.\d+)?)', re.IGNORECASE)
 TARGET_RE = re.compile(r'Target-\s*(?P<targets>[0-9+/\-. ]+)', re.IGNORECASE)
 MONTH_MAP = {m: i for i, m in enumerate(['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'], start=1)}
+FIXED_TARGET_PCT = float(os.getenv('AT_TELEGRAM_FIXED_TARGET_PCT', '10.0'))
+
+
+def fixed_targets_for_entry(entry_price: float) -> list[float]:
+    if FIXED_TARGET_PCT <= 0 or entry_price <= 0:
+        return []
+    return [round(float(entry_price) * (1.0 + FIXED_TARGET_PCT / 100.0), 2)]
+
+
 UNDERLYING_ALIAS = {
     'SBILIFE': 'SBILIFE',
     'NIFTY': 'NIFTY',
@@ -126,6 +135,9 @@ def parse_option_calls(messages: list[dict[str, Any]], channel_name: str) -> lis
         targets = []
         if tgt_match:
             targets = [float(x) for x in re.findall(r'\d+(?:\.\d+)?', tgt_match.group('targets'))[:4]]
+        fixed_targets = fixed_targets_for_entry((entry1 + entry2) / 2.0)
+        if fixed_targets:
+            targets = fixed_targets
         calls.append(OptionCall(
             channel=channel_name,
             message_id=int(m.get('message_id') or 0),
@@ -547,6 +559,7 @@ def main() -> int:
         'interval': args.interval,
         'max_hold_bars': int(args.max_hold_bars),
         'target_style': args.target_style,
+        'target_policy': {'mode': 'fixed_pct', 'target_pct': FIXED_TARGET_PCT} if FIXED_TARGET_PCT > 0 else {'mode': 'message_targets'},
         'signals_found': len(calls),
         'trades_simulated': int(len(trades)),
         'final_equity': round(final_equity, 2),
@@ -569,6 +582,7 @@ def main() -> int:
         f'- Channel: `{args.channel}`\n'
         f'- Starting capital: `{args.starting_capital:.2f}`\n'
         f'- Capital per trade pct: `{args.capital_per_trade_pct:.2%}`\n'
+        f'- Target policy: `{FIXED_TARGET_PCT:.2f}% fixed from entry`\n'
         f'- Interval: `{args.interval}`\n'
         f'- Target style: `{args.target_style}`\n'
         f'- Max hold bars: `{args.max_hold_bars}`\n'
