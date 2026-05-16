@@ -7,6 +7,13 @@ TOOL_DIR="$HOME/.openclaw/workspace/tools"
 REPORTS="./reports"
 mkdir -p "$REPORTS"
 
+# Load Sahil-confirmed Auto_Trader SSH env for non-interactive launches.
+AT_LOCAL_ENV="${AT_LOCAL_ENV:-$HOME/.openclaw/workspace/secrets/autotrader_servers.env}"
+if [ -f "$AT_LOCAL_ENV" ]; then
+  # shellcheck disable=SC1090
+  . "$AT_LOCAL_ENV"
+fi
+
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $*"; }
 
 log "Starting telegram learning pipeline"
@@ -47,13 +54,18 @@ log "Step 4: Running paper ledger"
 # Step 5: Sync key reports to server if env vars are available
 if [ -n "${AT_SERVER_HOST:-}" ] && [ -n "${AT_SERVER_KEY:-}" ]; then
   log "Step 5: Syncing reports to server"
+  SERVER_TARGET="$AT_SERVER_HOST"
+  case "$SERVER_TARGET" in
+    *@*) ;;
+    *) SERVER_TARGET="ubuntu@$SERVER_TARGET" ;;
+  esac
   for f in channel_learning_scores.json telegram_trade_audit_latest.json live_telegram_options_paper_latest.json live_telegram_options_paper_latest.md live_telegram_options_paper_equity_history.jsonl; do
     if [ -f "$REPORTS/$f" ]; then
-      scp -i "$AT_SERVER_KEY" -o StrictHostKeyChecking=no "$REPORTS/$f" "ubuntu@$AT_SERVER_HOST:/home/ubuntu/Auto_Trader/reports/" 2>&1 | while IFS= read -r line; do log "SYNC: $line"; done || true
+      scp -i "$AT_SERVER_KEY" -o StrictHostKeyChecking=no "$REPORTS/$f" "$SERVER_TARGET:/home/ubuntu/Auto_Trader/reports/" 2>&1 | while IFS= read -r line; do log "SYNC: $line"; done || true
     fi
   done
 else
-  log "Step 5: Skipping server sync (AT_SERVER_HOST/AT_SERVER_KEY not set)"
+  log "Step 5: Skipping server sync (AT_SERVER_HOST/AT_SERVER_KEY not set and $AT_LOCAL_ENV unavailable)"
 fi
 
 log "Pipeline complete"
