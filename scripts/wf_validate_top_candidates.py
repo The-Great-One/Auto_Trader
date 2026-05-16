@@ -100,12 +100,29 @@ def load_telegram_symbols():
         with open(scores_path) as f:
             d = json.load(f)
         syms = set()
-        for ch in d.get("channels", d) if isinstance(d.get("channels", d), dict) else []:
-            ch_data = d["channels"][ch] if isinstance(d.get("channels"), dict) else ch
-            for s in ch_data.get("symbols_seen", ch_data.get("symbols", [])):
+        # Handle various structures
+        channels = d
+        if isinstance(d, dict) and "channels" in d:
+            channels = d["channels"]
+        if isinstance(d, dict) and "symbols" in d:
+            # Top-level symbols list
+            for s in d["symbols"]:
                 syms.add(s.upper().replace(".NS", "").replace(".BO", ""))
+            if "channels" in d:
+                channels = d["channels"]
+        if isinstance(channels, dict):
+            for ch_name, ch_data in channels.items():
+                if isinstance(ch_data, dict):
+                    for s in ch_data.get("symbols_seen", ch_data.get("symbols", ch_data.get("top_symbols", []))):
+                        syms.add(s.upper().replace(".NS", "").replace(".BO", ""))
+        elif isinstance(channels, list):
+            for ch_data in channels:
+                if isinstance(ch_data, dict):
+                    for s in ch_data.get("symbols_seen", ch_data.get("symbols", ch_data.get("top_symbols", []))):
+                        syms.add(s.upper().replace(".NS", "").replace(".BO", ""))
         return syms
-    except Exception:
+    except Exception as e:
+        print(f"[WF-VALIDATE] Warning: could not load Telegram symbols: {e}")
         return set()
 
 
@@ -143,7 +160,7 @@ def main():
 
         # Run full-universe backtest
         try:
-            full_result = run_variant(data_map, buy, sell, name=name)
+            full_result = run_variant(name=name, data_map=data_map, buy_params=buy, sell_params=sell)
             full_result["name"] = name
         except Exception as e:
             print(f"[WF-VALIDATE] ERROR running {name}: {e}")
@@ -151,7 +168,7 @@ def main():
 
         # Run walk-forward validation (5-fold)
         try:
-            wf_result = run_walk_forward_validation(data_map, buy, sell, n_splits=5)
+            wf_result = run_walk_forward_validation(data_map=data_map, buy_params=buy, sell_params=sell, n_splits=5)
             wf_result["name"] = name
         except Exception as e:
             print(f"[WF-VALIDATE] ERROR in WF for {name}: {e}")
