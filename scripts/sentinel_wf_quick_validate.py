@@ -51,6 +51,10 @@ def main():
         sell_cfg = cand["sell"]
         print(f"\nRunning full backtest for {name}...")
         full_result = run_variant(name, buy_cfg, sell_cfg, data_map)
+        # Convert dataclass to dict
+        if hasattr(full_result, '__dataclass_fields__'):
+            from dataclasses import asdict
+            full_result = asdict(full_result)
         print(f"  Full: cagr={full_result.get('cagr_pct', '?')}%, ret={full_result.get('total_return_pct', '?')}%, dd={full_result.get('max_drawdown_pct', '?')}%, trades={full_result.get('trades', '?')}")
 
         # Walk-forward
@@ -74,6 +78,9 @@ def main():
             test_map = {s: df[(df.index > train_cutoff) & (df.index <= test_cutoff)] for s, df in data_map.items()}
 
             test_result = run_variant(name, buy_cfg, sell_cfg, test_map)
+            if hasattr(test_result, '__dataclass_fields__'):
+                from dataclasses import asdict
+                test_result = asdict(test_result)
             wf_folds.append({
                 "fold": fold_i + 1,
                 "train_end": str(train_cutoff.date()) if hasattr(train_cutoff, 'date') else str(train_cutoff),
