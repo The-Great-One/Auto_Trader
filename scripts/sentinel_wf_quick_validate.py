@@ -31,7 +31,7 @@ OUT_DIR = ROOT / "reports"
 
 # Best candidates from full universe sweep
 # Pick top 3 combo263 variants from VARIANTS
-CANDIDATES = [v for v in VARIANTS if v["name" in ("combo263_bep2.0_ts4", "combo263_bep2.5_ts4", "combo263_bep1.5_ts4")]
+CANDIDATES = [v for v in VARIANTS if v["name"] in ("combo263_bep2.0_ts4", "combo263_bep2.5_ts4", "combo263_bep1.5_ts4")]
 if not CANDIDATES:
     CANDIDATES = [v for v in VARIANTS if "combo263" in v["name"]][:3]
 
