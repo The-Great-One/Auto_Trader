@@ -1,158 +1,126 @@
 #!/usr/bin/env python3
-"""Refresh Kite access token using TOTP authentication."""
-import requests
+"""Refresh Kite access token using the hardened Auto_Trader token generator.
+
+This script intentionally delegates login to Auto_Trader.Request_Token instead of
+maintaining a second HTTP-login implementation. The older duplicate flow used a
+large Chrome-like header set (Sec-Fetch/Accept-Encoding/etc.) and was observed to
+trigger Zerodha's CAPTCHA branch before TOTP.
+"""
+from __future__ import annotations
+
+import argparse
 import json
-import re
-import pyotp
-import datetime
-from urllib.parse import urlparse, parse_qs
-from kiteconnect import KiteConnect
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-secrets = {}
-with open("Auto_Trader/my_secrets.py") as f:
-    exec(f.read(), secrets)
+ROOT = Path(__file__).resolve().parents[1]
+TOKEN_PATH = ROOT / "intermediary_files" / "access_token.json"
 
-API_KEY = secrets["API_KEY"]
-API_SECRET = secrets["API_SECRET"]
-TOTP_KEY = secrets["TOTP_KEY"]
-USER_NAME = secrets["USER_NAME"]
-PASS = secrets["PASS"]
+# Load secrets without importing the Auto_Trader package __init__; local laptops
+# can have optional dependency drift, but token refresh only needs Kite secrets.
+_secrets: dict[str, Any] = {}
+exec((ROOT / "Auto_Trader" / "my_secrets.py").read_text(encoding="utf-8"), _secrets)
+API_KEY = _secrets["API_KEY"]
+API_SECRET = _secrets["API_SECRET"]
 
-kite = KiteConnect(api_key=API_KEY)
 
-# Use Chrome-like headers to minimize CAPTCHA risk
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-}
+def _load_module(name: str, path: Path):
+    import importlib.util
 
-session = requests.Session()
-session.headers.update(BROWSER_HEADERS)
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load module {name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
-# Step 1: Visit homepage
-r1 = session.get("https://kite.zerodha.com/", timeout=10)
-print(f"Homepage: {r1.status_code}, cookies: {list(session.cookies.keys())}")
 
-# Step 2: Login URL
-r2 = session.get(kite.login_url(), timeout=10)
-print(f"Login page: {r2.status_code}, url: {r2.url[:100]}")
+def _read_token() -> dict[str, Any]:
+    try:
+        return json.loads(TOKEN_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
 
-# Step 3: Login
-login_headers = {
-    "Referer": "https://kite.zerodha.com/",
-    "Origin": "https://kite.zerodha.com",
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Dest": "empty",
-    "X-Requested-With": "XMLHttpRequest",
-}
-login_payload = {"user_id": USER_NAME, "password": PASS}
-login_response = session.post(
-    "https://kite.zerodha.com/api/login",
-    data=login_payload,
-    headers=login_headers,
-    timeout=10,
-)
-resp = login_response.json()
-print(f"Login: status={resp.get('status')}, message={resp.get('message', 'ok')[:100]}")
 
-if "request_id" in resp.get("data", {}):
-    request_id = resp["data"]["request_id"]
-    print(f"request_id: {request_id}")
+def _token_is_today(payload: dict[str, Any]) -> bool:
+    return bool(payload.get("access_token")) and str(payload.get("date")) == datetime.now().strftime("%Y-%m-%d")
 
-    # Step 4: TOTP
-    totp_code = str(pyotp.TOTP(TOTP_KEY).now())
-    print(f"TOTP: {totp_code}")
 
-    totp_payload = {
-        "user_id": USER_NAME,
-        "request_id": request_id,
-        "twofa_value": totp_code,
-        "twofa_type": "totp",
-        "skip_session": True,
-    }
-    totp_response = session.post(
-        "https://kite.zerodha.com/api/twofa",
-        data=totp_payload,
-        headers=login_headers,
-        timeout=10,
+def _write_token(access_token: str) -> dict[str, str]:
+    payload = {"access_token": access_token, "date": datetime.now().strftime("%Y-%m-%d")}
+    TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = TOKEN_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+    tmp.replace(TOKEN_PATH)
+    return payload
+
+
+def refresh(force: bool = False) -> dict[str, Any]:
+    existing = _read_token()
+    if _token_is_today(existing) and not force:
+        print(f"Using existing Kite access token for {existing['date']} at {TOKEN_PATH}")
+        return existing
+
+    # Load the isolated login implementation directly. It uses the minimal
+    # header set documented in Auto_Trader/Request_Token.py and avoids the stale
+    # duplicate header path that caused CAPTCHA responses.
+    request_token_mod = _load_module("autotrader_request_token_isolated", ROOT / "Auto_Trader" / "Request_Token.py")
+
+    from kiteconnect import KiteConnect  # type: ignore
+
+    kite = KiteConnect(api_key=API_KEY)
+    request_token = request_token_mod.get_request_token(
+        {
+            "api_key": API_KEY,
+            "username": _secrets["USER_NAME"],
+            "password": _secrets["PASS"],
+            "totp_key": _secrets["TOTP_KEY"],
+        }
     )
-    resp2 = totp_response.json()
-    print(f"2FA: status={resp2.get('status')}, message={resp2.get('message', 'ok')[:100]}")
+    data = kite.generate_session(request_token=request_token, api_secret=API_SECRET)
+    payload = _write_token(data["access_token"])
+    print(f"Wrote fresh Kite access token for {payload['date']} to {TOKEN_PATH}")
+    return payload
 
-    if totp_response.status_code == 200:
-        # Try getting enctoken from response
-        enctoken = resp2.get("data", {}).get("enctoken")
-        if enctoken:
-            print(f"enctoken found: {enctoken[:20]}...")
-            # Save enctoken for auto_trade.py
-            enc_data = {"enctoken": enctoken, "date": datetime.datetime.now().strftime("%Y-%m-%d")}
-            with open("intermediary_files/enctoken.json", "w") as f:
-                json.dump(enc_data, f, indent=4)
-            print("enctoken saved!")
 
-        # Try redirect for request_token
-        try:
-            redirect_response = session.get(kite.login_url(), timeout=10, allow_redirects=False)
-            location = redirect_response.headers.get("Location", "")
-            print(f"Redirect: {redirect_response.status_code}, Location: {location[:200]}")
-            parse_result = urlparse(location)
-            query_params = parse_qs(parse_result.query)
-        except Exception as e:
-            print(f"Redirect error (trying to extract token): {e}")
-            pattern = r"request_token=[A-Za-z0-9]+"
-            match = re.search(pattern, str(e))
-            if match:
-                query_params = parse_qs(match.group())
-            else:
-                query_params = {}
+def check_token() -> None:
+    payload = _read_token()
+    if not payload.get("access_token"):
+        raise SystemExit(f"No access token found at {TOKEN_PATH}")
+    from kiteconnect import KiteConnect  # type: ignore
 
-        tokens = query_params.get("request_token")
-        if tokens:
-            request_token = tokens[0]
-            print(f"request_token: {request_token[:15]}...")
+    kite = KiteConnect(api_key=API_KEY)
+    kite.set_access_token(payload["access_token"])
+    holdings = kite.holdings()
+    mf_holdings = kite.mf_holdings()
+    print(
+        json.dumps(
+            {
+                "token_date": payload.get("date"),
+                "equity_holdings": len(holdings),
+                "mf_holdings": len(mf_holdings),
+            },
+            indent=2,
+        )
+    )
 
-            # Step 6: Generate session
-            data = kite.generate_session(request_token, api_secret=API_SECRET)
-            print(f"access_token: {data['access_token'][:15]}...")
 
-            # Save
-            session_data = {
-                "access_token": data["access_token"],
-                "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-            }
-            with open("intermediary_files/access_token.json", "w") as f:
-                json.dump(session_data, f, indent=4)
-            print("Token saved!")
-        else:
-            # Try following the redirect chain
-            redirect2 = session.get(kite.login_url(), timeout=10, allow_redirects=True)
-            print(f"Final URL: {redirect2.url[:200]}")
-            parse_result = urlparse(redirect2.url)
-            query_params = parse_qs(parse_result.query)
-            tokens = query_params.get("request_token")
-            if tokens:
-                request_token = tokens[0]
-                data = kite.generate_session(request_token, api_secret=API_SECRET)
-                print(f"access_token: {data['access_token'][:15]}...")
-                session_data = {
-                    "access_token": data["access_token"],
-                    "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-                }
-                with open("intermediary_files/access_token.json", "w") as f:
-                    json.dump(session_data, f, indent=4)
-                print("Token saved!")
-            else:
-                print(f"No request_token found. Final URL: {redirect2.url}")
-    else:
-        print(f"2FA failed: {json.dumps(resp2)[:500]}")
-else:
-    print(f"Login failed. Full response: {json.dumps(resp)[:500]}")
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Refresh/check Kite access token")
+    parser.add_argument("--force", action="store_true", help="Force a fresh login even if today's token exists")
+    parser.add_argument("--check", action="store_true", help="Validate existing token by fetching holdings")
+    args = parser.parse_args()
+
+    if args.check:
+        check_token()
+        return 0
+    refresh(force=args.force)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

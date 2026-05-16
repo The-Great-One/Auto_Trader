@@ -3,10 +3,19 @@ import requests
 import onetimepass as otp
 import time as _time
 import random
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from kiteconnect import KiteConnect
-from Auto_Trader.my_secrets import API_KEY, PASS, TOTP_KEY, USER_NAME
 import logging
+
+# Load only the Kite secrets without importing Auto_Trader.__init__.  This keeps
+# token generation isolated from optional trading/analytics dependencies.
+_secrets: dict = {}
+exec((Path(__file__).resolve().parent / "my_secrets.py").read_text(encoding="utf-8"), _secrets)
+API_KEY = _secrets["API_KEY"]
+PASS = _secrets["PASS"]
+TOTP_KEY = _secrets["TOTP_KEY"]
+USER_NAME = _secrets["USER_NAME"]
 
 logger = logging.getLogger("Auto_Trade_Logger")
 
