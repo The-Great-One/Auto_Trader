@@ -533,6 +533,19 @@ def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: 
 
     rows: list[dict[str, Any]] = []
 
+    def inflows_blocked(m: dict[str, Any]) -> bool:
+        """Return True for fund sleeves where fresh purchases/SIPs should not be recommended.
+
+        Indian international mutual funds frequently stop fresh inflows when AMC/RBI
+        overseas investment limits are exhausted. Unless we have a live purchase
+        availability flag saying otherwise, treat international/NASDAQ/Taiwan/China
+        funds as hold-only for booster purposes.
+        """
+        cat = str(m.get("category") or "").upper()
+        name = str(m.get("fund") or m.get("tradingsymbol") or "").upper()
+        intl_tokens = ("NASDAQ", "INTERNATIONAL", "TAIWAN", "CHINA", "ASIAN", "ASIA", "GLOBAL", "OFFSHORE", "OVERSEAS")
+        return any(tok in cat or tok in name for tok in intl_tokens)
+
     def add(priority: str, action: str, fund: str, current_value: float, mf_pct: float, gain_pct: float, why: str, route: str) -> None:
         rows.append({
             "priority": priority,
@@ -555,8 +568,15 @@ def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: 
         mf_pct = _safe_float(m.get("mf_sleeve_pct"))
         value = _safe_float(m.get("current_value"))
         rec = str(m.get("recommendation") or "").lower()
-        if rec == "buy" and mf_pct < 12 and risk in {"moderate", "high", "low_moderate"}:
-            score = (12 - mf_pct) + max(0.0, -gain) * 1.5 + (2.0 if any(x in cat for x in ["Flexi", "Focused", "Mid", "NASDAQ"]) else 0.0)
+        sector_or_thematic = any(tok in cat.upper() for tok in ["SECTOR", "BANK", "INFRA"])
+        if (
+            rec == "buy"
+            and mf_pct < 12
+            and risk in {"moderate", "high", "low_moderate"}
+            and not inflows_blocked(m)
+            and not (sector_pct > 15 and sector_or_thematic)
+        ):
+            score = (12 - mf_pct) + max(0.0, -gain) * 1.5 + (2.0 if any(x in cat for x in ["Flexi", "Focused", "Mid"]) else 0.0)
             topup_candidates.append((score, m))
     for _, m in sorted(topup_candidates, key=lambda x: -x[0])[:5]:
         cat = str(m.get("category") or "")
@@ -580,7 +600,7 @@ def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: 
                 _safe_float(m.get("mf_sleeve_pct")),
                 _safe_float(m.get("gain_pct")),
                 f"ELSS is {elss_pct:.1f}% of the MF sleeve; extra money here reduces flexibility and can trap future rebalancing behind lock-ins.",
-                "Keep existing locked units; route new tax-saving only up to 80C need, otherwise redirect SIP to flexible core/international.",
+                "Keep existing locked units; route new tax-saving only up to 80C need, otherwise redirect SIP to flexible/core domestic funds; do not route to international funds unless fresh inflows are explicitly open.",
             )
 
     if sector_pct > 15:
@@ -597,33 +617,42 @@ def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: 
                 "Do not add fresh SIP until sleeve falls below ~12–15%; harvest gains only after exit-load/tax checks.",
             )
 
-    # 3) Improve diversification using current holdings rather than new fund sprawl.
+    # 3) International sleeve: acknowledge diversification gap, but do not suggest
+    # fresh top-ups while overseas fund inflows are generally closed.
     if intl_pct < 5:
-        nasdaq = [x for x in enriched if "NASDAQ" in str(x.get("category", "")).upper()]
-        for m in nasdaq[:1]:
+        intl_holdings = [x for x in enriched if inflows_blocked(x)]
+        for m in sorted(intl_holdings, key=lambda x: -_safe_float(x.get("current_value")))[:1]:
             add(
                 "medium",
-                "increase_global_diversifier",
+                "hold_no_fresh_inflow",
                 m.get("fund") or m.get("tradingsymbol") or "?",
                 _safe_float(m.get("current_value")),
                 _safe_float(m.get("mf_sleeve_pct")),
                 _safe_float(m.get("gain_pct")),
-                f"International exposure is only {intl_pct:.1f}% of MF sleeve; a small global sleeve can smooth India-only drawdowns and help risk-adjusted XIRR.",
-                "Build gradually toward ~5–8% MF sleeve; avoid Taiwan concentration unless explicitly desired.",
+                f"International exposure is only {intl_pct:.1f}% of MF sleeve, but fresh inflows into international funds are generally restricted/closed.",
+                "Keep existing international allocation; do not route fresh SIP/top-up here unless live purchase availability confirms inflows are open.",
             )
 
     # 4) Tiny satellite cleanup: small positions rarely move XIRR but add tracking
     # noise. Keep only if they have a deliberate role.
     for m in sorted([x for x in enriched if _safe_float(x.get("mf_sleeve_pct")) < 1.0], key=lambda x: _safe_float(x.get("mf_sleeve_pct")))[:4]:
+        if inflows_blocked(m):
+            action = "hold_or_exit_satellite"
+            why = "Tiny international satellite position has too little capital to materially lift portfolio XIRR, and fresh inflows are generally restricted/closed."
+            route = "Do not scale with fresh money; either keep as a deliberate satellite or exit/redeploy after exit-load/tax checks."
+        else:
+            action = "consolidate_or_scale"
+            why = "Tiny satellite position has too little capital to materially lift portfolio XIRR unless scaled with conviction."
+            route = "Either scale to at least ~3–5% MF sleeve over time or fold future money into the core winners."
         add(
             "low",
-            "consolidate_or_scale",
+            action,
             m.get("fund") or m.get("tradingsymbol") or "?",
             _safe_float(m.get("current_value")),
             _safe_float(m.get("mf_sleeve_pct")),
             _safe_float(m.get("gain_pct")),
-            "Tiny satellite position has too little capital to materially lift portfolio XIRR unless scaled with conviction.",
-            "Either scale to at least ~3–5% MF sleeve over time or fold future money into the core winners.",
+            why,
+            route,
         )
 
     # De-duplicate by fund/action while preserving priority order.
