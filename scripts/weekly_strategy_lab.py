@@ -1419,14 +1419,19 @@ def _simulate_symbol(symbol: str, df: pd.DataFrame, rnn_model=None, rnn_cfg: dic
         row.setdefault("instrument_token", 1626369)
         price = float(part.iloc[-1]["Close"])
 
-        # Resolve bar date for signal gating
+        # Resolve bar date for signal gating — strip tz to avoid tz-naive/tz-aware comparison errors
         bar_date = pd.to_datetime(row.get("Date", part.iloc[-1].get("Date")))
+        if hasattr(bar_date, "tz") and bar_date.tz is not None:
+            bar_date = bar_date.tz_localize(None)
+        # Also normalize signal gate dates to tz-naive
+        _sig_start = signal_start_date.tz_localize(None) if signal_start_date is not None and hasattr(signal_start_date, "tz") and signal_start_date.tz else signal_start_date
+        _sig_end = signal_end_date.tz_localize(None) if signal_end_date is not None and hasattr(signal_end_date, "tz") and signal_end_date.tz else signal_end_date
         in_signal_window = True
-        if signal_start_date is not None or signal_end_date is not None:
+        if _sig_start is not None or _sig_end is not None:
             in_signal_window = True
-            if signal_start_date is not None and bar_date < signal_start_date:
+            if _sig_start is not None and bar_date < _sig_start:
                 in_signal_window = False
-            if signal_end_date is not None and bar_date > signal_end_date:
+            if _sig_end is not None and bar_date > _sig_end:
                 in_signal_window = False
 
         if qty == 0:
@@ -2008,11 +2013,14 @@ def run_walk_forward_validation(
         with tempfile.TemporaryDirectory(prefix="at_state_") as td:
             _set_temp_state(RULE_SET_2, td)
 
-            # Collect all dates across symbols
+            # Collect all dates across symbols — strip tz to avoid tz-naive/tz-aware comparison errors
             all_dates = set()
             for symbol, df in data_map.items():
                 for d in df["Date"]:
-                    all_dates.add(pd.to_datetime(d))
+                    dt = pd.to_datetime(d)
+                    if hasattr(dt, "tz") and dt.tz is not None:
+                        dt = dt.tz_localize(None)
+                    all_dates.add(dt)
             all_dates = sorted(all_dates)
             n_dates = len(all_dates)
 
@@ -2036,8 +2044,10 @@ def run_walk_forward_validation(
                 # Keep warmup/training history through test_end, but do not allow
                 # signals before test_start. This avoids the old bug where OOS slices
                 # lost 250 warmup bars and produced artificial zero-trade folds.
+                # Strip tz from both sides to avoid tz-naive/tz-aware comparison errors.
+                _ted = test_end_date.tz_localize(None) if hasattr(test_end_date, "tz") and test_end_date.tz else test_end_date
                 test_data = {
-                    sym: df[pd.to_datetime(df["Date"]) <= test_end_date].copy()
+                    sym: df[pd.to_datetime(df["Date"]).dt.tz_localize(None) <= _ted].copy()
                     for sym, df in data_map.items()
                 }
                 test_data = {k: v for k, v in test_data.items() if len(v) > 260}
