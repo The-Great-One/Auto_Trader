@@ -56,7 +56,10 @@ def load_kite_symbols(min_rows=MIN_ROWS, min_span=MIN_SPAN_DAYS):
         try:
             df = pd.read_feather(fp)
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-            df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+            # Normalize timezone: strip tz info to avoid tz-naive/tz-aware comparison errors
+            if hasattr(df["Date"].dtype, "tz") and df["Date"].dtype.tz is not None:
+                df["Date"] = df["Date"].dt.tz_localize(None)
+            df = df.dropna(subset=["Date"]).sort_values("Date"]).reset_index(drop=True)
             if len(df) < min_rows:
                 skipped += 1
                 continue
