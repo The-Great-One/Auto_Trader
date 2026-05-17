@@ -98,6 +98,142 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 
 
+def _is_international_fund(row: dict[str, Any]) -> bool:
+    """Funds where fresh inflows are often restricted by overseas limits."""
+    cat = str(row.get("category") or "").upper()
+    name = str(row.get("fund") or row.get("tradingsymbol") or "").upper()
+    intl_tokens = (
+        "NASDAQ",
+        "INTERNATIONAL",
+        "TAIWAN",
+        "CHINA",
+        "ASIAN",
+        "ASIA",
+        "GLOBAL",
+        "OFFSHORE",
+        "OVERSEAS",
+    )
+    return any(tok in cat or tok in name for tok in intl_tokens)
+
+
+def _fresh_inflows_allowed(row: dict[str, Any]) -> bool:
+    """Conservative purchase-availability gate."""
+    explicit = row.get("fresh_inflows_allowed")
+    if explicit is not None:
+        return bool(explicit)
+    return not _is_international_fund(row)
+
+
+def load_market_regime() -> dict[str, Any]:
+    """Load current market/macro signals available in reports/."""
+    regime: dict[str, Any] = {
+        "risk_level": "normal",
+        "risk_score": 0,
+        "sanctions_or_geopolitical_risk": False,
+        "sector_sentiment": {},
+        "sources": [],
+        "caveats": [],
+    }
+
+    def read_json(name: str) -> dict[str, Any] | None:
+        path = REPORTS_DIR / name
+        if not path.exists():
+            regime["caveats"].append(f"missing {name}")
+            return None
+        try:
+            age_hours = (time.time() - path.stat().st_mtime) / 3600.0
+            payload = json.loads(path.read_text())
+            regime["sources"].append({"file": name, "age_hours": round(age_hours, 2)})
+            if age_hours > 36:
+                regime["caveats"].append(f"stale {name}: {age_hours:.1f}h old")
+            return payload if isinstance(payload, dict) else None
+        except Exception as exc:
+            regime["caveats"].append(f"failed reading {name}: {exc}")
+            return None
+
+    sector_payload = read_json("sector_rotation_latest.json") or {}
+    for row in sector_payload.get("sector_ranking") or []:
+        label = str(row.get("label") or row.get("topic") or "").lower()
+        sentiment = _safe_float(row.get("weighted_sentiment"))
+        for key, toks in {
+            "Sectoral/Banking": ("bank", "financial"),
+            "Infrastructure": ("infra", "industrial"),
+            "Index/NASDAQ": ("it", "technology"),
+            "International/Taiwan": ("it", "technology", "global"),
+        }.items():
+            if any(tok in label for tok in toks):
+                regime["sector_sentiment"][key] = max(
+                    sentiment, _safe_float(regime["sector_sentiment"].get(key), -999.0)
+                )
+
+    macro_payload = read_json("global_macro_latest.json") or {}
+    text = json.dumps(macro_payload).lower() if macro_payload else ""
+    risk_words = ("sanction", "war", "missile", "tariff", "export restriction", "oil spike", "taiwan", "china")
+    if any(w in text for w in risk_words):
+        regime["sanctions_or_geopolitical_risk"] = True
+        regime["risk_score"] += 25
+    for event in macro_payload.get("events") or []:
+        severity = _safe_float(event.get("severity"))
+        if severity:
+            regime["risk_score"] = max(_safe_float(regime["risk_score"]), severity)
+        event_text = json.dumps(event).lower()
+        if any(w in event_text for w in risk_words):
+            regime["sanctions_or_geopolitical_risk"] = True
+    risk_off_strength = sum(_safe_float(d.get("strength")) for d in (macro_payload.get("drivers") or []) if str(d.get("impact")) == "risk_off")
+    if risk_off_strength:
+        regime["risk_score"] = max(_safe_float(regime["risk_score"]), min(100.0, risk_off_strength * 4.0))
+    for key in ("risk_score", "macro_risk_score", "geopolitical_risk_score"):
+        if key in macro_payload:
+            regime["risk_score"] = max(_safe_float(regime["risk_score"]), _safe_float(macro_payload.get(key)))
+
+    if regime["sanctions_or_geopolitical_risk"] or _safe_float(regime["risk_score"]) >= 60:
+        regime["risk_level"] = "high"
+    elif _safe_float(regime["risk_score"]) >= 30:
+        regime["risk_level"] = "elevated"
+    return regime
+
+
+def _macro_adjustment(category: str, regime: dict[str, Any]) -> tuple[float, list[str]]:
+    """Return score adjustment and rationale from market regime."""
+    cat = str(category or "Unknown")
+    notes: list[str] = []
+    adj = 0.0
+    risk_level = str(regime.get("risk_level") or "normal")
+    sector_sent = _safe_float((regime.get("sector_sentiment") or {}).get(cat), 0.0)
+    outlook = CATEGORY_OUTLOOK.get(cat, "neutral")
+    if outlook == "positive":
+        adj += 2.0
+        notes.append("category outlook positive")
+    elif outlook == "cautious":
+        adj -= 5.0
+        notes.append("category outlook cautious")
+    elif outlook == "negative":
+        adj -= 10.0
+        notes.append("category outlook negative")
+    if sector_sent > 0.08:
+        adj += 4.0
+        notes.append(f"positive sector sentiment {sector_sent:+.2f}")
+    elif sector_sent < -0.05:
+        adj -= 5.0
+        notes.append(f"weak sector sentiment {sector_sent:+.2f}")
+
+    high_beta = any(tok in cat.upper() for tok in ("SMALL", "MID", "SECTOR", "INFRA", "NASDAQ", "INTERNATIONAL", "TAIWAN"))
+    defensive = any(tok in cat.upper() for tok in ("HYBRID", "DEBT", "FLEXI"))
+    if risk_level == "high" and high_beta:
+        adj -= 8.0
+        notes.append("high macro/geopolitical risk penalizes high-beta sleeve")
+    elif risk_level == "elevated" and high_beta:
+        adj -= 4.0
+        notes.append("elevated macro risk trims high-beta sleeve")
+    if risk_level in {"elevated", "high"} and defensive:
+        adj += 3.0
+        notes.append("risk regime favors flexible/defensive allocation")
+    if regime.get("sanctions_or_geopolitical_risk") and _is_international_fund({"category": cat}):
+        adj -= 8.0
+        notes.append("sanctions/geopolitical risk reduces international allocation appetite")
+    return adj, notes
+
+
 def _parse_dt(value: Any) -> datetime | None:
     if value in (None, "", "None"):
         return None
@@ -496,6 +632,140 @@ def build_mf_replacement_plan(mf_entries: list[dict[str, Any]]) -> dict[str, Any
         "actions": rows[:18],
     }
 
+def build_professional_mf_recommendation_engine(mf_entries: list[dict[str, Any]], portfolio_summary: dict[str, Any]) -> dict[str, Any]:
+    """Institutional-style MF decision engine.
+
+    Inputs used:
+    - live/current Kite holdings and portfolio weights
+    - investor XIRR estimate from orders where available
+    - MFAPI NAV performance: 1Y, 3Y, 5Y CAGR, 3Y volatility
+    - concentration and sleeve risk limits
+    - market regime: sector rotation, macro/geopolitical/sanctions risk
+    - hard constraints: ELSS lock-in and international inflow restrictions
+    """
+    mf_value = max(1e-9, _safe_float(portfolio_summary.get("mf_value")))
+    regime = load_market_regime()
+    category_values: dict[str, float] = {}
+    for m in mf_entries:
+        category_values[str(m.get("category") or "Unknown")] = category_values.get(str(m.get("category") or "Unknown"), 0.0) + _safe_float(m.get("current_value"))
+    category_pct = {k: round(v / mf_value * 100.0, 2) for k, v in category_values.items()}
+
+    decisions: list[dict[str, Any]] = []
+    for m in mf_entries:
+        category = str(m.get("category") or "Unknown")
+        risk = str(m.get("risk_level") or "moderate")
+        value = _safe_float(m.get("current_value"))
+        mf_pct = _safe_float(m.get("mf_sleeve_pct")) or (value / mf_value * 100.0)
+        gain = _safe_float(m.get("gain_pct"))
+        xirr = m.get("xirr_pct")
+        xirr_f = _safe_float(xirr) if xirr is not None else None
+        metric = _nav_metric_for_query(str(m.get("fund") or m.get("tradingsymbol") or ""))
+        expected = _expected_return_from_metric(metric)
+        vol = _safe_float((metric or {}).get("vol_3y_pct"), 14.0)
+        macro_adj, macro_notes = _macro_adjustment(category, regime)
+        inflow_allowed = _fresh_inflows_allowed(m)
+        locked = "ELSS" in category.upper()
+        high_risk = risk in {"high", "very_high"}
+        concentration_penalty = 0.0
+        concentration_notes: list[str] = []
+        if "ELSS" in category.upper() and category_pct.get(category, 0) > 30:
+            concentration_penalty -= 10.0
+            concentration_notes.append(f"ELSS concentration {category_pct.get(category, 0):.1f}% limits flexibility")
+        if any(tok in category.upper() for tok in ("SECTOR", "BANK", "INFRA")) and category_pct.get(category, 0) > 12:
+            concentration_penalty -= 7.0
+            concentration_notes.append(f"sector/thematic sleeve {category_pct.get(category, 0):.1f}% is above preferred cap")
+        if mf_pct > 18 and high_risk:
+            concentration_penalty -= 8.0
+            concentration_notes.append(f"high-risk fund weight {mf_pct:.1f}% is large")
+
+        performance_score = 0.0
+        perf_notes: list[str] = []
+        if expected is not None:
+            performance_score += min(25.0, max(-10.0, expected - 8.0))
+            perf_notes.append(f"MFAPI forward proxy {expected:.1f}%")
+        if xirr_f is not None:
+            performance_score += max(-10.0, min(10.0, (xirr_f - 10.0) * 0.7))
+            perf_notes.append(f"holding XIRR {xirr_f:.1f}%")
+        if gain < -5:
+            performance_score -= 4.0
+            perf_notes.append(f"below cost by {gain:.1f}%")
+        elif gain > 20 and high_risk:
+            performance_score -= 3.0
+            perf_notes.append(f"large gain in high-risk sleeve; protect gains")
+        vol_penalty = max(0.0, vol - 14.0) * (0.35 if high_risk else 0.2)
+
+        total_score = 50.0 + performance_score + macro_adj + concentration_penalty - vol_penalty
+        action = "hold"
+        priority = "medium"
+        route = "Maintain; rebalance only with fresh SIP flows."
+        if not inflow_allowed:
+            action = "hold_no_fresh_inflow"
+            route = "Do not add fresh money unless purchase/inflow status is explicitly open; hold or exit after tax/exit-load review."
+        elif concentration_penalty <= -9 or (locked and category_pct.get(category, 0) > 30):
+            action = "pause_fresh_sip"
+            priority = "high"
+            route = "Stop incremental SIP/top-up here; redirect fresh money to domestic core/flexi/hybrid sleeves."
+        elif total_score >= 62 and mf_pct < 12 and not (high_risk and CATEGORY_OUTLOOK.get(category) == "cautious"):
+            action = "top_up"
+            priority = "high" if total_score >= 70 else "medium"
+            route = "Add in tranches/SIP only; avoid lump-sum chasing and review after next macro refresh."
+        elif total_score >= 62 and high_risk and CATEGORY_OUTLOOK.get(category) == "cautious":
+            action = "watchlist_only"
+            priority = "medium"
+            route = "Performance is strong, but category/risk regime is cautious; wait for better macro confirmation before adding."
+        elif total_score < 42 and not locked:
+            action = "review_replace"
+            priority = "high" if total_score < 35 else "medium"
+            route = "Shortlist same-sleeve alternatives; switch only after exit-load and LTCG/STCG checks."
+        elif total_score < 42 and locked:
+            action = "pause_fresh_sip"
+            priority = "medium"
+            route = "Do not add; wait for lock-in/tax window before switching."
+
+        constraints = []
+        if not inflow_allowed:
+            constraints.append("fresh_inflows_blocked_or_unknown")
+        if locked:
+            constraints.append("elss_lock_in_check_required")
+        decisions.append({
+            "fund": (m.get("fund") or m.get("tradingsymbol") or "?")[:96],
+            "tradingsymbol": m.get("tradingsymbol"),
+            "category": category,
+            "risk_level": risk,
+            "current_value": round(value, 2),
+            "mf_sleeve_pct": round(mf_pct, 2),
+            "gain_pct": round(gain, 2),
+            "xirr_pct": xirr,
+            "return_1y_pct": (metric or {}).get("return_1y_pct"),
+            "return_3y_cagr_pct": (metric or {}).get("return_3y_cagr_pct"),
+            "return_5y_cagr_pct": (metric or {}).get("return_5y_cagr_pct"),
+            "vol_3y_pct": (metric or {}).get("vol_3y_pct"),
+            "expected_return_proxy_pct": round(expected, 2) if expected is not None else None,
+            "professional_score": round(total_score, 2),
+            "priority": priority,
+            "action": action,
+            "constraints": constraints,
+            "rationale": perf_notes + macro_notes + concentration_notes + (["volatility penalty applied"] if vol_penalty else []),
+            "suggested_route": route,
+        })
+
+    action_rank = {"top_up": 0, "watchlist_only": 1, "pause_fresh_sip": 2, "review_replace": 3, "hold_no_fresh_inflow": 4, "hold": 5}
+    decisions = sorted(decisions, key=lambda r: (action_rank.get(str(r.get("action")), 9), -_safe_float(r.get("professional_score"))))
+    return {
+        "method": "Professional MF engine: MFAPI NAV return/volatility + holding XIRR + concentration + market regime + sanctions/geopolitical/inflow constraints.",
+        "market_regime": regime,
+        "category_pct": category_pct,
+        "decision_contract": {
+            "top_up": "score >=62, underweight, inflows open, no concentration block",
+            "pause_fresh_sip": "over-concentrated/locked/weak but not switchable immediately",
+            "watchlist_only": "strong NAV metrics but category/macro risk says do not add yet",
+            "review_replace": "weak score and switchable after tax/exit-load checks",
+            "hold_no_fresh_inflow": "international/global fund with fresh inflows blocked/unknown",
+        },
+        "actions": decisions,
+    }
+
+
 def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: dict[str, Any]) -> dict[str, Any]:
     """Build actionable, current-holding based MF XIRR improvement ideas.
 
@@ -534,17 +804,7 @@ def build_mf_xirr_boosters(mf_entries: list[dict[str, Any]], portfolio_summary: 
     rows: list[dict[str, Any]] = []
 
     def inflows_blocked(m: dict[str, Any]) -> bool:
-        """Return True for fund sleeves where fresh purchases/SIPs should not be recommended.
-
-        Indian international mutual funds frequently stop fresh inflows when AMC/RBI
-        overseas investment limits are exhausted. Unless we have a live purchase
-        availability flag saying otherwise, treat international/NASDAQ/Taiwan/China
-        funds as hold-only for booster purposes.
-        """
-        cat = str(m.get("category") or "").upper()
-        name = str(m.get("fund") or m.get("tradingsymbol") or "").upper()
-        intl_tokens = ("NASDAQ", "INTERNATIONAL", "TAIWAN", "CHINA", "ASIAN", "ASIA", "GLOBAL", "OFFSHORE", "OVERSEAS")
-        return any(tok in cat or tok in name for tok in intl_tokens)
+        return not _fresh_inflows_allowed(m)
 
     def add(priority: str, action: str, fund: str, current_value: float, mf_pct: float, gain_pct: float, why: str, route: str) -> None:
         rows.append({
@@ -933,6 +1193,7 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
     }
     mf_replacement_plan = build_mf_replacement_plan(mf_entries)
     recommended_mf_portfolio = build_recommended_mf_portfolio(mf_entries, portfolio_summary_for_models)
+    professional_mf_engine = build_professional_mf_recommendation_engine(mf_entries, portfolio_summary_for_models)
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -956,6 +1217,7 @@ def build_report(holdings_data: dict[str, Any]) -> dict[str, Any]:
         "mf_xirr_boosters": mf_xirr_boosters,
         "mf_replacement_plan": mf_replacement_plan,
         "recommended_mf_portfolio": recommended_mf_portfolio,
+        "professional_mf_engine": professional_mf_engine,
     }
 
     return report
@@ -997,6 +1259,26 @@ def format_md(report: dict[str, Any]) -> str:
             lines.append(f"  - Value: ₹{h['current_value']:,.0f} | Cost: ₹{h['cost_value']:,.0f} | Gain: {h['gain_pct']:+.2f}% | Weight: {h['weight_pct']:.1f}%")
             lines.append(f"  - _{h['rationale']}_")
             lines.append("")
+
+    # Professional MF recommendation engine
+    pro_engine = report.get("professional_mf_engine") or {}
+    if pro_engine.get("actions"):
+        lines.append("## 🧠 Professional MF Recommendation Engine")
+        lines.append("")
+        regime = pro_engine.get("market_regime") or {}
+        caveats = regime.get("caveats") or []
+        lines.append(f"- Market regime: **{regime.get('risk_level', 'normal')}** | risk score: {regime.get('risk_score', 0)} | sanctions/geopolitical flag: {regime.get('sanctions_or_geopolitical_risk', False)}")
+        if caveats:
+            lines.append(f"- Caveats: {', '.join(str(c) for c in caveats[:3])}")
+        for a in pro_engine.get("actions", [])[:10]:
+            rationale = "; ".join(str(x) for x in (a.get("rationale") or [])[:3])
+            lines.append(
+                f"- **{a.get('priority', '').upper()} / {a.get('action', '')}:** "
+                f"{a.get('fund')} — score {a.get('professional_score')} | "
+                f"proxy {a.get('expected_return_proxy_pct')}% | {rationale}. "
+                f"_{a.get('suggested_route')}_"
+            )
+        lines.append("")
 
     # MF XIRR booster plan
     xirr_plan = report.get("mf_xirr_boosters") or {}
