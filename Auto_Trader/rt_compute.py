@@ -51,16 +51,34 @@ def _publish_paper_decisions(message_queue, decisions):
     if not isinstance(buy_datetimes, dict):
         buy_datetimes = {}
 
+    # The state file is the source of truth for paper lifecycle alerts. Module
+    # globals reset on service restart/import reload, so never depend on them
+    # alone for dedupe. A BUY alerts only when the symbol was not already open;
+    # a SELL alerts only when the symbol was open before this cycle.
+    prior_open_symbols = set(buy_datetimes)
+    alerted_buy_symbols = set(state.get("alerted_buy_symbols") or prior_open_symbols)
+    alerted_sell_symbols = set(state.get("alerted_sell_symbols") or [])
+    new_buys = [s for s in buy_symbols if s not in prior_open_symbols and s not in alerted_buy_symbols]
+    new_sells = [s for s in sell_symbols if s in prior_open_symbols and s not in alerted_sell_symbols]
+
     # Persist the first BUY timestamp per symbol until that symbol SELLs.
     for symbol in buy_symbols:
         buy_datetimes.setdefault(symbol, ts)
     for symbol in sell_symbols:
         buy_datetimes.pop(symbol, None)
 
+    alerted_buy_symbols.update(buy_datetimes)
+    alerted_buy_symbols.update(new_buys)
+    alerted_buy_symbols -= set(sell_symbols)
+    alerted_sell_symbols.update(new_sells)
+    alerted_sell_symbols -= set(buy_symbols)
+
     state.update({
         "updated_at": ts,
         "buy_datetimes": buy_datetimes,
         "open_buy_symbols": sorted(buy_datetimes),
+        "alerted_buy_symbols": sorted(alerted_buy_symbols),
+        "alerted_sell_symbols": sorted(alerted_sell_symbols),
     })
     _save_paper_live_state(state)
 
@@ -99,19 +117,10 @@ def _publish_paper_decisions(message_queue, decisions):
     if not buys and not sells:
         return
 
-    # --- Dedup: BUY fires once until SELL; SELL fires once until BUY ---
-    # A symbol that has been BUY-alerted should not re-alert until it appears in SELL.
-    # A symbol that has been SELL-alerted should not re-alert until it appears in BUY.
-    new_buys = [s for s in buy_symbols if s not in _ALERTED_BUY_SYMBOLS]
-    new_sells = [s for s in sell_symbols if s not in _ALERTED_SELL_SYMBOLS]
-
-    # Update alerted sets: add new alerts, clear SELL-alerted symbols from BUY set and vice versa
-    _ALERTED_BUY_SYMBOLS.update(buy_symbols)
-    _ALERTED_SELL_SYMBOLS.update(sell_symbols)
-    # If a symbol is now BUY, remove it from SELL-alerted (it can SELL-alert again later)
-    _ALERTED_SELL_SYMBOLS -= set(buy_symbols)
-    # If a symbol is now SELL, remove it from BUY-alerted (it can BUY-alert again later)
-    _ALERTED_BUY_SYMBOLS -= set(sell_symbols)
+    # Keep module globals warm for same-process diagnostics, but persistent
+    # state above is what prevents re-alerts across restarts.
+    _ALERTED_BUY_SYMBOLS = alerted_buy_symbols
+    _ALERTED_SELL_SYMBOLS = alerted_sell_symbols
 
     if not new_buys and not new_sells:
         logger.debug(f"[PAPER] No new alerts (buys={buy_symbols}, sells={sell_symbols}, alerted_buy={_ALERTED_BUY_SYMBOLS}, alerted_sell={_ALERTED_SELL_SYMBOLS})")
