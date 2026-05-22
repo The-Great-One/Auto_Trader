@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,72 @@ def _safe_float(value, default=None):
         return float(value)
     except Exception:
         return default
+
+
+class NearMissAggregator:
+    """Aggregate equity BUY gate blockers from paper-shadow diagnostics."""
+
+    def __init__(self) -> None:
+        self.gate_failures: Counter[str] = Counter()
+        self.hard_blocks: Counter[str] = Counter()
+        self.nearest_missing: Counter[str] = Counter()
+        self.readiness_scores: list[float] = []
+        self.score_gaps: list[float] = []
+        self.samples: list[dict[str, Any]] = []
+
+    def add(self, symbol: str | None, diagnostics: dict | None) -> None:
+        if not isinstance(diagnostics, dict):
+            return
+        symbol = str(symbol or diagnostics.get("symbol") or "UNKNOWN").upper()
+        for item in diagnostics.get("entry_gate_failures", []) or []:
+            self.gate_failures[str(item)] += 1
+        for item in diagnostics.get("hard_blocks", []) or []:
+            self.hard_blocks[str(item)] += 1
+        for item in diagnostics.get("nearest_mode_missing", []) or []:
+            self.nearest_missing[str(item)] += 1
+        readiness = _safe_float(diagnostics.get("readiness_score_pct"), None)
+        gap = _safe_float(diagnostics.get("score_gap_to_buy"), None)
+        if readiness is not None:
+            self.readiness_scores.append(readiness)
+        if gap is not None:
+            self.score_gaps.append(gap)
+        if diagnostics.get("entry_gate_failures") or diagnostics.get("hard_blocks"):
+            self.samples.append(
+                {
+                    "symbol": symbol,
+                    "decision": diagnostics.get("decision"),
+                    "readiness_score_pct": readiness,
+                    "score_gap_to_buy": gap,
+                    "entry_gate_failures": list(diagnostics.get("entry_gate_failures", []) or [])[:8],
+                    "hard_blocks": list(diagnostics.get("hard_blocks", []) or [])[:8],
+                    "nearest_mode": diagnostics.get("nearest_mode"),
+                    "nearest_mode_missing": list(diagnostics.get("nearest_mode_missing", []) or [])[:8],
+                }
+            )
+
+    def summary(self, top_n: int = 12) -> dict:
+        avg_readiness = (
+            round(sum(self.readiness_scores) / len(self.readiness_scores), 2)
+            if self.readiness_scores
+            else None
+        )
+        avg_gap = round(sum(self.score_gaps) / len(self.score_gaps), 2) if self.score_gaps else None
+        return {
+            "symbols_analyzed": len(self.samples),
+            "top_entry_gate_failures": self.gate_failures.most_common(top_n),
+            "top_hard_blocks": self.hard_blocks.most_common(top_n),
+            "top_nearest_mode_missing": self.nearest_missing.most_common(top_n),
+            "avg_readiness_score_pct": avg_readiness,
+            "avg_score_gap_to_buy": avg_gap,
+            "samples": sorted(
+                self.samples,
+                key=lambda x: (
+                    x.get("score_gap_to_buy") is None,
+                    x.get("score_gap_to_buy") if x.get("score_gap_to_buy") is not None else 999,
+                    -(x.get("readiness_score_pct") or 0),
+                ),
+            )[:top_n],
+        }
 
 
 def _normalize_param_value(value: Any):
@@ -471,6 +538,7 @@ def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
     """If market open, ensure both paper_shadow files exist for today. If either is missing, run it."""
     file_equity = REPORTS / "paper_shadow_latest.json"
     file_options = REPORTS / "paper_shadow_options_latest.json"
+    aggregator = NearMissAggregator()
     result = {
         "market_open": market_open,
         "paper_executed": False,
@@ -479,6 +547,7 @@ def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
         "reason": None,
         "file": str(file_equity),
         "options_file": str(file_options),
+        "near_miss_summary": aggregator.summary(),
     }
 
     if not market_open:
@@ -498,6 +567,10 @@ def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
     equity_ok, equity_payload = _is_today_payload(file_equity)
     options_ok, options_payload = _is_today_payload(file_options)
 
+    if equity_payload:
+        aggregator.add(equity_payload.get("symbol"), equity_payload.get("equity_entry_diagnostics"))
+        result["near_miss_summary"] = aggregator.summary()
+
     if equity_ok and options_ok:
         result["paper_executed"] = True
         result["decision"] = equity_payload.get("decision") if equity_payload else None
@@ -510,10 +583,13 @@ def check_and_fix_paper_execution(market_open: bool, trade_date: str) -> dict:
     equity_ok, equity_payload = _is_today_payload(file_equity)
     options_ok, _ = _is_today_payload(file_options)
 
+    if equity_payload:
+        aggregator.add(equity_payload.get("symbol"), equity_payload.get("equity_entry_diagnostics"))
     result["paper_executed"] = equity_ok and options_ok and proc.returncode == 0
     result["self_healed"] = result["paper_executed"]
     result["decision"] = (equity_payload or {}).get("decision")
     result["reason"] = "self_heal_run" if result["paper_executed"] else f"failed_rc_{proc.returncode}"
+    result["near_miss_summary"] = aggregator.summary()
     if not result["paper_executed"]:
         result["error"] = (proc.stderr or proc.stdout)[-1200:]
     return result
@@ -776,6 +852,7 @@ def main():
         "calendar": "NSE",
         "strategy_test": strategy,
         "paper_trader": paper,
+        "near_miss_summary": paper.get("near_miss_summary", {}),
         "weekly_universe_cagr": weekly_universe_cagr,
         "autopromote": autopromote,
         "iteration_plan": iteration_plan,
@@ -819,6 +896,12 @@ def main():
         f"- Self-healed: **{paper.get('self_healed')}**",
         f"- Decision: **{paper.get('decision')}**",
         f"- Reason: **{paper.get('reason')}**",
+        "",
+        "## Equity near-miss diagnostics",
+        f"- Avg readiness %: **{(paper.get('near_miss_summary') or {}).get('avg_readiness_score_pct')}**",
+        f"- Avg score gap to BUY: **{(paper.get('near_miss_summary') or {}).get('avg_score_gap_to_buy')}**",
+        f"- Top entry gate failures: **{(paper.get('near_miss_summary') or {}).get('top_entry_gate_failures', [])[:5]}**",
+        f"- Top hard blocks: **{(paper.get('near_miss_summary') or {}).get('top_hard_blocks', [])[:5]}**",
     ]
     if paper.get("error"):
         lines += ["", "### Error", "```", str(paper["error"]), "```"]

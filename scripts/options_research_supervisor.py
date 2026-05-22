@@ -81,9 +81,20 @@ def _extract_json_payload(text: str):
 
 
 
-def _run_json_script(script_name: str, env: dict | None = None) -> dict:
+def _run_json_script(script_name: str, env: dict | None = None, timeout: int | None = None) -> dict:
     cmd = [PYTHON_BIN, str(SCRIPTS / script_name)]
-    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    script_timeout = int(timeout or os.getenv("AT_OPTIONS_SUPERVISOR_SCRIPT_TIMEOUT", "3600") or 3600)
+    try:
+        proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, env=env, timeout=script_timeout)
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "ok": False,
+            "returncode": -1,
+            "payload": None,
+            "stdout": (exc.stdout or "")[-2000:] if isinstance(exc.stdout, str) else "",
+            "stderr": f"{script_name} timed out after {script_timeout}s",
+            "reason": f"timeout_{script_timeout}s",
+        }
     payload = _extract_json_payload(proc.stdout)
     return {
         "ok": proc.returncode == 0,
@@ -287,15 +298,25 @@ def main():
         fetch["reason"] = None if fetch.get("ok") else f"failed_rc_{fetch.get('returncode')}"
         summary["fetch"] = fetch
 
-        if fetch.get("ok"):
-            paper = _run_json_script("paper_shadow.py")
+        run_downstream = bool(fetch.get("ok")) or os.getenv("AT_OPTIONS_SUPERVISOR_USE_STALE_ON_FETCH_FAIL", "1").strip().lower() not in {"0", "false", "no"}
+        if run_downstream:
+            downstream_env = os.environ.copy()
+            if not fetch.get("ok"):
+                downstream_env["AT_OPTIONS_ALLOW_STALE_DATA"] = "1"
+                downstream_env["AT_RESEARCH_MODE"] = "1"
+
+            paper = _run_json_script("paper_shadow.py", env=downstream_env)
             paper["reason"] = None if paper.get("ok") else f"failed_rc_{paper.get('returncode')}"
+            if not fetch.get("ok") and paper.get("ok"):
+                paper["reason"] = "used_cached_data_after_fetch_failure"
             summary["paper_shadow"] = _mark_stale(paper, trade_date, ["options_shadow"])
 
-            lab_env = os.environ.copy()
+            lab_env = downstream_env.copy()
             lab_env["AT_OPTIONS_LAB_MAX_VARIANTS"] = str(resolve_options_lab_max_variants(now))
             lab = _run_json_script("options_strategy_lab.py", env=lab_env)
             lab["reason"] = None if lab.get("ok") else f"failed_rc_{lab.get('returncode')}"
+            if not fetch.get("ok") and lab.get("ok"):
+                lab["reason"] = "used_cached_data_after_fetch_failure"
             summary["options_lab"] = _mark_stale(lab, trade_date)
         else:
             summary["paper_shadow"]["reason"] = "skipped_due_to_fetch_failure"

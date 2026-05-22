@@ -17,7 +17,7 @@ import os
 import signal
 import sys
 import tempfile
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -1538,6 +1538,29 @@ def _run_variant_worker(task: tuple[str, dict, dict, dict]) -> BacktestResult:
     )
 
 
+def _failed_variant_result(name: str, buy_params: dict, sell_params: dict, rnn_params: dict, reason: str) -> BacktestResult:
+    params = {
+        "buy": buy_params,
+        "sell": sell_params,
+        "rnn": rnn_params,
+        "error": reason,
+    }
+    return BacktestResult(
+        name=name,
+        final_value=100000.0,
+        total_return_pct=-9999.0,
+        trades=0,
+        win_rate_pct=0.0,
+        max_drawdown_pct=-9999.0,
+        params=params,
+        symbols_tested=[],
+        selection_score=-9999.0,
+        rnn_enabled=bool((rnn_params or {}).get("enabled")),
+        rnn_avg_test_accuracy=0.0,
+        risk_metrics={"error": reason},
+    )
+
+
 def _variant_mp_context():
     default_method = "fork" if sys.platform == "darwin" else "spawn"
     method = os.getenv("AT_LAB_MP_START", default_method).strip() or default_method
@@ -2240,33 +2263,66 @@ def main():
     )
 
     if can_parallelize and variant_workers > 1:
+        variant_timeout = max(30, int(os.getenv("AT_LAB_VARIANT_TIMEOUT", "300") or 300))
         ctx = _variant_mp_context()
-        with ProcessPoolExecutor(
+        executor = ProcessPoolExecutor(
             max_workers=variant_workers,
             mp_context=ctx,
             initializer=_variant_worker_init,
             initargs=(data_map, rnn_models),
-        ) as executor:
-            future_map = {
-                executor.submit(_run_variant_worker, task): task[0]
-                for task in variant_list
-            }
-            for idx, future in enumerate(as_completed(future_map), start=1):
-                name = future_map[future]
-                write_status(
-                    phase="evaluating_variants",
-                    current_variant=name,
-                    variants_done=idx - 1,
-                    variants_total=len(variant_list),
-                    variants_total_full=len(full_variant_list),
-                    variant_batch_offset=batch_offset,
-                    variant_batch_limit=batch_limit,
-                    variant_batch_label=batch_label,
-                    progress_pct=round(((idx - 1) / max(1, len(variant_list))) * 100.0, 1),
-                    parallel_variants=True,
-                    variant_workers=variant_workers,
-                )
-                results.append(future.result())
+        )
+        future_map = {
+            executor.submit(_run_variant_worker, task): task
+            for task in variant_list
+        }
+        pending = set(future_map)
+        completed = 0
+        try:
+            while pending:
+                done, pending = wait(pending, timeout=variant_timeout, return_when=FIRST_COMPLETED)
+                if not done:
+                    timed_out = sorted(future_map[f][0] for f in pending)
+                    for future in pending:
+                        future.cancel()
+                    for name, buy_params, sell_params, rnn_params in (future_map[f] for f in pending):
+                        results.append(_failed_variant_result(name, buy_params, sell_params, rnn_params, f"variant_timeout_{variant_timeout}s"))
+                    write_status(
+                        phase="evaluating_variants",
+                        status="variant_timeout",
+                        message=f"No variant completed within {variant_timeout}s; cancelled {len(pending)} pending variants",
+                        timed_out_variants=timed_out[:25],
+                        variants_done=completed,
+                        variants_total=len(variant_list),
+                        variants_total_full=len(full_variant_list),
+                        variant_batch_offset=batch_offset,
+                        variant_batch_limit=batch_limit,
+                        variant_batch_label=batch_label,
+                        parallel_variants=True,
+                        variant_workers=variant_workers,
+                    )
+                    break
+                for future in done:
+                    name, buy_params, sell_params, rnn_params = future_map[future]
+                    write_status(
+                        phase="evaluating_variants",
+                        current_variant=name,
+                        variants_done=completed,
+                        variants_total=len(variant_list),
+                        variants_total_full=len(full_variant_list),
+                        variant_batch_offset=batch_offset,
+                        variant_batch_limit=batch_limit,
+                        variant_batch_label=batch_label,
+                        progress_pct=round((completed / max(1, len(variant_list))) * 100.0, 1),
+                        parallel_variants=True,
+                        variant_workers=variant_workers,
+                    )
+                    try:
+                        results.append(future.result(timeout=0))
+                    except Exception as exc:
+                        results.append(_failed_variant_result(name, buy_params, sell_params, rnn_params, f"variant_error:{exc}"))
+                    completed += 1
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
     else:
         for idx, (name, b, s, rnn_params) in enumerate(variant_list, start=1):
             write_status(
