@@ -13,6 +13,7 @@ __pycache__/
 *.pyc
 *.bak
 Deprecated/
+external/
 *.lock
 Auto_Trader/my_secrets.py
 venv/

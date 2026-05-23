@@ -1,0 +1,6 @@
+# Optional research-only dependencies for scripts/kronos_signal_pilot.py --mode kronos
+# Keep separate from production runtime requirements.
+torch>=2.0.0
+einops==0.8.1
+huggingface_hub==0.33.1
+safetensors==0.6.2
