@@ -1,409 +1,183 @@
-# 🚀 AutoTrader Bot
+# Auto_Trader
 
-⚠️ **Disclaimer**: This is not a college project. This is a fully productionized (almost) trading bot that can (hopefully) make you lots of money! 🚀
+Auto_Trader is a Python trading automation project for Zerodha Kite. It includes live market data handling, rule-based buy/sell decisions, guarded order execution, paper-shadow reporting, portfolio reporting, and operational dashboards.
 
-Welcome to **AutoTrader Bot**, a Python-based automated stock trading bot designed for real-time trading with customizable buy/sell strategies. This bot is optimized for Indian stocks and integrates with Zerodha Kite for seamless execution. It's built to be efficient, customizable, and easy to deploy.
+> Trading automation can cause financial loss. Review, test, and run in paper/dry-run mode before enabling live execution.
 
-## ✨ Features
+## What is in this repo
 
-- 🔄 **Custom Trading Strategies**: Leverage MACD, RSI, EMA, and Volume-based strategies to make buy/sell decisions.
-- 📈 **Real-Time Data**: Fetches live price and volume data using Zerodha’s KiteTicker.
-- 🤖 **Automated Orders**: Executes buy, sell, and hold signals based on predefined conditions.
-- 🚀 **Performance Optimization**: Efficient order placement adhering to rate limits, with caching and multiprocessing capabilities.
-- 💰 **Funds Management**: Allocates ₹20,000 per stock for trading or a custom amount set by you.
+- `wednesday.py` — main process launcher.
+- `Auto_Trader/` — runtime package for market data, rules, order execution, indicators, logging, Telegram delivery, portfolio/news helpers, and mutual-fund execution helpers.
+- `scripts/` — operational scripts for reports, paper-shadow runs, daily supervision, dashboard helpers, deployment verification, and compatibility wrappers for lab entrypoints.
+- `dashboard/` — Dash/Streamlit dashboard apps and mutual-fund dashboard utilities.
+- `PROJECT_MAP.md` — detailed project navigation and runtime notes.
 
-## 📚 Table of Contents
+Research/lab implementations are maintained outside the live runtime repo. The lab entrypoint files that remain here are compatibility wrappers and delegate to a separate Trader_Labs checkout when configured.
 
-1. [Installation](#installation)
-2. [Configuration](#configuration)
-3. [Usage](#usage)
-4. [Strategies](#strategies)
-5. [Performance Optimization](#performance-optimization)
-6. [Deployment](#deployment)
-7. [Running the Bot as a Service with Systemd](#running-the-bot-as-a-service-with-systemd)
-8. [Using Systemd Timers to Refresh Session Token](#using-systemd-timers-to-refresh-session-token)
-9. [Future Enhancements](#future-enhancements)
-10. [Contributing](#contributing)
-11. [License](#license)
+## Requirements
 
-## 🛠️ Installation
+- Python 3.10+
+- Zerodha Kite account/API credentials for live or paper-integrated workflows
+- Optional: Node/npm for dashboard scripts defined in `package.json`
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/The-Great-One/Auto_Trader.git
-    cd autotrader-bot
-    ```
+Install Python dependencies:
 
-2. Install the dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3. Create a file called `my_secrets.py` in the `Auto_Trader` directory with your API credentials:
-    ```python
-    API_KEY = 'your_api_key'
-    API_SECRET = 'your_api_secret'
-    TOTP_KEY = 'your_totp_key'
-    USER_NAME = 'your_username'
-    PASS = 'your_password'
-    TG_TOKEN = 'your_telegram_token'
-    CHANNEL = '@your_channel'
-    GITHUB_PAT = 'your_github_personal_access_token'
-    ```
-
-### ⚠️ Important Note:
-   - You can get your **TOTP_KEY** by scanning the QR code shown during the 2FA setup on the [Zerodha](https://kite.zerodha.com) website.
-   
-   Steps:
-   1. Log in to [Zerodha](https://kite.zerodha.com).
-   2. Set up 2-factor authentication.
-   3. Use an app like Google Authenticator or Authy to scan the QR code.
-   4. Retrieve the TOTP key from the authenticator app and add it to `my_secrets.py`.
-
-## ⚙️ Configuration
-
-- **Rate Limits**: The bot complies with Zerodha's API rate limits (10 requests/second, 200 orders/minute).
-- **Funds Management**: By default, the bot allocates ₹20,000 per stock from a total fund pool for trading.
-- **Order Handling**: Sell orders are prioritized to free up funds for new buy orders.
-
-### Example of a Rule:
-
-Create a file called `RULE_SET_*.py` and define a function called `buy_or_sell(df, row, holdings)`.
-
-- `df`: This is the entire DataFrame with calculated indicators.
-- `row`: This contains the latest raw values from the ticker, providing real-time data.
-- `holdings`: A list of symbols currently held by the bot.
-
-If you want to add more indicators, you can modify them here or in the `utils.py` file, inside the indicators function.
-
-#### Sample Implementation:
-```python
-def buy_or_sell(df, row, holdings):
-    # Example logic based on RSI and MACD
-    if row['rsi'] > 60 and row['macd_hist'] > 5 and row['symbol'] not in holdings:
-        # Place Buy Order
-        return 'BUY'
-    elif row['rsi'] < 40 and row['symbol'] in holdings:
-        # Place Sell Order
-        return 'SELL'
-    else:
-        return 'HOLD'
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## 🚀 Usage
+## Configuration
 
-To start the bot, run:
+Create `Auto_Trader/my_secrets.py` locally. This file is ignored by git and should never be committed.
+
+Example structure:
+
+```python
+API_KEY = "your_api_key"
+API_SECRET = "your_api_secret"
+TOTP_KEY = "your_totp_key"
+USER_NAME = "your_username"
+PASS = "your_password"
+TG_TOKEN = "your_telegram_bot_token"
+CHANNEL = "your_telegram_channel_or_chat"
+```
+
+Optional environment variables are used by specific scripts. See `.env.example` and `PROJECT_MAP.md` for currently supported operational settings.
+
+## Running locally
+
+Start the main runtime:
 
 ```bash
 python wednesday.py
 ```
 
-This will launch the bot, connect it to the Zerodha Kite API, fetch live stock data, and execute trades based on the defined strategy.
-
-## 📊 Strategies
-
-The following indicators are used in default strategies:
-
-- **MACD**: Signal line and histogram-based decisions.
-- **RSI**: Buy when RSI crosses above 60, sell below 40.
-- **EMA**: Crossover-based strategies using EMA 10 and EMA 20.
-- **Volume**: Volume spikes for trend confirmation.
-
-You can modify these strategies by editing their respective `RULE_SET` files.
-
-## ⚡ Performance Optimization
-
-- **Caching**: Data is fetched once per day and stored in memory for fast access.
-- **Multiprocessing**: Tasks are parallelized to avoid WebSocket blocking and ensure smooth data processing.
-- **Non-blocking WebSocket**: The bot uses asynchronous I/O to keep WebSocket connections stable while processing data.
-
-## ☁️ Deployment
-
-You can deploy this bot on **Vultr** or any cloud platform to keep it running continuously. 
-
-## 🛠️ Running the Bot as a Service with Systemd
-
-To make the bot run continuously in the background as a service using `systemd`, follow these steps:
-
-1. Create a new service file:
-
-    ```bash
-    sudo nano /etc/systemd/system/autotrader.service
-    ```
-
-2. Add the following content to the service file:
-
-    ```ini
-    [Unit]
-    Description=AutoTrader Bot Service
-    After=network.target
-
-    [Service]
-    User=your_username
-    WorkingDirectory=/path/to/AutoTrader
-    ExecStart=/usr/bin/python3 /path/to/AutoTrader/wednesday.py
-    Restart=on-failure
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-
-3. Reload `systemd` to recognize the new service:
-
-    ```bash
-    sudo systemctl daemon-reload
-    ```
-
-4. Start the service:
-
-    ```bash
-    sudo systemctl start autotrader.service
-    ```
-
-5. Enable the service to start on boot:
-
-    ```bash
-    sudo systemctl enable autotrader.service
-    ```
-
-6. Check the status of the service:
-
-    ```bash
-    sudo systemctl status autotrader.service
-    ```
-
-Now, the bot will automatically run as a service in the background and restart on failure.
-
-## ⏰ Using Systemd Timers to Refresh Session Token
-
-I wasn't able to refresh the session token in Python, so I'm using `systemd` to handle it. The bot will restart daily at 8:30 AM to refresh the session token.
-
-1. Create a timer file:
-
-    ```bash
-    sudo nano /etc/systemd/system/autotrader.timer
-    ```
-
-2. Add the following content to the timer file:
-
-    ```ini
-    [Unit]
-    Description=Run AutoTrader Bot at 8:30 AM daily to refresh the session token
-
-    [Timer]
-    OnCalendar=*-*-* 08:30:00
-    Persistent=true
-
-    [Install]
-    WantedBy=timers.target
-    ```
-
-3. Enable and start the timer:
-
-    ```bash
-    sudo systemctl enable autotrader.timer
-    sudo systemctl start autotrader.timer
-    ```
-
-4. Check the status of the timer to ensure it’s working:
-
-    ```bash
-    sudo systemctl status autotrader.timer
-    ```
-
-The bot will now refresh the session token daily at 8:30 AM.
-
-## 🧠 Portfolio Intelligence (Equity + ETF + MF + News-aware Rebalance)
-
-New scripts:
-
-- `scripts/daily_portfolio_report.py`
-  - Pulls Kite holdings + `mf_holdings()`
-  - Builds allocation snapshot (Equity / ETF / MF)
-  - Computes news risk score from Reuters RSS headlines
-  - Generates target allocation drift and INR rebalance advice
-  - Writes:
-    - `reports/portfolio_intel_YYYY-MM-DD.json`
-    - `reports/portfolio_intel_YYYY-MM-DD.md`
-
-- `Auto_Trader/mf_execution.py`
-  - Guarded mutual-fund execution helper
-  - Validates MF symbols against Kite MF instruments
-  - Enforces dry-run by default
-  - Adds per-order and per-run amount caps
-  - Can optionally require allowlisted MF symbols
-  - Requires `AT_MF_ENABLE_LIVE=1` for live order placement
-
-- `scripts/mf_order_manager.py`
-  - Safe CLI for MF search, holdings, orders, SIPs, and guarded execution
-  - Supports:
-    - searching Kite MF instruments
-    - viewing MF holdings / MF orders / MF SIPs
-    - showing built-in MF rebalance profiles (`aggressive`, `balanced`, `tax-aware`)
-    - executing a JSON order plan (dry-run by default)
-    - generating a MF rebalance plan from `portfolio_intel`
-    - executing a JSON SIP plan (dry-run by default)
-    - creating, modifying, and cancelling MF SIPs with live-guard rails
-
-- `scripts/send_discord_health_alert.py`
-  - Reads latest scorecard + portfolio intel report
-  - Sends daily health card to Discord via webhook (`DISCORD_WEBHOOK_URL`)
-
-- `scripts/weekly_strategy_supervisor.py`
-  - Backtests multiple strategies (`RULE_SET_2`, `RULE_SET_7`) on recent NIFTYETF history
-  - If current strategy is not profitable and an alternate is better, rotates rule-set and restarts `auto_trade.service`
-  - Writes `reports/weekly_strategy_supervisor.json`
-
-### MF execution examples
+Run a paper-shadow snapshot:
 
 ```bash
-# Search mutual funds
-python scripts/mf_order_manager.py search "parag parikh"
-
-# Show built-in MF rebalance profiles
-python scripts/mf_order_manager.py profiles
-
-# Generate MF rebalance plan from latest portfolio report
-python scripts/mf_order_manager.py rebalance-plan \
-  --buy-symbol "INF879O01027" \
-  --buy-symbol "INF179KC1DA9"
-
-# Let the aggressive profile auto-pick MF symbols from current holdings/report context
-python scripts/mf_order_manager.py rebalance-plan --refresh-report --profile aggressive
-
-# Create a monthly SIP, dry-run by default
-python scripts/mf_order_manager.py sip-create INF879O01027 \
-  --amount 5000 --instalments 24 --frequency monthly --instalment-day 5
-
-# Live execution requires BOTH --execute and env flag
-AT_MF_ENABLE_LIVE=1 python scripts/mf_order_manager.py plan mf_plan.json --execute
-AT_MF_ENABLE_LIVE=1 python scripts/mf_order_manager.py sip-create INF879O01027 \
-  --amount 5000 --instalments 24 --frequency monthly --instalment-day 5 --execute
+python scripts/paper_shadow.py
 ```
 
-Optional guardrails:
-- `AT_MF_MAX_ORDER_AMOUNT`
-- `AT_MF_MAX_TOTAL_ORDER_AMOUNT`
-- `AT_MF_MIN_ORDER_AMOUNT`
-- `AT_MF_ENABLE_LIVE`
-- `AT_MF_REQUIRE_ALLOWLIST`
-- `AT_MF_ALLOWED_SYMBOLS`
-- `AT_MF_ALLOWLIST_PATH`
-
-Suggested cron (example):
+Generate a daily portfolio report:
 
 ```bash
-# 16:20 IST generate intelligence report
-20 16 * * 1-5 /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/daily_portfolio_report.py >> /home/ubuntu/Auto_Trader/reports/portfolio_intel_cron.log 2>&1
-
-# 16:25 IST send Discord health alert
-25 16 * * 1-5 DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...' /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/send_discord_health_alert.py >> /home/ubuntu/Auto_Trader/reports/discord_alert_cron.log 2>&1
+python scripts/daily_portfolio_report.py
 ```
 
-## 🐦 X/Twitter Sentiment Pipeline
-
-New pieces:
-
-- `Auto_Trader/twitter_sentiment.py`
-  - fetches recent tweets for tracked symbols using X recent-search API
-  - classifies tweet types (`bullish`, `bearish`, `earnings_*`, `news`, `risk`, `regulatory`, `rumor`, `meme`)
-  - computes cached per-symbol sentiment snapshots
-  - exposes a guarded trade overlay for live decisions
-
-- `scripts/fetch_twitter_sentiment.py`
-  - refreshes symbol sentiment snapshots
-  - writes `reports/twitter_sentiment_latest.json`
-
-Behavior:
-
-- Trading overlay is **off by default**.
-- Enable live influence with `AT_TWITTER_SENTIMENT_ENABLED=1`.
-- The bot only uses **cached** sentiment in live trading, so the decision loop does not depend on live Twitter API calls.
-- Current overlay is intentionally conservative:
-  - can block a technically-valid `BUY` if social flow turns credibly bearish
-  - can force a `SELL` for already-held symbols on strong negative sentiment
-  - can confirm, but not create, bullish buys
-
-Required env for fetching:
-
-- `AT_TWITTER_BEARER_TOKEN`
-
-Useful optional envs:
-
-- `AT_TWITTER_EXTRA_SYMBOLS`
-- `AT_TWITTER_SYMBOL_ALIASES_JSON`
-- `AT_TWITTER_SENTIMENT_TTL_MINUTES`
-- `AT_TWITTER_MIN_TWEETS`
-- `AT_TWITTER_BUY_BLOCK_THRESHOLD`
-- `AT_TWITTER_SELL_FORCE_THRESHOLD`
-
-Example:
+Run the active dashboard:
 
 ```bash
-# refresh cached sentiment for holdings + extra symbols
-AT_TWITTER_BEARER_TOKEN='...' python scripts/fetch_twitter_sentiment.py --hours-back 6 --max-results 25
-
-# enable live overlay once you trust the output
-AT_TWITTER_SENTIMENT_ENABLED=1 python wednesday.py
-```
-
-## 🧪 Trader_Labs split
-
-Research/lab code has moved to its own repo: `/Users/sahilgoel/Desktop/Trader_Labs`.
-
-Auto_Trader is now the live/runtime repo. Lab entrypoints that cron or operators may still call are lightweight compatibility wrappers and delegate to Trader_Labs via `AT_TRADER_LABS_ROOT` or a sibling `../Trader_Labs` checkout. Promote improvements back only after validation and a promotion note.
-
-## 🧠 RNN Lab Overlay
-
-The RNN/lab overlay implementation moved to Trader_Labs. Run lab experiments from `/Users/sahilgoel/Desktop/Trader_Labs`; Auto_Trader live runtime is unaffected.
-
-## 📊 Ops Dashboard
-
-The active TraderOps dashboard is the Dash app.
-
-Primary file:
-- `dashboard/ops_dash_app.py`
-
-Legacy file:
-- `dashboard/ops_dashboard.py` (older Streamlit dashboard, not the main TraderOps surface)
-
-What the active Dash TraderOps app shows:
-- service health and runtime state
-- portfolio, paper, news, Telegram, research, and reports tabs
-- MF portfolio/rebalance visibility
-- MF FIRE tab for fund lookup inside TraderOps, with optional embedded full planner via `MF_FIRE_PUBLIC_URL`
-
-Run the active dashboard locally:
-
-```bash
-npm run dashboard
-# or
 ./scripts/start_dash_ops_dashboard.sh
 ```
 
-Legacy Streamlit dashboard, if you explicitly need it:
+## Strategy rules
+
+Runtime rule files live in `Auto_Trader/`, including:
+
+- `Auto_Trader/RULE_SET_7.py` — current buy-side rule module.
+- `Auto_Trader/RULE_SET_2.py` — current sell-side rule module.
+- `Auto_Trader/RULE_SET_OPTIONS_1.py` — options research/paper support rule module.
+
+Rule modules expose a `buy_or_sell(...)` style decision function used by the runtime and validation tooling.
+
+## Operational scripts
+
+Common scripts currently present in this repo include:
+
+- `scripts/daily_ops_supervisor.py` — daily operational supervisor.
+- `scripts/daily_scorecard.py` — daily trading scorecard.
+- `scripts/daily_portfolio_report.py` — holdings/allocation report.
+- `scripts/daily_improvement_audit.py` — read-only audit of recent reports/logs.
+- `scripts/paper_shadow.py` — offline paper-trader decision snapshot.
+- `scripts/mf_order_manager.py` — mutual-fund search, holdings, plans, orders, and SIP helpers with dry-run/live guards.
+- `scripts/send_discord_health_alert.py` — optional Discord webhook health alert.
+- `scripts/verify_deploy.sh` — deployment verification helper.
+
+## Trader_Labs compatibility
+
+The following files are compatibility wrappers for lab/research workflows:
+
+- `scripts/weekly_strategy_lab.py`
+- `scripts/weekly_universe_cagr_check.py`
+- `scripts/options_strategy_lab.py`
+- `scripts/options_research_supervisor.py`
+- `scripts/hourly_lab_status_check.py`
+
+They delegate to a separate Trader_Labs checkout. Configure it with:
 
 ```bash
-streamlit run dashboard/ops_dashboard.py
+export AT_TRADER_LABS_ROOT=/path/to/Trader_Labs
 ```
 
-Notes:
-- the active TraderOps app runs on Dash, default port `8504`
-- server panels use the configured Oracle SSH key already used for Auto_Trader ops
-- the dashboard reads existing JSON/CSV artifacts, so it stays lightweight and does not interfere with trading runtime
+If the environment variable is not set, the wrapper looks for a sibling `../Trader_Labs` directory.
 
-## 🛠️ Future Enhancements
+## Running as a systemd service
 
-- **Analytics Dashboard**: A real-time performance monitoring dashboard with profit/loss trends.
+Example service unit:
 
-## 🤝 Contributing
+```ini
+[Unit]
+Description=Auto_Trader service
+After=network.target
 
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
+[Service]
+User=your_user
+WorkingDirectory=/path/to/Auto_Trader
+ExecStart=/path/to/Auto_Trader/venv/bin/python /path/to/Auto_Trader/wednesday.py
+Restart=on-failure
 
-## 📜 License
+[Install]
+WantedBy=multi-user.target
+```
 
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+Example timer for daily restart/session refresh:
 
----
+```ini
+[Unit]
+Description=Restart Auto_Trader daily
 
-**Happy Trading!** 🚀📈
+[Timer]
+OnCalendar=*-*-* 08:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+## Mutual-fund helper examples
+
+Search mutual funds:
+
+```bash
+python scripts/mf_order_manager.py search "fund name"
+```
+
+Show built-in rebalance profiles:
+
+```bash
+python scripts/mf_order_manager.py profiles
+```
+
+Generate a dry-run rebalance plan:
+
+```bash
+python scripts/mf_order_manager.py rebalance-plan --refresh-report --profile balanced
+```
+
+Live mutual-fund execution requires explicit live flags supported by `scripts/mf_order_manager.py`.
+
+## Reports and generated files
+
+Generated reports, logs, caches, secrets, and local market-data artifacts are ignored by git. Important generated paths include:
+
+- `reports/`
+- `log/`
+- `logs/`
+- `intermediary_files/`
+- `Auto_Trader/my_secrets.py`
+
+## License
+
+No license file is currently included in this repository.
