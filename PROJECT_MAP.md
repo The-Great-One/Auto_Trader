@@ -9,6 +9,16 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - Live server host: set via `AT_SERVER_HOST` or `AT_ORACLE` env var
 - Service entrypoint: `wednesday.py`
 
+
+## Research/lab split
+
+Lab and research code now lives in a separate git repo:
+
+- Local labs repo: `/Users/sahilgoel/Desktop/Trader_Labs`
+- Server convention: clone beside Auto_Trader as `/home/ubuntu/Trader_Labs` or set `AT_TRADER_LABS_ROOT`
+- Main Auto_Trader keeps only live/runtime/ops/paper code plus small compatibility wrappers for scheduled lab entrypoints.
+- Promotion path: validate in Trader_Labs, write a promotion note, then cherry-pick/apply a minimal live-safe patch back to Auto_Trader.
+
 ## High level runtime flow
 
 1. `wednesday.py`
@@ -47,7 +57,6 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `RULE_SET_2.py` - current SELL rule
 - `utils.py` - indicators, market-open helpers, shared data utilities
 - `news_sentiment.py` - RSS/news feed fetch, timestamped news archive, headline classification, cached news sentiment snapshots, market-topic tracking (including Trump-market impact), and trading-decision overlay
-- `rnn_lab.py` - lab-only PyTorch GRU/RNN overlay that scores next-bar direction from indicator sequences for research backtests
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker
 - `TelegramLink.py` - Telegram delivery with retry/backoff
@@ -60,20 +69,17 @@ Living navigation doc for the Auto_Trader system. Update this when structure, ru
 - `send_discord_health_alert.py` - Discord webhook health card
 - `paper_shadow.py` - offline paper-trader decision snapshot
 - `fetch_news_sentiment.py` - refresh cached RSS/news sentiment snapshots for tracked symbols, archive timestamped articles for later correlation work, and update market-topic feeds such as Trump-market impact
-- `options_research_supervisor.py` - weekday options fetch + paper-shadow + options-lab supervisor for NIFTY research automation
+- `options_research_supervisor.py` - compatibility wrapper that delegates to Trader_Labs
 - `daily_improvement_audit.py` - read-only daily audit of reports/logs that identifies concrete improvement areas without auto-editing trading code
 - `mf_order_manager.py` - safe CLI for MF instrument lookup, holdings, orders, SIPs, built-in rebalance profiles, rebalance-plan generation, and dry-run/live guarded execution
-- `weekly_strategy_lab.py` - parameter sweep / backtest harness for BUY=RULE_SET_7 and SELL=RULE_SET_2 on equities/ETFs, now defaulting non-RNN variants to the same live-parity execution engine used by weekly validation, defaulting symbol selection to the full approved fundamentals universe unless explicitly overridden, pre-caching local history into `intermediary_files/Hist_Data`, and evaluating non-RNN variants in parallel worker processes
-- `run_full_rnn_equity_lab.py` - wrapper to run the RNN-enabled equity lab across the full approved equity universe
-- `options_strategy_lab.py` - research-only parameter sweep / backtest harness for NIFTY options using `RULE_SET_OPTIONS_1`, with no live auto-promotion
+- `weekly_strategy_lab.py` - compatibility wrapper that delegates to Trader_Labs
+- `options_strategy_lab.py` - compatibility wrapper that delegates to Trader_Labs
 - `telegram_options_paper_trader.py` - paper-trader framework for Telegram option-call strategies that resolves NFO contracts through Kite on Oracle, simulates example-capital entries/exits from channel calls, and reports weekly/monthly returns
 - `live_telegram_options_paper_ledger.py` - stateful live paper ledger for tracked Telegram option calls, with MTM equity, cash, open/closed positions, and accumulating weekly/monthly return snapshots
 - `fetch_nifty_options_data.py` - research data fetcher for NIFTY option contracts plus underlying index context used by the options lab and paper shadow
 - `weekly_strategy_supervisor.py` - strategy rotation / supervision logic
-- `walkforward_validate.py` - validation helper
 - `performance_digest.py` - report summarizer
-- `weekly_universe_cagr_check.py` - weekly 5 year validation pack for the live RULE_SET_7/RULE_SET_2 strategy, now using live watchlist parity (`Instruments.feather` when available), local cached history first (`intermediary_files/Hist_Data`), and next-open execution after close-of-bar signals to reduce look-ahead
-- `strategy_bucket_diagnostic.py` - bucketed validation helper that splits current strategy performance across Nifty 50, large cap, mid cap, and small cap slices using the same live-parity validation engine as the weekly CAGR pack
+- `weekly_universe_cagr_check.py` - compatibility wrapper that delegates to Trader_Labs
 
 ### `reports/`
 Generated outputs, especially:
@@ -101,7 +107,7 @@ Working state and cached artifacts, including holdings and historical market dat
 - Default equity universe is now filtered to `LARGE_CAP` + `MID_CAP` (plus approved ETFs) unless `AT_UNIVERSE_CAP_BUCKETS` overrides it.
 
 ### `tests/`
-Backtests, permutations, historical analysis, ad hoc research helpers.
+Live/runtime tests only. Research/lab tests moved to Trader_Labs.
 
 ## Current production rule model
 
@@ -164,6 +170,9 @@ Implication:
 - RSS/news sentiment fetch is available via `scripts/fetch_news_sentiment.py`; it now archives timestamped raw news/events for later correlation analysis and maintains market-topic snapshots, but still should not be scored inside historical backtests without point-in-time replay logic
 
 ## Strategy lab scope
+
+Strategy lab implementation moved to Trader_Labs. The main repo retains lightweight wrappers under `scripts/` for backward compatibility with cron/supervisor paths.
+
 
 - `scripts/weekly_strategy_lab.py` can optionally evaluate a lab-only RNN overlay when `AT_LAB_RNN_ENABLED=1`
 - non-RNN lab variants now default to live-parity execution (`AT_LAB_MATCH_LIVE=1`) so tuning is scored on the same mechanics as deployment

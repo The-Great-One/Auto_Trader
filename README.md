@@ -347,42 +347,15 @@ AT_TWITTER_BEARER_TOKEN='...' python scripts/fetch_twitter_sentiment.py --hours-
 AT_TWITTER_SENTIMENT_ENABLED=1 python wednesday.py
 ```
 
+## 🧪 Trader_Labs split
+
+Research/lab code has moved to its own repo: `/Users/sahilgoel/Desktop/Trader_Labs`.
+
+Auto_Trader is now the live/runtime repo. Lab entrypoints that cron or operators may still call are lightweight compatibility wrappers and delegate to Trader_Labs via `AT_TRADER_LABS_ROOT` or a sibling `../Trader_Labs` checkout. Promote improvements back only after validation and a promotion note.
+
 ## 🧠 RNN Lab Overlay
 
-A lab-only recurrent model layer now exists for research runs.
-
-- `Auto_Trader/rnn_lab.py`
-  - trains a small PyTorch GRU on rolling indicator sequences
-  - estimates next-bar upside probability per symbol
-- `scripts/weekly_strategy_lab.py`
-  - can test baseline strategy variants with and without the RNN overlay
-  - writes a persistent status file consumed by the dashboard while the lab is running
-  - uses the RNN conservatively: it can filter marginal BUY entries and trigger earlier SELL exits in the lab
-
-- `scripts/run_full_rnn_equity_lab.py`
-  - expands the lab to the full approved equity universe
-  - launches the weekly lab with the equity-tuned RNN defaults
-
-Important:
-
-- this is **research-only** right now
-- it does **not** change live trading behavior
-- enable it in the lab with `AT_LAB_RNN_ENABLED=1`
-
-Useful envs:
-
-- `AT_LAB_RNN_ENABLED`
-- `AT_LAB_RNN_SEQ_LEN`
-- `AT_LAB_RNN_EPOCHS`
-- `AT_LAB_RNN_HIDDEN`
-- `AT_LAB_RNN_BUY_THRESHOLD`
-- `AT_LAB_RNN_SELL_THRESHOLD`
-
-Example:
-
-```bash
-AT_LAB_RNN_ENABLED=1 python scripts/weekly_strategy_lab.py
-```
+The RNN/lab overlay implementation moved to Trader_Labs. Run lab experiments from `/Users/sahilgoel/Desktop/Trader_Labs`; Auto_Trader live runtime is unaffected.
 
 ## 📊 Ops Dashboard
 
