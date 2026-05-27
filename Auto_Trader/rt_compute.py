@@ -19,6 +19,75 @@ _PAPER_ALERT_COOLDOWN = max(30, int(os.getenv("AT_PAPER_ALERT_COOLDOWN", "300"))
 _ALERTED_BUY_SYMBOLS = set()   # Symbols that have been BUY-alerted; cleared only when they SELL
 _ALERTED_SELL_SYMBOLS = set()   # Symbols that have been SELL-alerted; cleared only when they BUY
 
+# Live price feed for external paper ledger consumers (e.g., RSI momentum tracker).
+# Only writes prices for symbols tracked by the paper ledger to avoid I/O spam.
+_LIVE_PRICE_PATH = "reports/live_prices.json"
+_LIVE_PRICE_INTERVAL = int(os.getenv("AT_LIVE_PRICE_INTERVAL", "5"))  # seconds
+_LAST_LIVE_PRICE_DUMP = 0.0
+
+
+def _publish_live_prices(data: list, instruments_dict: dict) -> None:
+    """Write symbol→last_price for symbols tracked by the paper ledger."""
+    global _LAST_LIVE_PRICE_DUMP
+
+    now = datetime.now().timestamp()
+    if now - _LAST_LIVE_PRICE_DUMP < _LIVE_PRICE_INTERVAL:
+        return
+    _LAST_LIVE_PRICE_DUMP = now
+
+    # Only track symbols the paper ledger actually holds
+    import json as _json
+
+    try:
+        tracked = _json.load(open(f"reports/paper_ledger_rsi_momentum_state.json"))
+        wanted = set(tracked.get("positions", {}).keys())
+    except Exception:
+        wanted = set()
+
+    if not wanted:
+        return
+
+    prices: dict[str, float] = {}
+    for stock in data:
+        symbol = stock.get("Symbol", stock.get("tradingsymbol", ""))
+        if symbol in wanted:
+            px = float(stock.get("last_price", 0.0) or 0.0)
+            if px > 0:
+                prices[symbol] = px
+    if not prices:
+        return
+
+    try:
+        # Maintain a rolling cache. Tick batches may not contain every wanted
+        # symbol, so overwriting with only the current batch causes partial MTM.
+        existing = {}
+        try:
+            with open(_LIVE_PRICE_PATH) as f:
+                existing = _json.load(f)
+        except Exception:
+            existing = {}
+
+        now_str = datetime.now().isoformat(timespec="seconds")
+        merged_prices = existing.get("prices", {}) if isinstance(existing.get("prices"), dict) else {}
+        price_times = existing.get("price_times", {}) if isinstance(existing.get("price_times"), dict) else {}
+
+        for symbol, px in prices.items():
+            merged_prices[symbol] = px
+            price_times[symbol] = now_str
+
+        # Keep only symbols currently wanted by the paper ledger.
+        merged_prices = {s: p for s, p in merged_prices.items() if s in wanted}
+        price_times = {s: t for s, t in price_times.items() if s in wanted}
+
+        with open(_LIVE_PRICE_PATH, "w") as f:
+            _json.dump({
+                "time": now_str,
+                "prices": merged_prices,
+                "price_times": price_times,
+            }, f)
+    except Exception:
+        pass
+
 
 def _load_paper_live_state() -> dict:
     try:
@@ -254,6 +323,9 @@ def Apply_Rules(q, message_queue):
                             intraday_bar_state,
                             last_cum_volume,
                         )
+
+                # Publish live prices for external paper ledger consumers
+                _publish_live_prices(data, instruments_dict)
 
                 # Use pool.map to process each stock in parallel
                 chunk_size = max(1, len(data) // (cpu_cores * 4))
