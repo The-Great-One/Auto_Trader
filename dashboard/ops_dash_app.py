@@ -27,6 +27,8 @@ TWITTER_DIR = INTERMEDIARY_DIR / "twitter_sentiment"
 LAB_STATUS_PATH = INTERMEDIARY_DIR / "lab_status" / "weekly_strategy_lab_status.json"
 LIVE_TELEGRAM_LEDGER_PATH = REPORTS_DIR / "live_telegram_options_paper_latest.json"
 LIVE_TELEGRAM_LEDGER_HISTORY = REPORTS_DIR / "live_telegram_options_paper_equity_history.jsonl"
+RSI_MOM_SHADOW_PATH = REPORTS_DIR / "paper_shadow_rsi_momentum_latest.json"
+RSI_MOM_LEDGER_PATH = REPORTS_DIR / "paper_ledger_rsi_momentum_latest.json"
 TELEGRAM_TRADE_AUDIT_PATH = REPORTS_DIR / "telegram_trade_audit_latest.json"
 ECO_CALENDAR_PATH = REPORTS_DIR / "economic_calendar_sector_latest.json"
 GLOBAL_MACRO_PATH = REPORTS_DIR / "global_macro_latest.json"
@@ -1006,6 +1008,8 @@ def collect_data() -> dict[str, Any]:
     paper = load_json(REPORTS_DIR / "paper_shadow_latest.json") or {}
     oracle_paper = load_json(REPORTS_DIR / "oracle_paper_shadow_latest.json") or {}
     live_paper = load_json(REPORTS_DIR / "paper_shadow_live_latest.json") or {}
+    rsi_mom_shadow = load_json(RSI_MOM_SHADOW_PATH) or {}
+    rsi_mom_ledger = load_json(RSI_MOM_LEDGER_PATH) or {}
     options_paper = load_json(REPORTS_DIR / "paper_shadow_options_latest.json") or {}
     news_payload = load_json(REPORTS_DIR / "news_sentiment_latest.json") or {}
     topics_payload = load_json(REPORTS_DIR / "market_topics_latest.json") or {}
@@ -1047,6 +1051,8 @@ def collect_data() -> dict[str, Any]:
         "paper": paper,
         "oracle_paper": oracle_paper,
         "live_paper": live_paper,
+        "rsi_mom_shadow": rsi_mom_shadow,
+        "rsi_mom_ledger": rsi_mom_ledger,
         "options_paper": options_paper,
         "news_payload": news_payload,
         "topics_payload": topics_payload,
@@ -1090,6 +1096,7 @@ def build_hero(data: dict[str, Any]) -> list[Any]:
     return [
         metric_card("auto_trade.service", server.get("service", "unknown"), server.get("substate", "")),
         metric_card("Paper decision", data.get("oracle_paper", {}).get("decision", data["paper"].get("decision", data["live_paper"].get("mode", "-"))), data.get("oracle_paper", {}).get("symbol", data["paper"].get("symbol", "paper shadow"))),
+        metric_card("RSI paper value", friendly(((data.get("rsi_mom_ledger") or {}).get("portfolio") or {}).get("total_value")), f"₹2L book · {(((data.get('rsi_mom_ledger') or {}).get('portfolio') or {}).get('positions_count', '-'))} pos"),
         metric_card("Telegram paper equity", data["telegram_ledger"].get("equity", "-"), f"cash {friendly(data['telegram_ledger'].get('cash'))}"),
         metric_card("Live portfolio value", data["portfolio"].get("total_value", "-"), data.get("portfolio_path") or "portfolio_intel"),
         metric_card("Latest lab return %", latest_lab.get("best_return_pct", "-"), latest_lab.get("best_name", "-")),
@@ -1410,6 +1417,39 @@ def build_paper_tab(data: dict[str, Any]) -> list[Any]:
         style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
     )
     children.append(section("Paper trading state", [cards]))
+
+    rsi_shadow = data.get("rsi_mom_shadow") or {}
+    rsi_ledger = data.get("rsi_mom_ledger") or {}
+    rsi_port = rsi_ledger.get("portfolio") or {}
+    rsi_metrics = rsi_ledger.get("metrics") or {}
+    rsi_signal = rsi_ledger.get("signal") or rsi_shadow.get("latest_signal") or {}
+    if rsi_shadow or rsi_ledger:
+        rsi_cards = html.Div(
+            [
+                metric_card("RSI-MOM paper value", friendly(rsi_port.get("total_value")), f"start {friendly(rsi_port.get('initial_capital', 200000))}"),
+                metric_card("RSI-MOM P&L %", friendly(rsi_metrics.get("total_return_pct")), f"CAGR {friendly(rsi_metrics.get('cagr_pct'))}%"),
+                metric_card("RSI-MOM positions", rsi_port.get("positions_count", "-"), f"deployed {friendly(rsi_port.get('deployment_pct'))}%"),
+                metric_card("Price source", rsi_port.get("price_source", "-"), to_ist_verbose(rsi_port.get("live_price_time") or rsi_ledger.get("generated_at"))),
+                metric_card("Signal date", rsi_signal.get("date", "-"), f"{len(rsi_signal.get('picks') or [])} picks"),
+                metric_card("Backtest XIRR", ((rsi_shadow.get("backtest_metrics") or {}).get("xirr_pct", "-")), f"DD {friendly((rsi_shadow.get('backtest_metrics') or {}).get('max_drawdown_pct'))}%"),
+            ],
+            style={"display": "flex", "gap": "12px", "flexWrap": "wrap"},
+        )
+        rsi_positions = (rsi_port.get("positions") or {})
+        if rsi_positions:
+            pos_rows = []
+            for sym, vals in rsi_positions.items():
+                row = {"symbol": sym}
+                if isinstance(vals, dict):
+                    row.update(vals)
+                pos_rows.append(row)
+            children.append(section("RSI momentum paper trader, ₹2L live-compatible book", [rsi_cards, table_from_df(pd.DataFrame(pos_rows), "rsi-mom-pos-table", page_size=12)], "Monthly RSI(22/44/66)+1M momentum rotation, whole-share fills, live tick MTM when available, Hist_Data fallback otherwise."))
+        else:
+            children.append(section("RSI momentum paper trader, ₹2L live-compatible book", [rsi_cards], "Waiting for first paper ledger state or prices."))
+        latest_trades = rsi_ledger.get("latest_trades") or []
+        if latest_trades:
+            children.append(section("RSI momentum latest paper trades", [table_from_df(pd.DataFrame(latest_trades), "rsi-mom-trades-table", page_size=20)]))
+
 
     open_df = to_df(ledger.get("open_positions") or [])
     closed_df = to_df(ledger.get("closed_positions") or [])
