@@ -55,7 +55,8 @@ Lab and research code now lives in a separate git repo:
 - `KITE_TRIGGER_ORDER.py` - order placement + duplicate protection
 - `RULE_SET_7.py` - current BUY rule
 - `RULE_SET_2.py` - current SELL rule
-- `utils.py` - indicators, market-open helpers, shared data utilities
+- `utils.py` - indicators, Tickertape-backed market-open fallback, MMI helper, shared data utilities
+- `tickertape_data.py` - fail-soft wrapper around `tickertape-api-client` for public Tickertape market status, MMI, quotes, and MF holdings
 - `news_sentiment.py` - RSS/news feed fetch, timestamped news archive, headline classification, cached news sentiment snapshots, market-topic tracking (including Trump-market impact), and trading-decision overlay
 - `mf_execution.py` - guarded mutual-fund order, SIP, rebalance-plan, and profile-selection helper
 - `updater.py` - background refresh/update worker

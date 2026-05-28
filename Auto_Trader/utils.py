@@ -24,6 +24,7 @@ from sqlalchemy import create_engine
 # Import rule set modules
 from . import RULE_SET_2, RULE_SET_7
 from .news_sentiment import apply_news_overlay
+from .tickertape_data import get_mmi_indicator, is_market_open_via_tickertape
 from .my_secrets import (
     API_KEY,
     API_SECRET,
@@ -1222,6 +1223,20 @@ def is_Market_Open(schedule=get_market_schedule()):
     if DEBUG_MODE:
         return True
 
+    # Prefer Tickertape's public exchange-status endpoint as the live market
+    # calendar signal, then fall back to pandas-market-calendars if the public
+    # web endpoint or optional package is unavailable. Kite remains the source
+    # of truth for execution/prices; this is only an open/closed guard.
+    if os.getenv("AT_TICKERTAPE_MARKET_STATUS", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }:
+        tickertape_open = is_market_open_via_tickertape("IN")
+        if tickertape_open is not None:
+            return tickertape_open
+
     if schedule is None:
         logger.info("Market is closed today.")
         return False
@@ -1447,11 +1462,10 @@ def get_mmi_now(force_refresh: bool = False):
     now = time.time()
     if force_refresh or (now - _last_fetch > TTL) or _last_data is None:
         try:
-            resp = requests.get("https://api.tickertape.in/mmi/now", timeout=5)
-            resp.raise_for_status()
-            _last_data = resp.json()["data"]["indicator"]
-            _last_fetch = now
-        except (RequestException, ValueError):
+            _last_data = get_mmi_indicator(force_refresh=force_refresh)
+            if _last_data is not None:
+                _last_fetch = now
+        except ValueError:
             return None
 
     return _last_data
