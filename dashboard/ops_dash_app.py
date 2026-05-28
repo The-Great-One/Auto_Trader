@@ -847,14 +847,17 @@ def load_event_pipelines() -> dict[str, Any]:
         ECO_CALENDAR_PATH.stat().st_mtime if ECO_CALENDAR_PATH.exists() else 0.0,
         (REPORTS_DIR / "news_sentiment_latest.json").stat().st_mtime if (REPORTS_DIR / "news_sentiment_latest.json").exists() else 0.0,
     )
-    if not news_payload or not earnings_payload or output_mtime + EVENT_PIPELINES_TTL_SECONDS < now or input_mtime > output_mtime + 2:
+    if (
+        os.getenv("DASH_RUN_BACKGROUND_GENERATORS", "0").strip().lower() in {"1", "true", "yes", "on"}
+        and (not news_payload or not earnings_payload or output_mtime + EVENT_PIPELINES_TTL_SECONDS < now or input_mtime > output_mtime + 2)
+    ):
         try:
             subprocess.run(
                 [str(ROOT / "venv" / "bin" / "python"), str(ROOT / "scripts" / "generate_market_event_pipelines.py")],
                 cwd=str(ROOT),
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=30,
             )
             news_payload = load_json(NEWS_BEHAVIOR_PATH) or news_payload or {}
             earnings_payload = load_json(EARNINGS_PIPELINE_PATH) or earnings_payload or {}
@@ -2929,14 +2932,18 @@ app = Dash(__name__, suppress_callback_exceptions=True)
 app.title = "Auto Trader Ops"
 app.config.suppress_callback_exceptions = True
 
-# Pre-load dashboard data at startup so the first page render is never blank
-try:
-    _preload = collect_data()
-    DASH_DATA_CACHE["ts"] = time.time()
-    DASH_DATA_CACHE["data"] = _preload
-    print(f"[ops_dash] Pre-loaded data at startup ({len(str(_preload))} bytes)")
-except Exception as _e:
-    print(f"[ops_dash] Pre-load failed: {_e}")
+# Do not block web-server startup on data collection. The interval callback
+# populates DASH_DATA_CACHE after the server is already listening; this prevents
+# stale report generators or SSH probes from making systemd show "active" while
+# port 8504 is unreachable.
+if os.getenv("DASH_PRELOAD_ON_STARTUP", "0").strip().lower() in {"1", "true", "yes", "on"}:
+    try:
+        _preload = collect_data()
+        DASH_DATA_CACHE["ts"] = time.time()
+        DASH_DATA_CACHE["data"] = _preload
+        print(f"[ops_dash] Pre-loaded data at startup ({len(str(_preload))} bytes)")
+    except Exception as _e:
+        print(f"[ops_dash] Pre-load failed: {_e}")
 
 
 
