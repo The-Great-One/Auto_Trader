@@ -356,10 +356,11 @@ def _send_rsi_momentum_status(message_queue):
         prices_fallback = {}
         if hist_dir.is_dir():
             try:
-                for f in sorted(hist_dir.glob("*.csv")):
-                    df = pd.read_csv(f, index_col=0, parse_dates=True)
-                    if "close" in df.columns:
-                        last = df["close"].ffill().iloc[-1]
+                for f in sorted(hist_dir.glob("*.feather")):
+                    df = pd.read_feather(f)
+                    close_col = "close" if "close" in df.columns else ("Close" if "Close" in df.columns else None)
+                    if close_col:
+                        last = df[close_col].ffill().iloc[-1]
                         sym = f.stem
                         prices_fallback[sym] = float(last)
             except Exception:
