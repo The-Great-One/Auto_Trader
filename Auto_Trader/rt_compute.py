@@ -390,9 +390,10 @@ def _send_rsi_momentum_status(message_queue):
                 pnl = (px - avg) * qty
                 total_pnl += pnl
                 pnl_pct = (px - avg) / avg * 100
-                rows.append((sym, pnl, pnl_pct, px))
+                invested = qty * avg
+                rows.append((sym, pnl, pnl_pct, px, invested))
             else:
-                rows.append((sym, 0.0, 0.0, 0.0))
+                rows.append((sym, 0.0, 0.0, 0.0, 0.0))
 
         # Sort by % return (best first)
         rows.sort(key=lambda r: r[2], reverse=True)
@@ -404,10 +405,11 @@ def _send_rsi_momentum_status(message_queue):
         # Tabular format with fixed-width columns
         SYM_W, PNL_W, CHG_W, PRC_W = 12, 12, 8, 10
         header = f"{'Symbol':<{SYM_W}} {'P&L':>{PNL_W}} {'Chg%':>{CHG_W}} {'Price':>{PRC_W}}"
-        separator = "-" * (SYM_W + PNL_W + CHG_W + PRC_W + 3)
+        sep = "-" * (SYM_W + PNL_W + CHG_W + PRC_W + 3)
+        NL = chr(10)
 
-        pos_lines = [header, separator]
-        for sym, pnl, pnl_pct_sym, px in rows:
+        pos_lines = [header, sep]
+        for sym, pnl, pnl_pct_sym, px, _ in rows:
             if px > 0:
                 if pnl_pct_sym > 2:
                     emoji = "🟢"
@@ -424,17 +426,11 @@ def _send_rsi_momentum_status(message_queue):
                 pnl_str = "-"
                 chg_str = "-"
                 prc_str = "-"
-
-            line = f"{emoji} {sym:<{SYM_W-2}} {pnl_str:>{PNL_W}} {chg_str:>{CHG_W}} {prc_str:>{PRC_W}}"
-            pos_lines.append(line)
+            pos_lines.append(f"{emoji} {sym:<{SYM_W-2}} {pnl_str:>{PNL_W}} {chg_str:>{CHG_W}} {prc_str:>{PRC_W}}")
 
         header_line = f"📊 RSI Momentum — {now_str}"
         pnl_line = f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)  |  {price_src}  |  ₹{capital:,.0f} cap"
-        msg = header_line + "
-" + pnl_line + "
-
-" + "
-".join(pos_lines)
+        msg = header_line + NL + pnl_line + NL + NL + NL.join(pos_lines)
         message_queue.put(msg)
 
     except Exception as e:
