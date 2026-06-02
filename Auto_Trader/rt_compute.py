@@ -279,8 +279,7 @@ def Apply_Rules(q, message_queue):
     Only the algo changed: RULE_SET buy/sell decisions replaced with RSI status reporting.
     """
     instruments_dict = load_instruments_data()
-    _last_status_s = 0.0
-    STATUS_INTERVAL_S = 300  # Publish RSI Momentum status every 5 minutes
+    _last_push_hour = -1  # Track last hour we pushed RSI status
 
     while True:
         try:
@@ -309,10 +308,10 @@ def Apply_Rules(q, message_queue):
             # Publish live prices for RSI Momentum paper ledger MTM
             _publish_live_prices(data, instruments_dict)
 
-            # Periodic RSI Momentum status to Telegram
-            now = time.time()
-            if now - _last_status_s >= STATUS_INTERVAL_S:
-                _last_status_s = now
+            # Hourly RSI Momentum status to Telegram (9:30-15:30 IST)
+            now_dt = datetime.now()
+            if 9 <= now_dt.hour <= 15 and now_dt.minute >= 30 and now_dt.hour != _last_push_hour:
+                _last_push_hour = now_dt.hour
                 _send_rsi_momentum_status(message_queue)
 
         except queue.Empty:
@@ -391,43 +390,53 @@ def _send_rsi_momentum_status(message_queue):
                 pnl = (px - avg) * qty
                 total_pnl += pnl
                 pnl_pct = (px - avg) / avg * 100
-                invested = qty * avg
-                rows.append((sym, pnl, pnl_pct, px, invested))
+                rows.append((sym, pnl, pnl_pct, px))
             else:
-                rows.append((sym, 0.0, 0.0, 0.0, 0.0))
+                rows.append((sym, 0.0, 0.0, 0.0))
 
         # Sort by % return (best first)
         rows.sort(key=lambda r: r[2], reverse=True)
 
         pnl_pct_total = (total_pnl / capital * 100) if capital else 0
         sign = "+" if total_pnl >= 0 else ""
-        emoji_total = "🟢" if total_pnl > 0 else ("🔴" if total_pnl < 0 else "🟡")
+        price_src = f"{live_count}/{len(positions)} live" if live_count else "EOD prices"
 
-        # Format position lines with emoji indicators
-        pos_lines = []
-        for i, (sym, pnl, pnl_pct_sym, px, invested) in enumerate(rows, 1):
+        # Tabular format with fixed-width columns
+        SYM_W, PNL_W, CHG_W, PRC_W = 12, 12, 8, 10
+        header = f"{'Symbol':<{SYM_W}} {'P&L':>{PNL_W}} {'Chg%':>{CHG_W}} {'Price':>{PRC_W}}"
+        separator = "-" * (SYM_W + PNL_W + CHG_W + PRC_W + 3)
+
+        pos_lines = [header, separator]
+        for sym, pnl, pnl_pct_sym, px in rows:
             if px > 0:
                 if pnl_pct_sym > 2:
-                    emoji = "🟢"  # green
+                    emoji = "🟢"
                 elif pnl_pct_sym < -2:
-                    emoji = "🔴"  # red
+                    emoji = "🔴"
                 else:
-                    emoji = "🟡"  # yellow
+                    emoji = "🟡"
                 pnl_sign = "+" if pnl >= 0 else ""
-                pos_lines.append(
-                    f" {i:2d}. {emoji} {sym}  {pnl_sign}₹{pnl:,.0f} ({pnl_pct_sym:+.1f}%)  ₹{px:,.0f}"
-                )
+                pnl_str = f"{pnl_sign}₹{pnl:,.0f}"
+                chg_str = f"{pnl_pct_sym:+.1f}%"
+                prc_str = f"₹{px:,.0f}"
             else:
-                pos_lines.append(f" {i:2d}. ⚪ {sym}  ? (no price)")
+                emoji = "⚪"
+                pnl_str = "-"
+                chg_str = "-"
+                prc_str = "-"
 
-        price_src = f"{live_count}/{len(positions)} live" if live_count else "EOD prices"
-        cap_str = f"₹{capital:,.0f}" if capital > 0 else "?"
+            line = f"{emoji} {sym:<{SYM_W-2}} {pnl_str:>{PNL_W}} {chg_str:>{CHG_W}} {prc_str:>{PRC_W}}"
+            pos_lines.append(line)
 
         msg = (
-            f"📊 RSI Momentum — {now_str}\n"
+            f"📊 RSI Momentum — {now_str}
+"
             f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)"
-            f"  |  {price_src}  |  {cap_str} cap\n\n"
-            + "\n".join(pos_lines)
+            f"  |  {price_src}  |  ₹{capital:,.0f} cap
+
+"
+            + "
+".join(pos_lines)
         )
         message_queue.put(msg)
 
