@@ -371,7 +371,7 @@ def _send_rsi_momentum_status(message_queue):
         live_count = 0
 
         cost_basis = state.get("cost_basis", {})
-        capital = sum(float(positions[sym]) * float(cost_basis.get(sym, 0))
+        capital = state.get("cash", 0) + sum(float(positions[sym]) * float(cost_basis.get(sym, 0))
                       for sym in positions if cost_basis.get(sym, 0))
 
         for sym in sorted(positions):
