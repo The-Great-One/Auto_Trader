@@ -164,7 +164,26 @@ def create_master(message_queue):
         # Return the list of instrument tokens if available
         if merged_df["instrument_token"].to_list():
             message_queue.put(f"Today's Stock Pool: {len(merged_df)}")
-            return merged_df["instrument_token"].to_list()
+            # Ensure RSI Momentum paper ledger symbols are subscribed
+            tokens = merged_df["instrument_token"].to_list()
+            try:
+                import json
+                from pathlib import Path
+                state_path = Path("reports/paper_ledger_rsi_momentum_state.json")
+                if state_path.exists():
+                    state = json.loads(state_path.read_text())
+                    for sym in state.get("positions", {}):
+                        sym_upper = sym.strip().upper()
+                        if sym_upper not in merged_df["Symbol"].str.upper().values:
+                            match = instrument_master[instrument_master["tradingsymbol"].str.upper() == sym_upper]
+                            if not match.empty:
+                                extra_token = int(match.iloc[0]["instrument_token"])
+                                if extra_token not in tokens:
+                                    tokens.append(extra_token)
+                                    logger.info(f"Added RSI paper ledger symbol {sym} (token {extra_token}) to ticker subscription")
+            except Exception:
+                pass
+            return tokens
         else:
             logger.error(
                 "Error: No instrument tokens found in the merged DataFrame.\n"
