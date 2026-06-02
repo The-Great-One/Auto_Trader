@@ -428,16 +428,13 @@ def _send_rsi_momentum_status(message_queue):
             line = f"{emoji} {sym:<{SYM_W-2}} {pnl_str:>{PNL_W}} {chg_str:>{CHG_W}} {prc_str:>{PRC_W}}"
             pos_lines.append(line)
 
-        msg = (
-            f"📊 RSI Momentum — {now_str}
-"
-            f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)"
-            f"  |  {price_src}  |  ₹{capital:,.0f} cap
+        header_line = f"📊 RSI Momentum — {now_str}"
+        pnl_line = f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)  |  {price_src}  |  ₹{capital:,.0f} cap"
+        msg = header_line + "
+" + pnl_line + "
 
-"
-            + "
+" + "
 ".join(pos_lines)
-        )
         message_queue.put(msg)
 
     except Exception as e:
