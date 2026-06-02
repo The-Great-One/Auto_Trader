@@ -13,7 +13,7 @@ import json
 import os
 import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -39,7 +39,58 @@ TOP_N = int(os.getenv("RSI_MOM_TOP_N", "10"))
 COST_BPS = float(os.getenv("RSI_MOM_COST_BPS", "10"))
 MOMENTUM_PERIOD = int(os.getenv("RSI_MOM_MOMENTUM_PERIOD", "21"))
 MIN_ROWS = int(os.getenv("RSI_MOM_MIN_ROWS", "700"))
-MIN_END_DATE = os.getenv("RSI_MOM_MIN_END_DATE", "2026-04-17")
+MIN_END_DATE = os.getenv("RSI_MOM_MIN_END_DATE", (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"))
+
+MIN_AVG_VOLUME = int(os.getenv("RSI_MOM_MIN_AVG_VOLUME", "50000"))
+MIN_MARKET_CAP_CR = float(os.getenv("RSI_MOM_MIN_MARKET_CAP_CR", "500"))
+MAX_PER_SECTOR = int(os.getenv("RSI_MOM_MAX_PER_SECTOR", "3"))
+
+
+def _load_instruments_master():
+    """Load Instruments.feather for market cap and sector lookups."""
+    path = ROOT / "intermediary_files" / "Instruments.feather"
+    if path.exists():
+        return pd.read_feather(path)
+    return pd.DataFrame()
+
+
+def _filter_universe(prices):
+    """Apply volume, market cap, and sector filters to the price universe."""
+    hist_dir = ROOT / "intermediary_files" / "Hist_Data"
+    instruments = _load_instruments_master()
+
+    keep = []
+    for col in prices.columns:
+        sym = str(col).strip().upper()
+        f = hist_dir / f"{sym}.feather"
+
+        # Volume filter
+        if MIN_AVG_VOLUME > 0 and f.exists():
+            try:
+                df = pd.read_feather(f)
+                vol_col = "volume" if "volume" in df.columns else ("Volume" if "Volume" in df.columns else None)
+                if vol_col:
+                    avg_vol = df[vol_col].tail(20).mean()
+                    if avg_vol < MIN_AVG_VOLUME:
+                        continue
+            except Exception:
+                pass
+
+        # Market cap filter (only for stocks in watchlist)
+        if MIN_MARKET_CAP_CR > 0 and not instruments.empty:
+            match = instruments[instruments["Symbol"].str.upper() == sym]
+            if not match.empty and "MarketCapCr" in match.columns:
+                mc = match.iloc[0]["MarketCapCr"]
+                if pd.notna(mc) and float(mc) < MIN_MARKET_CAP_CR:
+                    continue
+
+        keep.append(col)
+
+    filtered = prices[keep]
+    dropped = len(prices.columns) - len(keep)
+    if dropped > 0:
+        print(f"Universe filtered: {len(prices.columns)} -> {len(keep)} (vol>={MIN_AVG_VOLUME}, mcap>={MIN_MARKET_CAP_CR}Cr)")
+    return filtered
 
 
 def load_hist(hist_dir: Path) -> pd.DataFrame:
@@ -60,6 +111,13 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
     """Compute latest monthly rotation picks and publish paper decision."""
     if prices.empty or len(prices.columns) < top_n:
         return {"error": "insufficient symbols", "symbols_loaded": len(prices.columns)}
+
+    # Apply quality filters to the universe
+    prices = _filter_universe(prices)
+    if prices.empty or len(prices.columns) < top_n:
+        return {"error": f"insufficient symbols after filtering ({len(prices.columns)} left)", "symbols_loaded": len(prices.columns)}
+
+    instruments = _load_instruments_master()
 
     prices_ffill = prices
     mom_1m = prices_ffill.pct_change(MOMENTUM_PERIOD, fill_method=None)
@@ -101,7 +159,21 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
 
     for row in pick_log:
         if row["signal_date"] == str(latest_date.date()):
-            latest_picks = list(row["picks"])
+            raw_picks = list(row["picks"])
+            # Apply sector concentration cap
+            if MAX_PER_SECTOR > 0 and not instruments.empty:
+                sector_count: dict[str, int] = {}
+                latest_picks = []
+                for pick in raw_picks:
+                    sector_row = instruments[instruments["Symbol"].str.upper() == pick.upper()]
+                    sec = str(sector_row.iloc[0]["Sector"]) if not sector_row.empty and "Sector" in sector_row.columns else "Unknown"
+                    if sector_count.get(sec, 0) < MAX_PER_SECTOR:
+                        latest_picks.append(pick)
+                        sector_count[sec] = sector_count.get(sec, 0) + 1
+                    if len(latest_picks) >= top_n:
+                        break
+            else:
+                latest_picks = raw_picks
             latest_pick_scores = {s: round(float(score.loc[latest_date, s]), 2) for s in latest_picks}
             combined = score.loc[latest_date].where(mom_1m.loc[latest_date] > 0, 0)
             latest_screened_count = int((combined > 0).sum())
