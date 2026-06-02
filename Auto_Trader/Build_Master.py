@@ -175,7 +175,9 @@ def create_master(message_queue):
                     for sym in state.get("positions", {}):
                         sym_upper = sym.strip().upper()
                         if sym_upper not in merged_df["Symbol"].str.upper().values:
-                            match = instrument_master[instrument_master["tradingsymbol"].str.upper() == sym_upper]
+                            match = instrument_master[(instrument_master["tradingsymbol"].str.upper() == sym_upper) & (instrument_master["exchange"] == "NSE")]
+                            if match.empty:
+                                match = instrument_master[instrument_master["tradingsymbol"].str.upper() == sym_upper]
                             if not match.empty:
                                 extra_token = int(match.iloc[0]["instrument_token"])
                                 if extra_token not in tokens:
