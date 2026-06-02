@@ -370,10 +370,10 @@ def _send_rsi_momentum_status(message_queue):
         total_pnl = 0.0
         live_count = 0
 
+        cost_basis = state.get("cost_basis", {})
         for sym in sorted(positions):
-            pos = positions[sym]
-            qty = float(pos.get("quantity", 0))
-            avg = float(pos.get("avg_price", 0))
+            qty = float(positions[sym])
+            avg = float(cost_basis.get(sym, 0))
             if not qty or not avg:
                 continue
 
@@ -391,7 +391,7 @@ def _send_rsi_momentum_status(message_queue):
             else:
                 lines.append(f"  {sym}: ? (no price)")
 
-        capital = float(state.get("capital", 200000))
+        capital = sum(float(positions[sym]) * float(cost_basis.get(sym, 0)) for sym in positions)
         pnl_pct = (total_pnl / capital * 100) if capital else 0
         sign = "+" if total_pnl >= 0 else ""
         src = f"{live_count}L" if live_count else "EOD"
