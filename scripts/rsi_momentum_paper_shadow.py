@@ -160,7 +160,11 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
     for row in pick_log:
         if row["signal_date"] == str(latest_date.date()):
             raw_picks = list(row["picks"])
-            # Apply sector concentration cap
+            # Compute screened count (positive momentum stocks)
+            combined = score.loc[latest_date].where(mom_1m.loc[latest_date] > 0, 0)
+            latest_screened_count = int((combined > 0).sum())
+
+            # Apply sector concentration cap, filling gaps from ranked list
             if MAX_PER_SECTOR > 0 and not instruments.empty:
                 sector_count: dict[str, int] = {}
                 latest_picks = []
@@ -172,11 +176,23 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
                         sector_count[sec] = sector_count.get(sec, 0) + 1
                     if len(latest_picks) >= top_n:
                         break
+                # Fill remaining slots from ranked list when sector cap excludes picks
+                if len(latest_picks) < top_n:
+                    ranked = combined[combined > 0].sort_values(ascending=False)
+                    for sym in ranked.index:
+                        sym_str = str(sym)
+                        if sym_str in latest_picks:
+                            continue
+                        sector_row = instruments[instruments["Symbol"].str.upper() == sym_str.upper()]
+                        sec = str(sector_row.iloc[0]["Sector"]) if not sector_row.empty and "Sector" in sector_row.columns else "Unknown"
+                        if sector_count.get(sec, 0) < MAX_PER_SECTOR:
+                            latest_picks.append(sym_str)
+                            sector_count[sec] = sector_count.get(sec, 0) + 1
+                        if len(latest_picks) >= top_n:
+                            break
             else:
                 latest_picks = raw_picks
             latest_pick_scores = {s: round(float(score.loc[latest_date, s]), 2) for s in latest_picks}
-            combined = score.loc[latest_date].where(mom_1m.loc[latest_date] > 0, 0)
-            latest_screened_count = int((combined > 0).sum())
             break
 
     # Last 12 months performance
