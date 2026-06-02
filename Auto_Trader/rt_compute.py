@@ -1,3 +1,4 @@
+import time
 from multiprocessing import Pool, cpu_count
 import os
 import pandas as pd
@@ -269,88 +270,138 @@ def _update_intraday_bar(stock_data, bar_ts, bar_state, last_cum_volume):
 
 
 def Apply_Rules(q, message_queue):
-    """
-    Continuously processes stock data from a queue, applies trading rules,
-    and handles decisions to buy or sell stocks using multiprocessing.
+    """RSI Momentum monitor — replaces RULE_SET engine.
 
-    Parameters:
-        q (multiprocessing.Queue): A queue containing stock data dictionaries for all stocks in a tick.
-    """
-    cpu_cores = cpu_count()  # Use all cores
+    Receives live Kite ticks, publishes prices for the RSI Momentum paper ledger,
+    and periodically sends portfolio status updates to Telegram.
 
-    # Convert instruments_df to a dictionary where key is instrument_token
+    Architecture preserved: ticker -> queue -> Apply_Rules -> message_queue -> Telegram
+    Only the algo changed: RULE_SET buy/sell decisions replaced with RSI status reporting.
+    """
     instruments_dict = load_instruments_data()
-    intraday_bar_state = {}
-    last_cum_volume = {}
-    with Pool(processes=cpu_cores) as pool:
-        while True:
-            try:
-                # Get data from queue
-                data = q.get()  # Assume data is a list of dictionaries
-                if data is None:
-                    logger.warning("Received shutdown signal. Exiting Apply_Rules.")
-                    break  # Exit the loop if None is received (signal to stop)
+    _last_status_s = 0.0
+    STATUS_INTERVAL_S = 300  # Publish RSI Momentum status every 5 minutes
 
-                # Keep only the most recent queued snapshot to avoid stale processing.
-                while True:
-                    try:
-                        newer = q.get_nowait()
-                        if newer is None:
-                            logger.warning(
-                                "Received shutdown signal while draining queue."
-                            )
-                            return
-                        data = newer
-                    except queue.Empty:
-                        break
+    while True:
+        try:
+            data = q.get()
+            if data is None:
+                logger.warning("Received shutdown signal. Exiting Apply_Rules.")
+                break
 
-                # Process the data by enriching it with instruments data
-                for stock_data in data:
-                    instrument_token = stock_data.get("instrument_token")
-
-                    # Merge instruments data into stock data
-                    instrument_data = instruments_dict.get(instrument_token, {})
-                    stock_data.update(
-                        instrument_data
-                    )  # Add instrument details to stock data
-
-                    bar_ts = _resolve_bar_timestamp(stock_data)
-                    stock_data["Date"] = bar_ts
-                    if TRADING_MODE == "INTRADAY":
-                        _update_intraday_bar(
-                            stock_data,
-                            bar_ts,
-                            intraday_bar_state,
-                            last_cum_volume,
-                        )
-
-                # Publish live prices for external paper ledger consumers
-                _publish_live_prices(data, instruments_dict)
-
-                # Use pool.map to process each stock in parallel
-                chunk_size = max(1, len(data) // (cpu_cores * 4))
-                results = pool.map(process_stock_and_decide, data, chunksize=chunk_size)
-
-                # Filter out None results
-                decisions = [decision for decision in results if decision is not None]
-
-                # Handle the decisions
-                if decisions:
-                    if PAPER_SHADOW_MODE:
-                        _publish_paper_decisions(message_queue, decisions)
-                    else:
-                        handle_decisions(message_queue, decisions=decisions)
-
-            except queue.Empty:
-                # If the queue is empty, log a message and continue
-                logger.info("No new data in the queue. Waiting for next tick.")
-                continue
-            except Exception as e:
-                if isinstance(e, KeyboardInterrupt):
-                    logger.info("Manual interrupt detected. Exiting gracefully.")
+            # Keep only the most recent tick snapshot
+            while True:
+                try:
+                    newer = q.get_nowait()
+                    if newer is None:
+                        logger.warning("Shutdown signal while draining queue.")
+                        return
+                    data = newer
+                except queue.Empty:
                     break
-                else:
-                    logger.error(
-                        f"An error occurred while processing data: {e}, Traceback: {traceback.format_exc()}"
-                    )
-                    sys.exit(1)
+
+            # Enrich tick data with instrument metadata
+            for stock_data in data:
+                instrument_token = stock_data.get("instrument_token")
+                instrument_data = instruments_dict.get(instrument_token, {})
+                stock_data.update(instrument_data)
+
+            # Publish live prices for RSI Momentum paper ledger MTM
+            _publish_live_prices(data, instruments_dict)
+
+            # Periodic RSI Momentum status to Telegram
+            now = time.time()
+            if now - _last_status_s >= STATUS_INTERVAL_S:
+                _last_status_s = now
+                _send_rsi_momentum_status(message_queue)
+
+        except queue.Empty:
+            continue
+        except Exception as e:
+            if isinstance(e, KeyboardInterrupt):
+                logger.info("Manual interrupt. Exiting.")
+                break
+            logger.error(f"Apply_Rules error: {e}\n{traceback.format_exc()}")
+            time.sleep(5)
+
+
+def _send_rsi_momentum_status(message_queue):
+    """Read RSI Momentum paper ledger state + live prices and push a crisp
+    P&L summary to the Telegram message queue."""
+    from pathlib import Path
+
+    try:
+        state_path = Path("reports/paper_ledger_rsi_momentum_state.json")
+        if not state_path.exists():
+            return
+
+        state = json.loads(state_path.read_text())
+        positions = state.get("positions", {})
+        if not positions:
+            return
+
+        # Read live prices for current MTM
+        live_prices = {}
+        live_path = Path("reports/live_prices.json")
+        if live_path.exists():
+            try:
+                live = json.loads(live_path.read_text())
+                live_prices = live.get("prices", {})
+            except Exception:
+                pass
+
+        # Read Hist_Data fallback prices
+        import pandas as pd
+        hist_dir = Path("intermediary_files/Hist_Data")
+        prices_fallback = {}
+        if hist_dir.is_dir():
+            try:
+                for f in sorted(hist_dir.glob("*.csv")):
+                    df = pd.read_csv(f, index_col=0, parse_dates=True)
+                    if "close" in df.columns:
+                        last = df["close"].ffill().iloc[-1]
+                        sym = f.stem
+                        prices_fallback[sym] = float(last)
+            except Exception:
+                pass
+
+        now_str = datetime.now().strftime("%H:%M")
+        lines = []
+        total_pnl = 0.0
+        live_count = 0
+
+        for sym in sorted(positions):
+            pos = positions[sym]
+            qty = float(pos.get("quantity", 0))
+            avg = float(pos.get("avg_price", 0))
+            if not qty or not avg:
+                continue
+
+            px = float(live_prices.get(sym, 0) or 0)
+            if px > 0:
+                live_count += 1
+            else:
+                px = float(prices_fallback.get(sym, 0) or 0)
+
+            if px > 0:
+                pnl = (px - avg) * qty
+                total_pnl += pnl
+                pnl_str = f"+{pnl:+.0f}" if pnl >= 0 else f"{pnl:.0f}"
+                lines.append(f"  {sym}: {pnl_str}  ({px:.0f})")
+            else:
+                lines.append(f"  {sym}: ? (no price)")
+
+        capital = float(state.get("capital", 200000))
+        pnl_pct = (total_pnl / capital * 100) if capital else 0
+        sign = "+" if total_pnl >= 0 else ""
+        src = f"{live_count}L" if live_count else "EOD"
+
+        msg = (
+            f"[RSI] {now_str} | P&L: {sign}{total_pnl:,.0f} ({pnl_pct:+.1f}%) "
+            f"| {len(positions)} pos | {src}\n" +
+            "\n".join(lines)
+        )
+        message_queue.put(msg)
+
+    except Exception as e:
+        logger.error(f"RSI status failed: {e}")
