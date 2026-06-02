@@ -366,11 +366,14 @@ def _send_rsi_momentum_status(message_queue):
                 pass
 
         now_str = datetime.now().strftime("%H:%M")
-        lines = []
+        rows = []
         total_pnl = 0.0
         live_count = 0
 
         cost_basis = state.get("cost_basis", {})
+        capital = sum(float(positions[sym]) * float(cost_basis.get(sym, 0))
+                      for sym in positions if cost_basis.get(sym, 0))
+
         for sym in sorted(positions):
             qty = float(positions[sym])
             avg = float(cost_basis.get(sym, 0))
@@ -386,20 +389,44 @@ def _send_rsi_momentum_status(message_queue):
             if px > 0:
                 pnl = (px - avg) * qty
                 total_pnl += pnl
-                pnl_str = f"+{pnl:+.0f}" if pnl >= 0 else f"{pnl:.0f}"
-                lines.append(f"  {sym}: {pnl_str}  ({px:.0f})")
+                pnl_pct = (px - avg) / avg * 100
+                invested = qty * avg
+                rows.append((sym, pnl, pnl_pct, px, invested))
             else:
-                lines.append(f"  {sym}: ? (no price)")
+                rows.append((sym, 0.0, 0.0, 0.0, 0.0))
 
-        capital = sum(float(positions[sym]) * float(cost_basis.get(sym, 0)) for sym in positions)
-        pnl_pct = (total_pnl / capital * 100) if capital else 0
+        # Sort by % return (best first)
+        rows.sort(key=lambda r: r[2], reverse=True)
+
+        pnl_pct_total = (total_pnl / capital * 100) if capital else 0
         sign = "+" if total_pnl >= 0 else ""
-        src = f"{live_count}L" if live_count else "EOD"
+        emoji_total = "🟢" if total_pnl > 0 else ("🔴" if total_pnl < 0 else "🟡")
+
+        # Format position lines with emoji indicators
+        pos_lines = []
+        for i, (sym, pnl, pnl_pct_sym, px, invested) in enumerate(rows, 1):
+            if px > 0:
+                if pnl_pct_sym > 2:
+                    emoji = "🟢"  # green
+                elif pnl_pct_sym < -2:
+                    emoji = "🔴"  # red
+                else:
+                    emoji = "🟡"  # yellow
+                pnl_sign = "+" if pnl >= 0 else ""
+                pos_lines.append(
+                    f" {i:2d}. {emoji} {sym}  {pnl_sign}₹{pnl:,.0f} ({pnl_pct_sym:+.1f}%)  ₹{px:,.0f}"
+                )
+            else:
+                pos_lines.append(f" {i:2d}. ⚪ {sym}  ? (no price)")
+
+        price_src = f"{live_count}/{len(positions)} live" if live_count else "EOD prices"
+        cap_str = f"₹{capital:,.0f}" if capital > 0 else "?"
 
         msg = (
-            f"[RSI] {now_str} | P&L: {sign}{total_pnl:,.0f} ({pnl_pct:+.1f}%) "
-            f"| {len(positions)} pos | {src}\n" +
-            "\n".join(lines)
+            f"📊 RSI Momentum — {now_str}\n"
+            f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)"
+            f"  |  {price_src}  |  {cap_str} cap\n\n"
+            + "\n".join(pos_lines)
         )
         message_queue.put(msg)
 
