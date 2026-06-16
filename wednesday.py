@@ -88,16 +88,40 @@ def monitor_market():
                             )
                             if result.returncode == 0:
                                 logger.info('[REBALANCER] Rebalance completed OK')
-                                new_positions = [
-                                    line for line in result.stdout.split('\n')
-                                    if 'BUY' in line or 'SELL' in line
-                                ]
-                                if new_positions:
-                                    logger.info(f'[REBALANCER] Trades: {new_positions[:5]}')
+                                # ── Send clean Telegram message ──
+                                try:
+                                    with open(state_path) as f2:
+                                        new_state = json.load(f2)
+                                    NL = chr(10)
+                                    pos = new_state.get('positions', {})
+                                    cost = new_state.get('cost_basis', {})
+                                    cash_val = new_state.get('cash', 0)
+                                    invested = sum(float(pos[s]) * float(cost.get(s, 0)) for s in pos if cost.get(s, 0))
+                                    total_val = cash_val + invested
+                                    msgs = [
+                                        f'🔄 RSI Momentum Rebalance',
+                                        f'Signal: {signal_date}',
+                                    ]
+                                    if picks:
+                                        msgs.append(f'Picks ({len(picks)}): {", ".join(picks[:5])}' + (f' +{len(picks)-5}' if len(picks) > 5 else ''))
+                                    msgs.append(f'Value: ₹{total_val:,.0f}  |  Cash: ₹{cash_val:,.0f}  |  Positions: {len(pos)}')
+                                    # Show any ST exits that happened during this rebalance
+                                    st_exits_log = [
+                                        t for t in new_state.get('trade_log', [])
+                                        if t.get('action') == 'SELL_ST' and t.get('date') == signal_date
+                                    ]
+                                    if st_exits_log:
+                                        msgs.append(f'ST Exits: {", ".join(e["symbol"] for e in st_exits_log)}')
+                                    msgs.append('Paper only — no live orders.')
+                                    message_queue.put(NL.join(msgs))
+                                except Exception as msg_e:
+                                    logger.warning(f'[REBALANCER] Message formatting failed: {msg_e}')
                             else:
                                 logger.error(f'[REBALANCER] Rebalance FAILED (rc={result.returncode})\nSTDOUT: {result.stdout[-500:]}\nSTDERR: {result.stderr[-500:]}')
+                                message_queue.put(f'⚠️ RSI Momentum Rebalance FAILED\nSignal: {signal_date}\nError: {result.stderr[-300:]}')
                         except _sp.TimeoutExpired:
                             logger.error('[REBALANCER] Rebalance TIMED OUT after 120s')
+                            message_queue.put(f'⚠️ RSI Momentum Rebalance TIMED OUT\nSignal: {signal_date}')
                         except Exception as e:
                             logger.error(f'[REBALANCER] Subprocess error: {e}\n{_tb.format_exc()}')
                     else:
