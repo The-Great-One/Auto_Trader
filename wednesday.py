@@ -102,9 +102,17 @@ def monitor_market():
                                         f'🔄 RSI Momentum Rebalance',
                                         f'Signal: {signal_date}',
                                     ]
-                                    if picks:
-                                        msgs.append(f'Picks ({len(picks)}): {", ".join(picks[:5])}' + (f' +{len(picks)-5}' if len(picks) > 5 else ''))
                                     msgs.append(f'Value: ₹{total_val:,.0f}  |  Cash: ₹{cash_val:,.0f}  |  Positions: {len(pos)}')
+                                    if pos:
+                                        msgs.append('')
+                                        for sym in sorted(pos, key=lambda s: float(pos[s]) * float(cost.get(s, 0)), reverse=True):
+                                            q = float(pos[s])
+                                            cp = float(cost.get(s, 0))
+                                            alloc = q * cp
+                                            pct = (alloc / total_val * 100) if total_val else 0
+                                            msgs.append(f'  {sym}  {int(q)} sh  ₹{alloc:,.0f}  ({pct:.1f}%)')
+                                    if skipped := [s for s in picks if s not in pos]:
+                                        msgs.append(f'Skipped: {", ".join(skipped)}')
                                     # Show any ST exits that happened during this rebalance
                                     st_exits_log = [
                                         t for t in new_state.get('trade_log', [])
