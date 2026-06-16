@@ -328,102 +328,126 @@ def _send_rsi_momentum_status(message_queue):
     """Read RSI Momentum paper ledger state + live prices and push a crisp
     P&L summary to the Telegram message queue."""
     from pathlib import Path
+    import traceback as _tb
 
     try:
+        # ── 1. Load state ──
         state_path = Path("reports/paper_ledger_rsi_momentum_state.json")
         if not state_path.exists():
+            logger.debug("[RSI-STATUS] No state file — skipping")
             return
 
-        state = json.loads(state_path.read_text())
+        try:
+            state = json.loads(state_path.read_text())
+        except Exception as e:
+            logger.error(f"[RSI-STATUS] Failed to read state file: {e}")
+            return
+
         positions = state.get("positions", {})
         if not positions:
             return
 
-        # Read live prices for current MTM
+        # ── 2. Load live prices ──
         live_prices = {}
         live_path = Path("reports/live_prices.json")
         if live_path.exists():
             try:
                 live = json.loads(live_path.read_text())
                 live_prices = live.get("prices", {})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[RSI-STATUS] Failed to read live prices: {e}")
 
-        # Read Hist_Data fallback prices
+        # ── 3. Load Hist_Data fallback ──
         import pandas as pd
         hist_dir = Path("intermediary_files/Hist_Data")
         prices_fallback = {}
         if hist_dir.is_dir():
             try:
-                for f in sorted(hist_dir.glob("*.feather")):
-                    df = pd.read_feather(f)
-                    close_col = "close" if "close" in df.columns else ("Close" if "Close" in df.columns else None)
-                    if close_col:
-                        last = df[close_col].ffill().iloc[-1]
-                        sym = f.stem
-                        prices_fallback[sym] = float(last)
-            except Exception:
-                pass
+                feather_files = sorted(hist_dir.glob("*.feather"))
+                for f in feather_files:
+                    try:
+                        df = pd.read_feather(f)
+                        close_col = "close" if "close" in df.columns else ("Close" if "Close" in df.columns else None)
+                        if close_col:
+                            last = df[close_col].ffill().iloc[-1]
+                            sym = f.stem
+                            prices_fallback[sym] = float(last)
+                    except Exception as e:
+                        logger.warning(f"[RSI-STATUS] Failed to read fallback {f.name}: {e}")
+            except Exception as e:
+                logger.warning(f"[RSI-STATUS] Failed to scan Hist_Data: {e}")
 
+        # ── 4. Compute MTM ──
         now_str = datetime.now().strftime("%H:%M")
         rows = []
         total_pnl = 0.0
         live_count = 0
+        missing_count = 0
 
         cost_basis = state.get("cost_basis", {})
-        capital = state.get("cash", 0) + sum(float(positions[sym]) * float(cost_basis.get(sym, 0))
-                      for sym in positions if cost_basis.get(sym, 0))
+        try:
+            capital = state.get("cash", 0) + sum(
+                float(positions[sym]) * float(cost_basis.get(sym, 0))
+                for sym in positions if cost_basis.get(sym, 0)
+            )
+        except Exception as e:
+            logger.error(f"[RSI-STATUS] Capital calc failed: {e}")
+            return
 
         for sym in sorted(positions):
-            qty = float(positions[sym])
-            avg = float(cost_basis.get(sym, 0))
-            if not qty or not avg:
-                continue
+            try:
+                qty = float(positions[sym])
+                avg = float(cost_basis.get(sym, 0))
+                if not qty or not avg:
+                    continue
 
-            px = float(live_prices.get(sym, 0) or 0)
-            if px > 0:
-                live_count += 1
-            else:
-                px = float(prices_fallback.get(sym, 0) or 0)
+                px = float(live_prices.get(sym, 0) or 0)
+                if px > 0:
+                    live_count += 1
+                else:
+                    px = float(prices_fallback.get(sym, 0) or 0)
 
-            if px > 0:
-                pnl = (px - avg) * qty
-                total_pnl += pnl
-                pnl_pct = (px - avg) / avg * 100
-                invested = qty * avg
-                rows.append((sym, pnl, pnl_pct, px, invested))
-            else:
-                rows.append((sym, 0.0, 0.0, 0.0, 0.0))
+                if px > 0:
+                    pnl = (px - avg) * qty
+                    total_pnl += pnl
+                    pnl_pct = (px - avg) / avg * 100
+                    invested = qty * avg
+                    rows.append((sym, pnl, pnl_pct, px, invested))
+                else:
+                    missing_count += 1
+                    rows.append((sym, 0.0, 0.0, 0.0, 0.0))
+            except Exception as e:
+                logger.warning(f"[RSI-STATUS] MTM failed for {sym}: {e}")
+                missing_count += 1
 
-        # Sort by % return (best first)
+        if not rows:
+            return
+
+        # ── 5. Format message ──
         rows.sort(key=lambda r: r[2], reverse=True)
 
         pnl_pct_total = (total_pnl / capital * 100) if capital else 0
         sign = "+" if total_pnl >= 0 else ""
         price_src = f"{live_count}/{len(positions)} live" if live_count else "EOD prices"
 
-        # Tabular format with fixed-width columns
-        # Simple one-line-per-position format (no alignment needed)
         NL = chr(10)
-        
         pos_lines = []
         for sym, pnl, pnl_pct_sym, px, _ in rows:
             if px > 0:
-                if pnl_pct_sym > 2:
-                    emoji = "🟢"
-                elif pnl_pct_sym < -2:
-                    emoji = "🔴"
-                else:
-                    emoji = "🟡"
+                # Red for negative, green for positive — no neutral
+                emoji = "🟢" if pnl >= 0 else "🔴"
                 pnl_sign = "+" if pnl >= 0 else ""
                 pos_lines.append(f"{emoji} {sym}  {pnl_sign}₹{pnl:,.0f} ({pnl_pct_sym:+.1f}%) @ ₹{px:,.0f}")
             else:
                 pos_lines.append(f"⚪ {sym}  ? (no price)")
-        
+
         header_line = f"📊 RSI Momentum — {now_str}"
         pnl_line = f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)  |  {price_src}  |  ₹{capital:,.0f} cap"
         msg = header_line + NL + pnl_line + NL + NL + NL.join(pos_lines)
         message_queue.put(msg)
 
+        if missing_count:
+            logger.info(f"[RSI-STATUS] Pushed ({live_count} live, {missing_count} missing prices)")
+
     except Exception as e:
-        logger.error(f"RSI status failed: {e}")
+        logger.error(f"[RSI-STATUS] Fatal: {e}\n{_tb.format_exc()}")

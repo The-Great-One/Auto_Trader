@@ -1,5 +1,6 @@
 import logging
 import traceback
+import os
 import time
 import sys
 from multiprocessing import Queue, Process
@@ -11,7 +12,10 @@ from Auto_Trader import (
     Updater,
 )
 from Auto_Trader.TelegramLink import telegram_main
+import subprocess as _sp
 
+from pathlib import Path as _Path
+ROOT = _Path(__file__).resolve().parent
 logger = logging.getLogger("Auto_Trade_Logger")
 
 
@@ -30,13 +34,15 @@ def monitor_market():
         p2 = Process(target=Apply_Rules, args=(q, message_queue))
         p3 = Process(target=Updater)
         p4 = Process(target=telegram_main, args=(message_queue,))
+        p5 = Process(target=run_rebalancer, args=(message_queue,))
 
         p1.start()
         p2.start()
         p3.start()
         p4.start()
+        p5.start()
 
-        return [p1, p2, p3, p4]
+        return [p1, p2, p3, p4, p5]
 
     def stop_processes(processes):
         """Stops all running processes."""
@@ -47,6 +53,58 @@ def monitor_market():
             p.terminate()  # Gracefully terminate the process
             p.join()  # Ensure the process has finished
         return []
+
+    def run_rebalancer(message_queue):
+        """Periodically check for new shadow signals and trigger paper rebalance."""
+        import json, time, traceback as _tb
+        shadow_path = 'reports/paper_shadow_rsi_momentum_latest.json'
+        state_path = 'reports/paper_ledger_rsi_momentum_state.json'
+        check_interval = 300  # every 5 minutes
+        
+        while True:
+            try:
+                if not Path(shadow_path).exists():
+                    logger.debug('[REBALANCER] No shadow file — waiting for first signal')
+                elif not Path(state_path).exists():
+                    logger.debug('[REBALANCER] No state file — first run pending')
+                else:
+                    with open(shadow_path) as f:
+                        shadow = json.load(f)
+                    with open(state_path) as f:
+                        state = json.load(f)
+                    signal_date = shadow.get('latest_signal', {}).get('date', '')
+                    last_rebalance = state.get('last_rebalance_date', '')
+                    picks = shadow.get('latest_signal', {}).get('picks', [])
+                    if signal_date and signal_date > last_rebalance:
+                        logger.info(f'[REBALANCER] Triggering rebalance: signal {signal_date} > last {last_rebalance} | picks: {picks}')
+                        try:
+                            result = _sp.run(
+                                ['./venv/bin/python', 'scripts/rsi_momentum_paper_ledger.py'],
+                                capture_output=True, text=True, timeout=120, cwd=str(ROOT),
+                                env={**os.environ, 'RSI_LEDGER_CAPITAL': '200000',
+                                     'RSI_LEDGER_TELEGRAM_ALERTS': '1',
+                                     'RSI_LEDGER_LIVE_MAX_AGE_SEC': '600',
+                                     'RSI_LEDGER_ST_EXIT_MULT': '2.0'}
+                            )
+                            if result.returncode == 0:
+                                logger.info('[REBALANCER] Rebalance completed OK')
+                                new_positions = [
+                                    line for line in result.stdout.split('\n')
+                                    if 'BUY' in line or 'SELL' in line
+                                ]
+                                if new_positions:
+                                    logger.info(f'[REBALANCER] Trades: {new_positions[:5]}')
+                            else:
+                                logger.error(f'[REBALANCER] Rebalance FAILED (rc={result.returncode})\nSTDOUT: {result.stdout[-500:]}\nSTDERR: {result.stderr[-500:]}')
+                        except _sp.TimeoutExpired:
+                            logger.error('[REBALANCER] Rebalance TIMED OUT after 120s')
+                        except Exception as e:
+                            logger.error(f'[REBALANCER] Subprocess error: {e}\n{_tb.format_exc()}')
+                    else:
+                        logger.debug(f'[REBALANCER] No rebalance needed: signal={signal_date} <= last={last_rebalance}')
+            except Exception as e:
+                logger.error(f'[REBALANCER] Loop error: {e}\n{_tb.format_exc()}')
+            time.sleep(check_interval)
 
     while True:
         try:

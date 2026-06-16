@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RSI + Momentum Rotation Paper Shadow.
 
-Monthly rotation paper trader: ranks stocks by RSI(22,44,66) average,
+Rotation paper trader: ranks stocks by RSI(22,44,66) average,
 filters to positive 1-month momentum, holds top-N equal-weight.
 Publishes paper decision to paper_shadow_rsi_momentum_latest.json.
 No real orders placed.
@@ -36,6 +36,8 @@ OUT_DIR.mkdir(exist_ok=True)
 
 # Default params — override via env
 TOP_N = int(os.getenv("RSI_MOM_TOP_N", "8"))
+REBALANCE_FREQ = os.getenv("RSI_MOM_REBALANCE_FREQ", "2W-FRI")
+REGIME_MODE = os.getenv("RSI_MOM_REGIME_MODE", "sma100")  # sma100, sma200, none
 COST_BPS = float(os.getenv("RSI_MOM_COST_BPS", "10"))
 MOMENTUM_PERIOD = int(os.getenv("RSI_MOM_MOMENTUM_PERIOD", "63"))
 MIN_ROWS = int(os.getenv("RSI_MOM_MIN_ROWS", "700"))
@@ -89,7 +91,7 @@ def _filter_universe(prices):
     filtered = prices[keep]
     dropped = len(prices.columns) - len(keep)
     if dropped > 0:
-        print(f"Universe filtered: {len(prices.columns)} -> {len(keep)} (vol>={MIN_AVG_VOLUME}, mcap>={MIN_MARKET_CAP_CR}Cr)")
+        print(f"Universe filtered: {len(prices.columns)} -> {len(keep)} (vol>={MIN_AVG_VOLUME}, mcap>={MIN_MARKET_CAP_CR}Cr, regime={REGIME_MODE}, freq={REBALANCE_FREQ})")
     return filtered
 
 
@@ -122,8 +124,10 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
     prices_ffill = prices
 
     # SMA200 filter: price must be above 200-day moving average
-    sma200 = prices_ffill.rolling(200, min_periods=200).mean()
-    sma200_filter = (prices_ffill > sma200).astype(float)
+    # Regime filter: configurable SMA (sma100 best in backtest sweep)
+    regime_window = 100 if REGIME_MODE == "sma100" else 200
+    regime_ma = prices_ffill.rolling(regime_window, min_periods=regime_window).mean()
+    regime_filter = (prices_ffill > regime_ma).astype(float) if REGIME_MODE != "none" else (prices_ffill > 0).astype(float)
 
     # MACD filter: MACD line must be above signal line
     ema_fast = prices_ffill.ewm(span=12, min_periods=12).mean()
@@ -139,8 +143,8 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
     rsi66 = lab_rsi(prices_ffill, 66)
     score = (rsi22 + rsi44 + rsi66) / 3.0
 
-    # Monthly rebalance dates
-    dates = lab_rebalance_dates(prices_ffill.index, "ME")
+    # Rebalance dates (configurable, default bi-weekly Friday)
+    dates = lab_rebalance_dates(prices_ffill.index, REBALANCE_FREQ)
     if len(dates) < 1:
         return {"error": "no rebalance dates"}
     actionable_dates = []
@@ -163,6 +167,7 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
         top_n=top_n,
         cost_bps=COST_BPS,
         momentum_period=MOMENTUM_PERIOD,
+        rebalance_freq=REBALANCE_FREQ,
     )
     if r.empty or not pick_log:
         return {"error": "no active periods in backtest"}
@@ -175,8 +180,8 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
             raw_picks = []
             for p in raw_picks_full:
                 passes = True
-                if latest_date in sma200_filter.index and p in sma200_filter.columns:
-                    if sma200_filter.loc[latest_date, p] <= 0:
+                if latest_date in regime_filter.index and p in regime_filter.columns:
+                    if regime_filter.loc[latest_date, p] <= 0:
                         passes = False
                 if latest_date in macd_filter.index and p in macd_filter.columns:
                     if macd_filter.loc[latest_date, p] <= 0:
@@ -185,8 +190,8 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
                     raw_picks.append(p)
             # Compute screened count (positive momentum + SMA200 + MACD)
             combined = score.loc[latest_date].where(mom_1m.loc[latest_date] > 0, 0)
-            if latest_date in sma200_filter.index:
-                combined = combined.where(sma200_filter.loc[latest_date] > 0, 0)
+            if latest_date in regime_filter.index:
+                combined = combined.where(regime_filter.loc[latest_date] > 0, 0)
             if latest_date in macd_filter.index:
                 combined = combined.where(macd_filter.loc[latest_date] > 0, 0)
             latest_screened_count = int((combined > 0).sum())
@@ -206,8 +211,8 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
                 # Fill remaining slots from ranked list when sector cap excludes picks
                 if len(latest_picks) < top_n:
                     fill_combined = combined.copy()
-                    if latest_date in sma200_filter.index:
-                        fill_combined = fill_combined.where(sma200_filter.loc[latest_date] > 0, 0)
+                    if latest_date in regime_filter.index:
+                        fill_combined = fill_combined.where(regime_filter.loc[latest_date] > 0, 0)
                     if latest_date in macd_filter.index:
                         fill_combined = fill_combined.where(macd_filter.loc[latest_date] > 0, 0)
                     ranked = fill_combined[fill_combined > 0].sort_values(ascending=False)

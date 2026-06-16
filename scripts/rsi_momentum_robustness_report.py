@@ -54,11 +54,12 @@ def strategy_daily_returns(
     top_n: int = 10,
     cost_bps: float = 10.0,
     momentum_period: int = 21,
+    rebalance_freq: str = "ME",
 ) -> tuple[pd.Series, list[dict]]:
     rsi_score = (lab_rsi(prices, 22) + lab_rsi(prices, 44) + lab_rsi(prices, 66)) / 3.0
     mom_1m = prices.pct_change(momentum_period, fill_method=None)
     returns = prices.pct_change(fill_method=None).fillna(0)
-    dates = lab_rebalance_dates(prices.index, "ME")
+    dates = lab_rebalance_dates(prices.index, rebalance_freq)
     weights = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
     turnover_l = pd.Series(0.0, index=prices.index)
     prev = pd.Series(0.0, index=prices.columns)

@@ -44,6 +44,7 @@ STATE_FILE = OUT_DIR / "paper_ledger_rsi_momentum_state.json"
 OUTPUT_FILE = OUT_DIR / "paper_ledger_rsi_momentum_latest.json"
 LIVE_PRICE_MAX_AGE_SEC = float(os.getenv("RSI_LEDGER_LIVE_MAX_AGE_SEC", "600"))
 TELEGRAM_ALERTS = os.getenv("RSI_LEDGER_TELEGRAM_ALERTS", "1").strip().lower() not in {"0", "false", "no", "off"}
+ST_EXIT_MULT = float(os.getenv("RSI_LEDGER_ST_EXIT_MULT", "0"))  # 0=disabled, 2.0=recommended
 
 
 # ── Data loading ──────────────────────────────────────────────
@@ -69,7 +70,131 @@ def load_prices(hist_dir: Path, min_rows: int = 350) -> pd.DataFrame:
         s = df.set_index(date_col)[close_col].dropna().sort_index()
         if len(s) >= min_rows:
             loaded[symbol] = s
-    return pd.DataFrame(loaded).sort_index()
+    prices_df = pd.DataFrame(loaded).sort_index()
+    # Bridge small data gaps (weekends, holidays) so symbols with
+    # 1-3 missing days don't silently drop from rebalance executions.
+    return prices_df.ffill(limit=3)
+
+
+def load_ohlcv(hist_dir: Path, symbols: set) -> dict:
+    """Load OHLCV data for SuperTrend. Returns {sym: DataFrame(Close,High,Low)}."""
+    ohlcv = {}
+    for fpath in sorted(hist_dir.glob("*.feather")):
+        sym = fpath.stem
+        if sym not in symbols or any(kw in sym for kw in ["FUT", "OPT", "-I", "-II"]):
+            continue
+        try:
+            df = pd.read_feather(fpath)
+        except Exception:
+            continue
+        dc = next((c for c in ["date", "Date", "datetime"] if c in df.columns), None)
+        cc = next((c for c in ["close", "Close", "CLOSE"] if c in df.columns), None)
+        hc = next((c for c in ["high", "High"] if c in df.columns), None)
+        lc = next((c for c in ["low", "Low"] if c in df.columns), None)
+        if not all([dc, cc, hc, lc]):
+            continue
+        df[dc] = pd.to_datetime(df[dc]).dt.tz_localize(None)
+        df = df.set_index(dc).sort_index()
+        df = df.rename(columns={cc: "Close", hc: "High", lc: "Low"})
+        ohlcv[sym] = df[["Close", "High", "Low"]]
+    return ohlcv
+
+
+def _check_st_exits(state, ohlcv_data, prices_dict, today):
+    """Check held positions against SuperTrend and sell if below.
+    Returns list of exit trades for logging/alerts."""
+    import traceback as _tb
+
+    if ST_EXIT_MULT <= 0:
+        return []  # disabled
+    
+    if not ohlcv_data:
+        print("[ST-EXIT] No OHLCV data available — skipping ST check")
+        return []
+    
+    exits = []
+    for sym, shares in list(state.positions.items()):
+        try:
+            if sym not in ohlcv_data:
+                continue
+            
+            odf = ohlcv_data[sym]
+            # Need at least 20 bars for ATR+ST
+            if len(odf) < 20:
+                print(f"[ST-EXIT] {sym}: insufficient data ({len(odf)} bars, need 20) — skipping")
+                continue
+            
+            h = odf["High"].values
+            l = odf["Low"].values
+            c = odf["Close"].values
+            
+            # ATR(14)
+            tr = np.maximum(h - l, np.maximum(
+                np.abs(h - np.roll(c, 1)), np.abs(l - np.roll(c, 1))))
+            atr = np.full(len(tr), np.nan)
+            atr[13] = np.nanmean(tr[:14])
+            for i in range(14, len(tr)):
+                atr[i] = (atr[i - 1] * 13 + tr[i]) / 14
+            
+            # SuperTrend
+            hl2 = (h + l) * 0.5
+            up = hl2 + ST_EXIT_MULT * atr
+            dn = hl2 - ST_EXIT_MULT * atr
+            
+            up_shift = np.roll(up, 1); up_shift[0] = np.nan
+            dn_shift = np.roll(dn, 1); dn_shift[0] = np.nan
+            
+            raw = np.where(c > up_shift, dn, np.where(c < dn_shift, up, np.nan))
+            st_line = pd.Series(raw).ffill().values
+            above_st = c[-1] > st_line[-1] if not np.isnan(st_line[-1]) else True
+            
+            if not above_st:
+                # Position is below SuperTrend -> exit
+                px = prices_dict.get(sym, c[-1])
+                if px <= 0:
+                    px = c[-1]
+                cost_rate = COST_BPS / 10000.0
+                gross = shares * px
+                cost = gross * cost_rate
+                net = gross - cost
+                
+                state.cash += net
+                state.trade_log.append({
+                    "date": today,
+                    "action": "SELL_ST",
+                    "symbol": sym,
+                    "shares": round(shares, 2),
+                    "price": round(px, 2),
+                    "gross": round(gross, 2),
+                    "cost": round(cost, 2),
+                    "net": round(net, 2),
+                    "reason": f"below Supertrend({ST_EXIT_MULT}xATR)",
+                })
+                exits.append({"symbol": sym, "shares": shares, "price": px, "net": net})
+                del state.positions[sym]
+                if sym in state.cost_basis:
+                    del state.cost_basis[sym]
+                print(f"[ST-EXIT] SELL_ST {sym}: {shares} shares @ {px:.2f} (net ₹{net:,.0f})")
+        except Exception as e:
+            print(f"[ST-EXIT] ERROR processing {sym}: {e}\n{_tb.format_exc()}")
+            continue
+    
+    if exits:
+        print(f"[ST-EXIT] Total: {len(exits)} exits, net ₹{sum(e['net'] for e in exits):,.0f}")
+    
+    return exits
+
+
+def _format_st_exit_alert(exits, today):
+    """Format a compact ST exit Telegram alert."""
+    if not exits:
+        return ""
+    total_net = sum(e["net"] for e in exits)
+    lines = [f"[PAPER][RSI-MOM] ST Exit ({ST_EXIT_MULT}xATR)", f"Date: {today}"]
+    for e in exits:
+        lines.append(f'SELL {e["symbol"]} {e["shares"]} @ Rs.{e["price"]:,.2f} (Rs.{e["net"]:,.0f})')
+    lines.append(f'Total exited: Rs.{total_net:,.0f}')
+    return "\n".join(lines)
 
 
 # ── State management ──────────────────────────────────────────
@@ -243,7 +368,23 @@ def execute_rebalance(
     # This mirrors the live equity environment more closely than fractional
     # shares: each target bucket gets a budget, buys floor(budget / all-in px),
     # and leaves uninvested residual cash in the ledger.
-    available = [s for s in picks if s in prices_series and pd.notna(prices_series[s]) and prices_series[s] > 0]
+    unavailable = []
+    available = []
+    for s in picks:
+        if s not in prices_series:
+            unavailable.append((s, "symbol not in price data"))
+        elif pd.isna(prices_series[s]) or prices_series[s] <= 0:
+            unavailable.append((s, "price NaN or <= 0"))
+        else:
+            available.append(s)
+    for sym, reason in unavailable:
+        state.trade_log.append({
+            "date": date,
+            "action": "SKIP",
+            "symbol": sym,
+            "reason": reason,
+            "price": 0,
+        })
     if not available:
         state.last_rebalance_date = date
         return state
@@ -506,6 +647,16 @@ def main() -> int:
     # Log/refresh portfolio value for this valuation date
     log_daily(state, current_value, valuation_date)
 
+    # ── SuperTrend exit check (daily, between rebalances) ──
+    st_exits = []
+    if ST_EXIT_MULT > 0 and len(state.positions) > 0:
+        st_ohlcv = load_ohlcv(HIST_DIR, set(state.positions.keys()))
+        st_exits = _check_st_exits(state, st_ohlcv, prices_dict, today)
+        if st_exits:
+            # Recompute portfolio value after exits
+            current_value = portfolio_value(state, prices_dict)
+            log_daily(state, current_value, valuation_date)
+
     # Compute metrics
     metrics = compute_metrics(state.daily_values)
 
@@ -514,6 +665,10 @@ def main() -> int:
     save_state(state)
 
     telegram_alert_sent = False
+    if st_exits:
+        telegram_alert_sent = send_paper_telegram_alert(
+            _format_st_exit_alert(st_exits, today)
+        )
     if new_trades:
         telegram_alert_sent = send_paper_telegram_alert(
             _format_paper_rebalance_alert(
