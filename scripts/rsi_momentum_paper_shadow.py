@@ -46,6 +46,7 @@ MIN_END_DATE = os.getenv("RSI_MOM_MIN_END_DATE", (datetime.now() - timedelta(day
 MIN_AVG_VOLUME = int(os.getenv("RSI_MOM_MIN_AVG_VOLUME", "50000"))
 MIN_MARKET_CAP_CR = float(os.getenv("RSI_MOM_MIN_MARKET_CAP_CR", "500"))
 MAX_PER_SECTOR = int(os.getenv("RSI_MOM_MAX_PER_SECTOR", "3"))
+FORCE_SIGNAL_DATE = os.getenv("RSI_MOM_FORCE_SIGNAL", "")  # "today" or "YYYY-MM-DD"
 
 
 def _load_instruments_master():
@@ -157,6 +158,19 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
 
     # Latest actionable signal (must have a next trading day for execution parity)
     latest_date = actionable_dates[-1]
+
+    # ---- Force signal date override ----
+    force_date = None
+    if FORCE_SIGNAL_DATE:
+        if FORCE_SIGNAL_DATE.lower() == "today":
+            force_date = prices_ffill.index[-1]
+        else:
+            from datetime import datetime as _dt
+            force_date = pd.Timestamp(_dt.strptime(FORCE_SIGNAL_DATE, "%Y-%m-%d"))
+        if force_date and force_date in prices_ffill.index:
+            latest_date = force_date
+            # FORCE_SIGNAL: overriding rebalance date to {latest_date.date()}")
+
     latest_picks: list[str] = []
     latest_pick_scores: dict[str, float] = {}
     latest_screened_count = 0
@@ -231,6 +245,51 @@ def compute_rotation(prices: pd.DataFrame, top_n: int = TOP_N) -> dict:
                 latest_picks = raw_picks
             latest_pick_scores = {s: round(float(score.loc[latest_date, s]), 2) for s in latest_picks}
             break
+
+    # ---- Force signal: compute picks directly if date not in pick_log ----
+    if force_date and not latest_picks:
+        fc = score.loc[latest_date].where(mom_1m.loc[latest_date] > 0, 0)
+        raw_picks_full = list(fc[fc > 0].sort_values(ascending=False).head(top_n * 3).index)
+        raw_picks2 = []
+        for p in raw_picks_full:
+            ok = True
+            if latest_date in regime_filter.index and p in regime_filter.columns:
+                if regime_filter.loc[latest_date, p] <= 0:
+                    ok = False
+            if latest_date in macd_filter.index and p in macd_filter.columns:
+                if macd_filter.loc[latest_date, p] <= 0:
+                    ok = False
+            if ok:
+                raw_picks2.append(p)
+        latest_screened_count = int((fc > 0).sum())
+        if MAX_PER_SECTOR > 0 and not instruments.empty:
+            sc = {}
+            latest_picks = []
+            for pick in raw_picks2:
+                sr = instruments[instruments["Symbol"].str.upper() == pick.upper()]
+                sec = str(sr.iloc[0]["Sector"]) if not sr.empty and "Sector" in sr.columns else "Unknown"
+                if sc.get(sec, 0) < MAX_PER_SECTOR:
+                    latest_picks.append(pick)
+                    sc[sec] = sc.get(sec, 0) + 1
+                if len(latest_picks) >= top_n:
+                    break
+            if len(latest_picks) < top_n:
+                fill = fc.where(regime_filter.loc[latest_date] > 0, 0).where(macd_filter.loc[latest_date] > 0, 0)
+                ranked = fill[fill > 0].sort_values(ascending=False)
+                for sym in ranked.index:
+                    sstr = str(sym)
+                    if sstr in latest_picks:
+                        continue
+                    sr = instruments[instruments["Symbol"].str.upper() == sstr.upper()]
+                    sec = str(sr.iloc[0]["Sector"]) if not sr.empty and "Sector" in sr.columns else "Unknown"
+                    if sc.get(sec, 0) < MAX_PER_SECTOR:
+                        latest_picks.append(sstr)
+                        sc[sec] = sc.get(sec, 0) + 1
+                    if len(latest_picks) >= top_n:
+                        break
+        else:
+            latest_picks = raw_picks2[:top_n]
+        latest_pick_scores = {s: round(float(score.loc[latest_date, s]), 2) for s in latest_picks}
 
     # Last 12 months performance
     if len(r) > 252:
