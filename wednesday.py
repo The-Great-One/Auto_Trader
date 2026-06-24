@@ -76,7 +76,6 @@ def monitor_market():
                     last_rebalance = state.get('last_rebalance_date', '')
                     picks = shadow.get('latest_signal', {}).get('picks', [])
                     if signal_date and signal_date > last_rebalance:
-                        logger.info(f"[REBALANCER] Heartbeat — signal {signal_date} = last {last_rebalance}, no rebalance needed")
                         logger.info(f'[REBALANCER] Triggering rebalance: signal {signal_date} > last {last_rebalance} | picks: {picks}')
                         try:
                             result = _sp.run(
@@ -134,7 +133,7 @@ def monitor_market():
                         except Exception as e:
                             logger.error(f'[REBALANCER] Subprocess error: {e}\n{_tb.format_exc()}')
                     else:
-                        logger.debug(f'[REBALANCER] No rebalance needed: signal={signal_date} <= last={last_rebalance}')
+                        logger.info(f'[REBALANCER] Heartbeat — signal {signal_date} = last {last_rebalance}, no action')
             except Exception as e:
                 logger.error(f'[REBALANCER] Loop error: {e}\n{_tb.format_exc()}')
             time.sleep(check_interval)
