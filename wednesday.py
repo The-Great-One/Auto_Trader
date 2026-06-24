@@ -99,10 +99,9 @@ def monitor_market():
                                     invested = sum(float(pos[s]) * float(cost.get(s, 0)) for s in pos if cost.get(s, 0))
                                     total_val = cash_val + invested
                                     msgs = [
-                                        f'🔄 RSI Momentum Rebalance',
-                                        f'Signal: {signal_date}',
+                                        f'🔄 RSI Momentum Rebalance — {signal_date}',
+                                        f'💰 ₹{total_val:,.0f}  |  {len(pos)} positions  |  Cash: ₹{cash_val:,.0f}',
                                     ]
-                                    msgs.append(f'Value: ₹{total_val:,.0f}  |  Cash: ₹{cash_val:,.0f}  |  Positions: {len(pos)}')
                                     if pos:
                                         msgs.append('')
                                         for sym in sorted(pos, key=lambda s: float(pos[s]) * float(cost.get(s, 0)), reverse=True):
@@ -112,15 +111,14 @@ def monitor_market():
                                             pct = (alloc / total_val * 100) if total_val else 0
                                             msgs.append(f'  {sym}  {int(q)} sh  ₹{alloc:,.0f}  ({pct:.1f}%)')
                                     if skipped := [s for s in picks if s not in pos]:
-                                        msgs.append(f'Skipped: {", ".join(skipped)}')
-                                    # Show any ST exits that happened during this rebalance
+                                        msgs.append(f'\n⚠️ Skipped: {", ".join(skipped)}')
                                     st_exits_log = [
                                         t for t in new_state.get('trade_log', [])
                                         if t.get('action') == 'SELL_ST' and t.get('date') == signal_date
                                     ]
                                     if st_exits_log:
-                                        msgs.append(f'ST Exits: {", ".join(e["symbol"] for e in st_exits_log)}')
-                                    msgs.append('Paper only — no live orders.')
+                                        msgs.append(f'\n🔴 ST Exits: {", ".join(e["symbol"] for e in st_exits_log)}')
+                                    msgs.append('\n📝 Paper only — no live orders')
                                     message_queue.put(NL.join(msgs))
                                 except Exception as msg_e:
                                     logger.warning(f'[REBALANCER] Message formatting failed: {msg_e}')

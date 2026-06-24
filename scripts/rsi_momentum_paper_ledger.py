@@ -268,19 +268,29 @@ def _format_paper_rebalance_alert(
     sells = [t for t in trades if t.get("action") == "SELL"]
     buys = [t for t in trades if t.get("action") == "BUY"]
     host = socket.gethostname()
+    total_val = current_value
     lines = [
-        "[PAPER][RSI-MOM] Rebalance signal",
-        f"Server: {host}",
-        f"Signal: {signal_date} | Valuation: {valuation_date}",
-        f"Portfolio: {_format_money(current_value)} | Positions: {position_count}",
+        f"🔄 RSI Momentum Rebalance — {signal_date}",
+        f"💰 ₹{total_val:,.0f}  |  {position_count} positions  |  2W-FRI",
     ]
     if sells:
-        lines.append(f"SELL {len(sells)}:")
-        lines.extend(f"- {_format_trade_line(t)}" for t in sells)
+        lines.append(f"\n🔴 SELL {len(sells)}:")
+        for t in sells:
+            symbol = t.get("symbol", "?")
+            shares = t.get("shares", 0)
+            price = t.get("price", 0)
+            gross = float(t.get("gross", 0) or 0)
+            lines.append(f"  {symbol}  {shares} sh  @ ₹{price:,.2f}  (₹{gross:,.0f})")
     if buys:
-        lines.append(f"BUY {len(buys)}:")
-        lines.extend(f"- {_format_trade_line(t)}" for t in buys)
-    lines.append("Paper only — no real Kite orders placed by this ledger.")
+        lines.append(f"\n🟢 BUY {len(buys)}:")
+        for t in buys:
+            symbol = t.get("symbol", "?")
+            shares = t.get("shares", 0)
+            price = t.get("price", 0)
+            gross = float(t.get("gross", 0) or 0)
+            pct = (gross / total_val * 100) if total_val else 0
+            lines.append(f"  {symbol}  {shares} sh  @ ₹{price:,.2f}  (₹{gross:,.0f}, {pct:.1f}%)")
+    lines.append("\n📝 Paper only — no live orders")
     return "\n".join(lines)
 
 
@@ -599,6 +609,12 @@ def main() -> int:
             # RSI_LEDGER_LIVE_MAX_AGE_SEC.
             live_dt = datetime.fromisoformat(live_time)
             live_age_sec = (datetime.now() - live_dt).total_seconds()
+            # After market close (15:30 IST), the last live tick IS the closing price.
+            # Bypass the freshness filter so we don't fall back to yesterday's Hist_Data.
+            now_ist = datetime.now()
+            market_closed = now_ist.hour >= 15 and now_ist.minute >= 30
+            max_age = float('inf') if market_closed else LIVE_PRICE_MAX_AGE_SEC
+
             if live_prices:
                 for sym in state.positions:
                     px = float(live_prices.get(sym, 0.0) or 0.0)
@@ -607,7 +623,7 @@ def main() -> int:
                     sym_time = price_times.get(sym) or live_time
                     sym_dt = datetime.fromisoformat(sym_time)
                     sym_age = (datetime.now() - sym_dt).total_seconds()
-                    if sym_age < LIVE_PRICE_MAX_AGE_SEC:
+                    if sym_age < max_age:
                         prices_dict[sym] = px
                         price_sources[sym] = f"live:{sym_time}"
                         fresh_live_count += 1
