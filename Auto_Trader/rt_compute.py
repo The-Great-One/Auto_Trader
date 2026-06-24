@@ -441,9 +441,18 @@ def _send_rsi_momentum_status(message_queue):
             else:
                 pos_lines.append(f"⚪ {sym}  ? (no price)")
 
+        realized_pnl = state.get("realized_pnl", 0.0)
+        unrealized_pnl = total_pnl - realized_pnl
+        r_sign = "+" if realized_pnl >= 0 else ""
+        u_sign = "+" if unrealized_pnl >= 0 else ""
         header_line = f"📊 RSI Momentum — {now_str}"
+        realized_pnl = state.get("realized_pnl", 0.0)
+        unrealized_pnl = total_pnl - realized_pnl
+        r_sign = "+" if realized_pnl >= 0 else ""
+        u_sign = "+" if unrealized_pnl >= 0 else ""
         pnl_line = f"💰 P&L: {sign}₹{total_pnl:,.0f} ({pnl_pct_total:+.1f}%)  |  {price_src}  |  ₹{capital:,.0f} cap"
-        msg = header_line + NL + pnl_line + NL + NL + NL.join(pos_lines)
+        breakdown = f"📈 Realized: {r_sign}₹{realized_pnl:,.0f}  |  Unrealized: {u_sign}₹{unrealized_pnl:,.0f}"
+        msg = header_line + NL + pnl_line + NL + breakdown + NL + NL + NL.join(pos_lines)
         message_queue.put(msg)
 
         if missing_count:

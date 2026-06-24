@@ -171,6 +171,10 @@ def _check_st_exits(state, ohlcv_data, prices_dict, today):
                     "reason": f"below Supertrend({ST_EXIT_MULT}xATR)",
                 })
                 exits.append({"symbol": sym, "shares": shares, "price": px, "net": net})
+                # Track realized P&L before deleting cost basis
+                if sym in state.cost_basis:
+                    entry_cost = shares * state.cost_basis[sym]
+                    state.realized_pnl += net - entry_cost
                 del state.positions[sym]
                 if sym in state.cost_basis:
                     del state.cost_basis[sym]
@@ -209,6 +213,7 @@ class PortfolioState:
     last_rebalance_date: str = ""
     daily_values: list[dict] = field(default_factory=list)  # [{date, value, return}]
     trade_log: list[dict] = field(default_factory=list)
+    realized_pnl: float = 0.0
     created_at: str = ""
     updated_at: str = ""
 
@@ -225,6 +230,7 @@ class PortfolioState:
             last_rebalance_date=d.get("last_rebalance_date", ""),
             daily_values=d.get("daily_values", []),
             trade_log=d.get("trade_log", []),
+            realized_pnl=d.get("realized_pnl", 0.0),
             created_at=d.get("created_at", ""),
             updated_at=d.get("updated_at", ""),
         )
@@ -371,6 +377,15 @@ def execute_rebalance(
                 "cost": round(cost, 2),
                 "net": round(net, 2),
             })
+    # Track realized P&L before clearing
+    for symbol, shares in list(state.positions.items()):
+        if symbol in state.cost_basis:
+            entry_cost = shares * state.cost_basis[symbol]
+            # Find the SELL trade for this symbol to get net proceeds
+            for t in reversed(state.trade_log):
+                if t.get("action") == "SELL" and t.get("symbol") == symbol:
+                    state.realized_pnl += t["net"] - entry_cost
+                    break
     state.positions.clear()
     state.cost_basis.clear()
 
