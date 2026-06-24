@@ -14,8 +14,8 @@ from Auto_Trader import (
 from Auto_Trader.TelegramLink import telegram_main
 import subprocess as _sp
 
-from pathlib import Path as _Path
-ROOT = _Path(__file__).resolve().parent
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger("Auto_Trade_Logger")
 
 
