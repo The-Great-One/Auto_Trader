@@ -106,8 +106,8 @@ def monitor_market():
                                     if pos:
                                         msgs.append('')
                                         for sym in sorted(pos, key=lambda s: float(pos[s]) * float(cost.get(s, 0)), reverse=True):
-                                            q = float(pos[s])
-                                            cp = float(cost.get(s, 0))
+                                            q = float(pos[sym])
+                                            cp = float(cost.get(sym, 0))
                                             alloc = q * cp
                                             pct = (alloc / total_val * 100) if total_val else 0
                                             msgs.append(f'  {sym}  {int(q)} sh  ₹{alloc:,.0f}  ({pct:.1f}%)')
