@@ -76,6 +76,7 @@ def monitor_market():
                     last_rebalance = state.get('last_rebalance_date', '')
                     picks = shadow.get('latest_signal', {}).get('picks', [])
                     if signal_date and signal_date > last_rebalance:
+                        logger.info(f"[REBALANCER] Heartbeat — signal {signal_date} = last {last_rebalance}, no rebalance needed")
                         logger.info(f'[REBALANCER] Triggering rebalance: signal {signal_date} > last {last_rebalance} | picks: {picks}')
                         try:
                             result = _sp.run(
