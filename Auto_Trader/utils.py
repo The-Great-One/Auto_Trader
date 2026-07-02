@@ -125,7 +125,20 @@ def _raise_if_manual_login_cooldown_active() -> None:
         return
 
     age = time.time() - created_ts
-    cooldown = _manual_login_cooldown_seconds()
+    base_cooldown = _manual_login_cooldown_seconds()
+    error_text = str(payload.get("error") or "").lower()
+    # Credential/TOTP failures can lock the Kite account if retried repeatedly.
+    # Keep those in cooldown for at least a day unless explicitly overridden.
+    if any(
+        marker in error_text
+        for marker in ("totp", "invalid username", "invalid password", "invalid credentials")
+    ):
+        cooldown = max(
+            base_cooldown,
+            int(os.getenv("AT_KITE_CREDENTIAL_FAILURE_COOLDOWN_SECONDS", "86400")),
+        )
+    else:
+        cooldown = base_cooldown
     if age < cooldown:
         raise RuntimeError(
             "Kite login is in manual-intervention cooldown after CAPTCHA/TOTP failure; "
