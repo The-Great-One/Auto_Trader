@@ -623,12 +623,14 @@ def main() -> int:
             # few seconds, so default freshness is 10 minutes, configurable via
             # RSI_LEDGER_LIVE_MAX_AGE_SEC.
             live_dt = datetime.fromisoformat(live_time)
-            live_age_sec = (datetime.now() - live_dt).total_seconds()
-            # After market close (15:30 IST), the last live tick IS the closing price.
-            # Bypass the freshness filter so we don't fall back to yesterday's Hist_Data.
             now_ist = datetime.now()
-            market_closed = now_ist.hour >= 15 and now_ist.minute >= 30
-            max_age = float('inf') if market_closed else LIVE_PRICE_MAX_AGE_SEC
+            live_age_sec = (now_ist - live_dt).total_seconds()
+            # After market close (15:30 IST), the last same-day live tick IS the
+            # closing price. Bypass freshness only for today's ticks — never for
+            # week-old live_prices.json data.
+            market_closed = (now_ist.hour, now_ist.minute) >= (15, 30)
+            allow_close_tick = market_closed and live_dt.date() == now_ist.date()
+            max_age = float('inf') if allow_close_tick else LIVE_PRICE_MAX_AGE_SEC
 
             if live_prices:
                 for sym in state.positions:
