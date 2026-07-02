@@ -1,0 +1,18 @@
+[Unit]
+Description=Auto Trader Kite WebSocket live-price fallback
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Auto_Trader
+EnvironmentFile=-/home/ubuntu/.autotrader_env
+ExecStart=/home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/kite_ws_price_fallback.py
+Restart=always
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

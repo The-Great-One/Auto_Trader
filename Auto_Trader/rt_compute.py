@@ -85,6 +85,8 @@ def _publish_live_prices(data: list, instruments_dict: dict) -> None:
                 "time": now_str,
                 "prices": merged_prices,
                 "price_times": price_times,
+                "source": "wednesday_kite_ticker",
+                "source_pid": os.getpid(),
             }, f)
     except Exception:
         pass
