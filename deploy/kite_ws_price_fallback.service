@@ -5,7 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
 WorkingDirectory=/home/ubuntu/Auto_Trader
 ExecStart=/bin/bash -lc 'cd /home/ubuntu/Auto_Trader && source /home/ubuntu/.autotrader_env && exec /home/ubuntu/Auto_Trader/venv/bin/python /home/ubuntu/Auto_Trader/scripts/kite_ws_price_fallback.py'
 Restart=always
