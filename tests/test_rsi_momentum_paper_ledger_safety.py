@@ -15,9 +15,13 @@ from scripts import rsi_momentum_paper_ledger as ledger
 class RebalanceSafetyTests(unittest.TestCase):
     def test_hist_dir_can_be_overridden_for_tickertape_dataset(self):
         with tempfile.TemporaryDirectory() as td:
-            with mock.patch.dict(os.environ, {"RSI_LEDGER_HIST_DIR": td}):
+            with mock.patch.dict(
+                os.environ,
+                {"RSI_LEDGER_HIST_DIR": td, "RSI_LEDGER_MIN_ROWS": "200"},
+            ):
                 reloaded = importlib.reload(ledger)
                 self.assertEqual(reloaded.HIST_DIR, Path(td))
+                self.assertEqual(reloaded.MIN_PRICE_ROWS, 200)
         importlib.reload(ledger)
 
     def make_state(self):

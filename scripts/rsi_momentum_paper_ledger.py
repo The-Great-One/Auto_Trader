@@ -47,6 +47,7 @@ LIVE_PRICE_MAX_AGE_SEC = float(os.getenv("RSI_LEDGER_LIVE_MAX_AGE_SEC", "600"))
 TELEGRAM_ALERTS = os.getenv("RSI_LEDGER_TELEGRAM_ALERTS", "1").strip().lower() not in {"0", "false", "no", "off"}
 ST_EXIT_MULT = float(os.getenv("RSI_LEDGER_ST_EXIT_MULT", "0"))  # 0=disabled, 2.0=recommended
 MIN_REBALANCE_PICKS = int(os.getenv("RSI_LEDGER_MIN_PICKS", "8"))
+MIN_PRICE_ROWS = int(os.getenv("RSI_LEDGER_MIN_ROWS", "350"))
 
 
 class RebalanceDataError(RuntimeError):
@@ -613,7 +614,7 @@ def log_daily(state: PortfolioState, value: float, date: str) -> None:
 # ── Main ────────────────────────────────────────────────────
 
 def main() -> int:
-    prices_df = load_prices(HIST_DIR)
+    prices_df = load_prices(HIST_DIR, min_rows=MIN_PRICE_ROWS)
     if prices_df.empty:
         print("ERROR: no price data")
         return 1
