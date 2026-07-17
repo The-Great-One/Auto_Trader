@@ -31,7 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 OUT_DIR = ROOT / "reports"
-HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
+HIST_DIR = Path(os.getenv("RSI_LEDGER_HIST_DIR", str(ROOT / "intermediary_files" / "Hist_Data")))
 OUT_DIR.mkdir(exist_ok=True)
 
 # Config

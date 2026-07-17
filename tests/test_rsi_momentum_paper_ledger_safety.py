@@ -1,6 +1,11 @@
 import copy
+import importlib
 import math
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
@@ -8,6 +13,13 @@ from scripts import rsi_momentum_paper_ledger as ledger
 
 
 class RebalanceSafetyTests(unittest.TestCase):
+    def test_hist_dir_can_be_overridden_for_tickertape_dataset(self):
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch.dict(os.environ, {"RSI_LEDGER_HIST_DIR": td}):
+                reloaded = importlib.reload(ledger)
+                self.assertEqual(reloaded.HIST_DIR, Path(td))
+        importlib.reload(ledger)
+
     def make_state(self):
         return ledger.PortfolioState(
             cash=100.0,
