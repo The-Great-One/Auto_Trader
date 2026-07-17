@@ -12,6 +12,7 @@ Output: reports/paper_ledger_rsi_momentum_latest.json
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import math
 import os
@@ -45,6 +46,11 @@ OUTPUT_FILE = OUT_DIR / "paper_ledger_rsi_momentum_latest.json"
 LIVE_PRICE_MAX_AGE_SEC = float(os.getenv("RSI_LEDGER_LIVE_MAX_AGE_SEC", "600"))
 TELEGRAM_ALERTS = os.getenv("RSI_LEDGER_TELEGRAM_ALERTS", "1").strip().lower() not in {"0", "false", "no", "off"}
 ST_EXIT_MULT = float(os.getenv("RSI_LEDGER_ST_EXIT_MULT", "0"))  # 0=disabled, 2.0=recommended
+MIN_REBALANCE_PICKS = int(os.getenv("RSI_LEDGER_MIN_PICKS", "8"))
+
+
+class RebalanceDataError(RuntimeError):
+    """Raised when a rebalance cannot be executed completely and atomically."""
 
 
 # ── Data loading ──────────────────────────────────────────────
@@ -347,6 +353,55 @@ def portfolio_value(state: PortfolioState, prices: dict[str, float]) -> float:
     return state.cash + position_value
 
 
+def _has_valid_price(prices: pd.Series, symbol: str) -> bool:
+    if symbol not in prices:
+        return False
+    try:
+        value = float(prices[symbol])
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(value) and value > 0
+
+
+def validate_rebalance_inputs(
+    state: PortfolioState,
+    picks: list[str],
+    prices_series: pd.Series,
+    min_picks: int = MIN_REBALANCE_PICKS,
+) -> None:
+    """Validate a complete rotation before any portfolio state is mutated."""
+    unique_picks = list(dict.fromkeys(picks))
+    if len(unique_picks) != len(picks):
+        raise RebalanceDataError("rebalance signal contains duplicate picks")
+    if len(unique_picks) != min_picks:
+        raise RebalanceDataError(
+            f"rebalance signal has {len(unique_picks)} picks; exactly {min_picks} required"
+        )
+
+    missing_held = sorted(
+        symbol for symbol in state.positions if not _has_valid_price(prices_series, symbol)
+    )
+    missing_picks = sorted(
+        symbol for symbol in unique_picks if not _has_valid_price(prices_series, symbol)
+    )
+    problems = []
+    if missing_held:
+        problems.append(f"held positions missing valid sell prices: {', '.join(missing_held)}")
+    if missing_picks:
+        problems.append(f"targets missing valid buy prices: {', '.join(missing_picks)}")
+    if problems:
+        raise RebalanceDataError("; ".join(problems))
+
+
+def _commit_rebalance_state(
+    original: PortfolioState,
+    staged: PortfolioState,
+) -> PortfolioState:
+    for field_name in PortfolioState.__dataclass_fields__:
+        setattr(original, field_name, copy.deepcopy(getattr(staged, field_name)))
+    return original
+
+
 def execute_rebalance(
     state: PortfolioState,
     picks: list[str],
@@ -355,6 +410,10 @@ def execute_rebalance(
     cost_bps: float = COST_BPS,
 ) -> PortfolioState:
     """Sell everything, buy new picks equal-weight."""
+    # Validate the whole rotation before touching cash, positions, or logs.
+    validate_rebalance_inputs(state, picks, prices_series)
+    original_state = state
+    state = copy.deepcopy(state)
     cost_rate = cost_bps / 10000.0
 
     # 1. Sell existing positions
@@ -412,7 +471,7 @@ def execute_rebalance(
         })
     if not available:
         state.last_rebalance_date = date
-        return state
+        return _commit_rebalance_state(original_state, state)
 
     per_symbol_capital = state.cash / len(available)
     skipped = []
@@ -458,7 +517,7 @@ def execute_rebalance(
         })
 
     state.last_rebalance_date = date
-    return state
+    return _commit_rebalance_state(original_state, state)
 
 
 def compute_metrics(daily_values: list[dict]) -> dict:
@@ -594,15 +653,19 @@ def main() -> int:
     # Check if rebalance needed
     new_trades: list[dict] = []
     trade_log_len_before = len(state.trade_log)
-    if should_rebalance(state, signal, signal_date):
-        print(f"REBALANCE: signal {signal_date} is newer than last rebalance {state.last_rebalance_date}")
-        state = execute_rebalance(state, picks, signal_prices, signal_date)
-        new_trades = state.trade_log[trade_log_len_before:]
-    elif not state.positions:
-        # First run — initialize with current signal
-        print(f"INIT: first run, buying {len(picks)} picks from signal {signal_date}")
-        state = execute_rebalance(state, picks, signal_prices, signal_date)
-        new_trades = state.trade_log[trade_log_len_before:]
+    try:
+        if should_rebalance(state, signal, signal_date):
+            print(f"REBALANCE: signal {signal_date} is newer than last rebalance {state.last_rebalance_date}")
+            state = execute_rebalance(state, picks, signal_prices, signal_date)
+            new_trades = state.trade_log[trade_log_len_before:]
+        elif not state.positions:
+            # First run — initialize with current signal
+            print(f"INIT: first run, buying {len(picks)} picks from signal {signal_date}")
+            state = execute_rebalance(state, picks, signal_prices, signal_date)
+            new_trades = state.trade_log[trade_log_len_before:]
+    except RebalanceDataError as exc:
+        print(f"ERROR: rebalance aborted without state changes: {exc}")
+        return 2
 
     # MTM current positions — prefer live prices from rt_compute, fall back to Hist_Data
     LIVE_PRICE_FILE = ROOT / "reports" / "live_prices.json"
