@@ -201,7 +201,7 @@ def _format_st_exit_alert(exits, today):
     if not exits:
         return ""
     total_net = sum(e["net"] for e in exits)
-    lines = [f"[PAPER][RSI-MOM] ST Exit ({ST_EXIT_MULT}xATR)", f"Date: {today}"]
+    lines = [f"🔻 RSI Momentum ST Exit ({ST_EXIT_MULT}xATR) — {today}"]
     for e in exits:
         lines.append(f'SELL {e["symbol"]} {e["shares"]} @ Rs.{e["price"]:,.2f} (Rs.{e["net"]:,.0f})')
     lines.append(f'Total exited: Rs.{total_net:,.0f}')
@@ -285,7 +285,7 @@ def _format_paper_rebalance_alert(
     total_val = current_value
     lines = [
         f"🔄 RSI Momentum Rebalance — {signal_date}",
-        f"💰 ₹{total_val:,.0f}  |  {position_count} positions  |  2W-FRI",
+        f"💰 ₹{total_val:,.0f}  |  {position_count} positions  |  3W-FRI",
         f"📈 Realized P&L: {_format_money(realized_pnl)}",
     ]
     if sells:
@@ -314,10 +314,10 @@ def send_paper_telegram_alert(message: str) -> bool:
     if not TELEGRAM_ALERTS:
         return False
     try:
-        from Auto_Trader.my_secrets import CHANNEL, TG_TOKEN
+        from Auto_Trader.my_secrets import CHANNEL, TG_TOKEN  # legacy; file deleted
         from telegram import Bot
     except Exception as exc:
-        print(f"WARN: Telegram alert unavailable: {exc}")
+        print(f"WARN: Telegram alert unavailable (legacy path pruned; TELEGRAM_ALERTS=0 in cron): {exc}")
         return False
 
     if not TG_TOKEN or not CHANNEL:
@@ -444,15 +444,6 @@ def execute_rebalance(
                 "net": round(net, 2),
                 "realized_pnl": round(realized, 2),
             })
-    # Track realized P&L before clearing
-    for symbol, shares in list(state.positions.items()):
-        if symbol in state.cost_basis:
-            entry_cost = shares * state.cost_basis[symbol]
-            # Find the SELL trade for this symbol to get net proceeds
-            for t in reversed(state.trade_log):
-                if t.get("action") == "SELL" and t.get("symbol") == symbol:
-                    state.realized_pnl += t["net"] - entry_cost
-                    break
     state.positions.clear()
     state.cost_basis.clear()
 
