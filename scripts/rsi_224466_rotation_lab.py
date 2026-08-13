@@ -87,16 +87,25 @@ def find_hist_dir(value: str | None) -> Path:
     raise SystemExit("No Hist_Data directory found")
 
 
-def load_prices(
+def load_ohlc_prices(
     hist_dir: Path,
     min_rows: int,
     min_end_date: str,
     symbols: set[str] | None,
     max_symbols: int,
-) -> tuple[pd.DataFrame, dict]:
+) -> tuple[dict[str, pd.DataFrame], dict]:
     min_end = pd.Timestamp(min_end_date) if min_end_date else None
-    loaded: list[pd.Series] = []
-    skipped: dict[str, int] = {"derivative": 0, "not_requested": 0, "too_short": 0, "stale": 0, "read_error": 0}
+    loaded_open: list[pd.Series] = []
+    loaded_close: list[pd.Series] = []
+    skipped: dict[str, int] = {
+        "derivative": 0,
+        "not_requested": 0,
+        "missing_ohlc": 0,
+        "too_short": 0,
+        "stale": 0,
+        "read_error": 0,
+    }
+    duplicate_rows_dropped = 0
     summaries: list[dict] = []
 
     files = sorted(hist_dir.glob("*.feather"))
@@ -111,23 +120,28 @@ def load_prices(
         try:
             df = pd.read_feather(fp)
             cmap = {str(c).lower(): c for c in df.columns}
-            if "date" not in cmap or "close" not in cmap:
-                skipped["read_error"] += 1
+            if not {"date", "open", "close"}.issubset(cmap):
+                skipped["missing_ohlc"] += 1
                 continue
             s = pd.DataFrame(
                 {
-                    "date": pd.to_datetime(df[cmap["date"]], errors="coerce"),
+                    "date": pd.to_datetime(df[cmap["date"]], errors="coerce", utc=True).dt.tz_localize(None),
+                    "open": pd.to_numeric(df[cmap["open"]], errors="coerce"),
                     "close": pd.to_numeric(df[cmap["close"]], errors="coerce"),
                 }
             ).dropna()
-            s = s.drop_duplicates("date").sort_values("date")
+            before = len(s)
+            s = s.drop_duplicates("date", keep="last").sort_values("date")
+            duplicate_rows_dropped += before - len(s)
             if len(s) < min_rows:
                 skipped["too_short"] += 1
                 continue
             if min_end is not None and s["date"].max() < min_end:
                 skipped["stale"] += 1
                 continue
-            loaded.append(s.set_index("date")["close"].rename(symbol))
+            indexed = s.set_index("date")
+            loaded_open.append(indexed["open"].rename(symbol))
+            loaded_close.append(indexed["close"].rename(symbol))
             summaries.append(
                 {
                     "symbol": symbol,
@@ -136,25 +150,42 @@ def load_prices(
                     "end": str(s["date"].max().date()),
                 }
             )
-            if max_symbols and len(loaded) >= max_symbols:
+            if max_symbols and len(loaded_close) >= max_symbols:
                 break
         except Exception:
             skipped["read_error"] += 1
 
-    if not loaded:
+    if not loaded_close:
         raise SystemExit(f"No usable symbols loaded from {hist_dir}")
-    prices = pd.concat(loaded, axis=1).sort_index().dropna(how="all")
+    opens = pd.concat(loaded_open, axis=1, sort=False).sort_index().dropna(how="all")
+    closes = pd.concat(loaded_close, axis=1, sort=False).sort_index().dropna(how="all")
+    common_index = opens.index.union(closes.index).sort_values()
+    opens = opens.reindex(common_index)
+    closes = closes.reindex(common_index)
     context = {
         "hist_dir": str(hist_dir),
-        "symbols_loaded": len(loaded),
+        "symbols_loaded": len(loaded_close),
         "skipped": skipped,
-        "date_range": [str(prices.index.min().date()), str(prices.index.max().date())],
+        "duplicate_rows_dropped": duplicate_rows_dropped,
+        "date_range": [str(common_index.min().date()), str(common_index.max().date())],
         "min_rows": min_rows,
         "min_end_date": min_end_date,
         "loaded_symbols": [x["symbol"] for x in summaries],
         "symbol_summaries_sample": summaries[:50],
     }
-    return prices, context
+    return {"open": opens, "close": closes}, context
+
+
+def load_prices(
+    hist_dir: Path,
+    min_rows: int,
+    min_end_date: str,
+    symbols: set[str] | None,
+    max_symbols: int,
+) -> tuple[pd.DataFrame, dict]:
+    """Compatibility wrapper for close-only callers; opens are never synthesized."""
+    ohlc, context = load_ohlc_prices(hist_dir, min_rows, min_end_date, symbols, max_symbols)
+    return ohlc["close"], context
 
 
 def rsi_dataframe(prices: pd.DataFrame, period: int) -> pd.DataFrame:
@@ -165,6 +196,9 @@ def rsi_dataframe(prices: pd.DataFrame, period: int) -> pd.DataFrame:
     avg_loss = loss.rolling(window=period, min_periods=period).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
     out = 100 - (100 / (1 + rs))
+    out = out.mask((avg_loss == 0) & (avg_gain > 0), 100.0)
+    out = out.mask((avg_gain == 0) & (avg_loss > 0), 0.0)
+    out = out.mask((avg_gain == 0) & (avg_loss == 0), 50.0)
     # Require a real continuous-ish window; no synthetic score on missing prices.
     valid = prices.notna().rolling(window=period + 1, min_periods=period + 1).sum() >= period + 1
     return out.where(valid)
