@@ -34,3 +34,7 @@ scripts/test_mumbai_vpn.py
 scripts/test_kite_login.py
 .env
 *.env
+
+# runtime logs
+log/
+*.log
