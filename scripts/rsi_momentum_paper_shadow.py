@@ -10,7 +10,6 @@ No real orders placed.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from datetime import datetime
@@ -23,13 +22,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.atomic_io import atomic_write_json
 from scripts.rsi_momentum_report import find_hist_dir
 from scripts.rsi_224466_rotation_lab import (
+    load_ohlc_prices as lab_load_ohlc_prices,
     load_prices as lab_load_prices,
     rebalance_dates as lab_rebalance_dates,
     rsi_dataframe as lab_rsi,
     build_regime_mask,
 )
+from scripts.signal_schema import build_paper_signal
 
 OUT_DIR = ROOT / "reports"
 HIST_DIR = ROOT / "intermediary_files" / "Hist_Data"
@@ -108,6 +110,45 @@ def load_hist(hist_dir: Path) -> pd.DataFrame:
     return prices_raw.ffill(limit=3)
 
 
+def load_market_data(hist_dir: Path) -> dict[str, pd.DataFrame]:
+    """Load real opens and closes; only closes receive the bounded strategy fill."""
+    if not hist_dir.is_dir():
+        return {"open": pd.DataFrame(), "close": pd.DataFrame()}
+    ohlc, _ctx = lab_load_ohlc_prices(
+        hist_dir,
+        min_rows=MIN_ROWS,
+        min_end_date=MIN_END_DATE,
+        symbols=set(),
+        max_symbols=0,
+    )
+    return {"open": ohlc["open"], "close": ohlc["close"].ffill(limit=3)}
+
+
+def modeled_execution(
+    opens: pd.DataFrame,
+    closes: pd.DataFrame,
+    signal_date: pd.Timestamp,
+    picks: list[str],
+) -> tuple[str | None, dict[str, float] | None]:
+    """Return real D+1 session opens when present, without close substitution."""
+    later_sessions = closes.index[closes.index > signal_date]
+    if len(later_sessions) == 0:
+        return None, None
+    execution_date = later_sessions[0]
+    if execution_date not in opens.index:
+        return str(execution_date.date()), {}
+    row = pd.to_numeric(opens.loc[execution_date], errors="coerce")
+    real_opens = {
+        symbol: float(row[symbol])
+        for symbol in picks
+        if symbol in row.index
+        and pd.notna(row[symbol])
+        and np.isfinite(float(row[symbol]))
+        and float(row[symbol]) > 0
+    }
+    return str(execution_date.date()), real_opens
+
+
 def _sector_of(instruments: pd.DataFrame, symbol: str) -> str:
     if instruments.empty:
         return "Unknown"
@@ -167,7 +208,7 @@ def signal_data_quality_error(
     return None
 
 
-def compute_rotation(prices: pd.DataFrame) -> dict:
+def compute_rotation(prices: pd.DataFrame, opens: pd.DataFrame | None = None) -> dict:
     """Compute latest champion-config rotation picks and publish paper decision."""
     p = PARAMS
     top_n = int(p["top_n"])
@@ -208,10 +249,7 @@ def compute_rotation(prices: pd.DataFrame) -> dict:
     if len(dates) < 1:
         return {"error": "no rebalance dates"}
     actionable_dates = [d for d in dates if pf.index.get_loc(d) + 1 < len(pf.index)]
-    if not actionable_dates:
-        return {"error": "no actionable rebalance dates"}
-
-    latest_date = actionable_dates[-1]
+    latest_date = dates[-1]
     instruments = load_instruments()
 
     # ---- Latest signal selection (mirrors auto_iteration_lab._simulate) ----
@@ -355,35 +393,45 @@ def compute_rotation(prices: pd.DataFrame) -> dict:
     if quality_error:
         return {"error": quality_error, "symbols_loaded": len(prices.columns)}
 
-    return {
-        "generated_at": datetime.now().isoformat(),
-        "strategy": "rsi_momentum_rotation_champion",
-        "params": {k: v for k, v in PARAMS.items()},
-        "latest_signal": {
-            "date": str(latest_date.date()),
-            "picks": picks,
-            "scores": pick_scores,
-            "weights": {s: round(wv, 4) for s, wv in weights.items()},
-            "symbols_screened": latest_screened_count,
-            "sectors": {s: _sector_of(instruments, s) for s in picks} if not instruments.empty else {},
+    execution_date, execution_open = modeled_execution(
+        opens if opens is not None else pd.DataFrame(), prices, latest_date, picks
+    )
+    return build_paper_signal(
+        params=PARAMS,
+        signal_date=str(latest_date.date()),
+        target_weights=weights,
+        target_cash_weight=max(0.0, 1.0 - sum(weights.values())),
+        modeled_execution_date=execution_date,
+        modeled_execution_open=execution_open,
+        metadata={
+            "generated_at": datetime.now().isoformat(),
+            "strategy": "rsi_momentum_rotation_champion",
+            "vol_lookback": int(p.get("vol_lookback", 20)),
+            "latest_signal_diagnostics": {
+                "date": str(latest_date.date()),
+                "picks": picks,
+                "scores": pick_scores,
+                "symbols_screened": latest_screened_count,
+                "sectors": {s: _sector_of(instruments, s) for s in picks} if not instruments.empty else {},
+            },
+            "legacy_non_promotion_safe_backtest_metrics": {
+                "symbols_loaded": len(pf.columns),
+                "date_range": [str(r_series.index[0].date()), str(r_series.index[-1].date())],
+                "days": int(len(r_series)),
+                "years": round(years, 2),
+                "rebalance_count": rebalance_count,
+                "avg_turnover": round(turnover_total / max(rebalance_count, 1), 1),
+                "cagr_pct": round(cagr * 100, 2),
+                "total_return_pct": round((eq.iloc[-1] - 1) * 100, 2),
+                "max_drawdown_pct": round(dd.min() * 100, 2),
+                "vol_pct": round(vol * 100, 2),
+                "sharpe": round(float(sharpe), 3),
+                "positive_years": int((yearly > 0).sum()),
+                "total_years": int(len(yearly)),
+                "return_12m_pct": round(float(ret_12m * 100), 1),
+            },
         },
-        "backtest_metrics": {
-            "symbols_loaded": len(pf.columns),
-            "date_range": [str(r_series.index[0].date()), str(r_series.index[-1].date())],
-            "days": int(len(r_series)),
-            "years": round(years, 2),
-            "rebalance_count": rebalance_count,
-            "avg_turnover": round(turnover_total / max(rebalance_count, 1), 1),
-            "cagr_pct": round(cagr * 100, 2),
-            "total_return_pct": round((eq.iloc[-1] - 1) * 100, 2),
-            "max_drawdown_pct": round(dd.min() * 100, 2),
-            "vol_pct": round(vol * 100, 2),
-            "sharpe": round(float(sharpe), 3),
-            "positive_years": int((yearly > 0).sum()),
-            "total_years": int(len(yearly)),
-            "return_12m_pct": round(float(ret_12m * 100), 1),
-        },
-    }
+    )
 
 
 def main() -> int:
@@ -393,23 +441,25 @@ def main() -> int:
         return 1
 
     print(f"Loading {hist_dir}...")
-    prices = load_hist(hist_dir)
+    market_data = load_market_data(hist_dir)
+    prices = market_data["close"]
     print(f"Loaded {len(prices.columns)} symbols, {len(prices)} days")
 
-    result = compute_rotation(prices)
+    result = compute_rotation(prices, market_data["open"])
     if "error" in result:
         print(f"ERROR: {result['error']}")
         return 1
 
     output_path = OUT_DIR / "paper_shadow_rsi_momentum_latest.json"
-    output_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    atomic_write_json(output_path, result)
 
-    picks = result["latest_signal"]["picks"]
-    scores = result["latest_signal"]["scores"]
-    bm = result["backtest_metrics"]
+    diagnostics = result["metadata"]["latest_signal_diagnostics"]
+    picks = diagnostics["picks"]
+    scores = diagnostics["scores"]
+    bm = result["metadata"]["legacy_non_promotion_safe_backtest_metrics"]
 
     print(f"\n=== RSI + Momentum Rotation Paper Shadow (champion config) ===")
-    print(f"Signal date: {result['latest_signal']['date']} | Rebalance: {PARAMS['rebalance_freq']} | Top {PARAMS['top_n']}")
+    print(f"Signal date: {result['signal_date']} | Rebalance: {PARAMS['rebalance_freq']} | Top {PARAMS['top_n']}")
     print(f"Top {PARAMS['top_n']} picks:")
     for s in picks:
         print(f"  {s:<15s} RSI score: {scores.get(s, 'N/A')}")

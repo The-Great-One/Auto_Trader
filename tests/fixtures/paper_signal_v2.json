@@ -1,0 +1,19 @@
+{
+  "schema_version": "paper_signal_v2_target_weights",
+  "signal_id": "2bb87437200b05bb8ddaab199bfca073ca30c5fbed28828e5561b897e1eec82b",
+  "params_fingerprint": "c896e3bf2dd04ceb14e74289f5197de259253e3ffcf2936e9ac6db233c210128",
+  "signal_date": "2026-07-17",
+  "modeled_execution_date": "2026-07-20",
+  "modeled_execution_open": {
+    "AAA": 111.0,
+    "BBB": 222.0
+  },
+  "target_weights": {
+    "AAA": 0.6,
+    "BBB": 0.3
+  },
+  "target_cash_weight": 0.1,
+  "metadata": {
+    "vol_lookback": 10
+  }
+}
