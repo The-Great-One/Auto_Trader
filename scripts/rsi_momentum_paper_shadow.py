@@ -117,6 +117,56 @@ def _sector_of(instruments: pd.DataFrame, symbol: str) -> str:
     return str(m.iloc[0].get("Sector", "Unknown"))
 
 
+def signal_data_quality_error(
+    prices: pd.DataFrame,
+    picks: list[str] | None,
+    top_n: int,
+    min_fresh_symbols: int = 50,
+    min_fresh_coverage: float = 0.8,
+    max_data_age_days: int = 5,
+    as_of: pd.Timestamp | None = None,
+) -> str | None:
+    """Return a fail-closed reason when the latest signal data is unsafe."""
+    if prices.empty or len(prices.columns) == 0:
+        return "no price data available for signal publication"
+
+    latest_date = pd.Timestamp(prices.index[-1]).tz_localize(None).normalize()
+    check_date = (
+        pd.Timestamp.now().tz_localize(None).normalize()
+        if as_of is None
+        else pd.Timestamp(as_of).tz_localize(None).normalize()
+    )
+    age_days = int((check_date - latest_date).days)
+    if age_days > max_data_age_days:
+        return (
+            f"latest price date {latest_date.date()} is stale by {age_days} days "
+            f"(maximum {max_data_age_days})"
+        )
+
+    latest = pd.to_numeric(prices.iloc[-1], errors="coerce")
+    valid = latest.apply(
+        lambda value: pd.notna(value) and np.isfinite(float(value)) and float(value) > 0
+    )
+    fresh_count = int(valid.sum())
+    total_count = len(prices.columns)
+    coverage = fresh_count / total_count
+    required_symbols = max(top_n, min_fresh_symbols)
+    if fresh_count < required_symbols or coverage < min_fresh_coverage:
+        return (
+            f"latest-date fresh symbols {fresh_count}/{total_count} below safety threshold "
+            f"(need >= {required_symbols} and coverage >= {min_fresh_coverage:.0%})"
+        )
+
+    if picks is not None:
+        unique_picks = list(dict.fromkeys(picks))
+        if len(picks) != top_n or len(unique_picks) != top_n:
+            return (
+                f"signal must contain exactly {top_n} unique picks; "
+                f"received {len(picks)} picks ({len(unique_picks)} unique)"
+            )
+    return None
+
+
 def compute_rotation(prices: pd.DataFrame) -> dict:
     """Compute latest champion-config rotation picks and publish paper decision."""
     p = PARAMS
@@ -299,6 +349,11 @@ def compute_rotation(prices: pd.DataFrame) -> dict:
         last_start = r_series.index[-1] - pd.Timedelta(days=365)
         eq_12m = (1 + r_series.loc[r_series.index >= last_start]).cumprod()
         ret_12m = eq_12m.iloc[-1] - 1 if len(eq_12m) > 0 else 0.0
+
+    # Fail closed: do not publish a signal built on stale or thin data.
+    quality_error = signal_data_quality_error(prices, picks=picks, top_n=top_n)
+    if quality_error:
+        return {"error": quality_error, "symbols_loaded": len(prices.columns)}
 
     return {
         "generated_at": datetime.now().isoformat(),

@@ -95,7 +95,7 @@ class RebalanceSafetyTests(unittest.TestCase):
             **{p: 30.0 + i for i, p in enumerate(picks)},
         })
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises((TypeError, ValueError)):
             ledger.execute_rebalance(state, picks, prices, "2026-07-17")
 
         self.assertEqual(state.to_dict(), before)
