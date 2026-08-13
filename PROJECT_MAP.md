@@ -13,6 +13,8 @@ Auto_Trader is the production paper RSI momentum trader. Prices and historical d
 
 - `scripts/rsi_momentum_paper_shadow.py` — weekday champion signal (hardcoded PARAMS, fail-closed data-quality guard).
 - `scripts/rsi_momentum_paper_ledger.py` — five-minute MTM and paper rebalance.
+- `scripts/signal_schema.py` — stable versioned D-close target-weight intent.
+- `scripts/atomic_io.py` — crash-safe state/signal/output publication.
 - `scripts/rsi_momentum_report.py` — shared rotation/report logic.
 - `scripts/rsi_224466_rotation_lab.py` — shared indicator and simulation helpers.
 - `scripts/nightly_cleanup.py` + `scripts/prune_report_clutter.py` — report retention.
@@ -39,3 +41,5 @@ Times are UTC (server local time):
 3. On production: `git pull --ff-only origin main`.
 
 Do not restart services or run the shadow/ledger merely to deploy documentation changes. Runtime state stays under ignored `reports/`, `log/`, and `intermediary_files/` paths.
+
+Before a target-weight rebalance, the Mac quote producer must publish `paper_quote_snapshot_v1` for the union of held and target symbols, with one snapshot ID, timezone-aware generation/per-symbol timestamps, and finite positive fresh prices. Missing coverage fails closed and leaves the signal unconsumed. Modeled D+1 opens are diagnostic only; actual fills are timestamped when the ledger runs.

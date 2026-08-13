@@ -14,6 +14,10 @@ No real orders are placed. Zerodha Kite is retired and is not a supported price,
 
 Nightly strategy research lives in the separate `Trader_Labs` repository (auto-iteration lab, independent of this repository).
 
+### Correct paper execution contract
+
+The shadow publishes a versioned D-close intent with target weights (including inverse-volatility weights), target cash, a stable signal ID, and nullable modeled D+1 opens. The ledger fills whole-share target deltas only from one complete, timezone-aware, strictly fresh `paper_quote_snapshot_v1`; historical opens are slippage diagnostics and never retroactive fills. Fees use actual traded notional, residual cash and target-weight deviations are retained, and consumed signal IDs are idempotent. Authoritative state is atomically committed before its same-revision rebuildable output. This remains paper-only: no live orders are placed.
+
 ## Repository contents
 
 - `scripts/rsi_momentum_paper_shadow.py` — champion signal generator.
