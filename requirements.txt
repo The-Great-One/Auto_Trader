@@ -1,14 +1,11 @@
-# Versions mirror the production Auto_Trader venv on arunnet (2026-08-13).
-filelock==3.16.1
-kiteconnect==5.0.1
+# Minimal runtime deps for the paper RSI momentum pipeline (2026-08-13).
+# Versions mirror the production Auto_Trader venv on arunnet.
+# The live venv also contains legacy packages (kiteconnect, TA-Lib, etc.)
+# from the Kite era; they are no longer required and can be ignored.
 numpy==2.4.4
 pandas==2.2.3
-pandas-market-calendars==4.4.1
 pyarrow==17.0.0
 python-dateutil==2.9.0.post0
-requests==2.32.3
-retry==0.9.2
-TA-Lib==0.6.8
 
 # Test runner (not installed in the production runtime venv).
 pytest==8.4.2
