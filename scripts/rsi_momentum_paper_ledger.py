@@ -84,6 +84,7 @@ class PortfolioState:
     last_rebalance_date: str = ""
     daily_values: list[dict] = field(default_factory=list)  # [{date, value, return}]
     trade_log: list[dict] = field(default_factory=list)
+    realized_pnl: float = 0.0  # cumulative realized P&L from closed positions
     created_at: str = ""
     updated_at: str = ""
 
@@ -100,6 +101,7 @@ class PortfolioState:
             last_rebalance_date=d.get("last_rebalance_date", ""),
             daily_values=d.get("daily_values", []),
             trade_log=d.get("trade_log", []),
+            realized_pnl=float(d.get("realized_pnl", 0.0) or 0.0),
             created_at=d.get("created_at", ""),
             updated_at=d.get("updated_at", ""),
         )
@@ -138,6 +140,7 @@ def _format_paper_rebalance_alert(
     valuation_date: str,
     current_value: float,
     position_count: int,
+    realized_pnl: float = 0.0,
 ) -> str:
     """Create a concise paper BUY/SELL Telegram alert for a rebalance."""
     sells = [t for t in trades if t.get("action") == "SELL"]
@@ -148,6 +151,7 @@ def _format_paper_rebalance_alert(
         f"Server: {host}",
         f"Signal: {signal_date} | Valuation: {valuation_date}",
         f"Portfolio: {_format_money(current_value)} | Positions: {position_count}",
+        f"Realized P&L: {_format_money(realized_pnl)}",
     ]
     if sells:
         lines.append(f"SELL {len(sells)}:")
@@ -226,6 +230,10 @@ def execute_rebalance(
             net = gross - cost
             state.cash += net
             sold_value += net
+            # Realized P&L: (sell price - avg buy price) * shares - fees
+            entry_px = float(state.cost_basis.get(symbol, px))
+            realized = (px - entry_px) * shares - cost
+            state.realized_pnl += realized
             state.trade_log.append({
                 "date": date,
                 "action": "SELL",
@@ -235,6 +243,7 @@ def execute_rebalance(
                 "gross": round(gross, 2),
                 "cost": round(cost, 2),
                 "net": round(net, 2),
+                "realized_pnl": round(realized, 2),
             })
     state.positions.clear()
     state.cost_basis.clear()
@@ -522,6 +531,7 @@ def main() -> int:
                 valuation_date=valuation_date,
                 current_value=current_value,
                 position_count=len(state.positions),
+                realized_pnl=state.realized_pnl,
             )
         )
 
@@ -541,6 +551,13 @@ def main() -> int:
                 "pnl_pct": round((px / cost - 1) * 100, 2) if cost > 0 else 0.0,
             }
 
+    # Realized P&L from closed positions (persisted across runs).
+    # Unrealized = true MTM of open positions vs their cost basis.
+    unrealized = 0.0
+    for sym, shares in state.positions.items():
+        if sym in prices_dict:
+            unrealized += (prices_dict[sym] - float(state.cost_basis.get(sym, prices_dict[sym]))) * shares
+
     output = {
         "generated_at": datetime.now().isoformat(),
         "valuation_date": valuation_date,
@@ -554,6 +571,9 @@ def main() -> int:
             "cash": round(state.cash, 2),
             "position_value": round(current_value - state.cash, 2),
             "total_value": round(current_value, 2),
+            "realized_pnl": round(state.realized_pnl, 2),
+            "unrealized_pnl": round(unrealized, 2),
+            "total_return_pnl": round(current_value - INITIAL_CAPITAL, 2),
             "deployment_pct": round(((current_value - state.cash) / current_value) * 100, 2) if current_value > 0 else 0.0,
             "positions_count": len(state.positions),
             "price_source": price_source,
@@ -581,6 +601,7 @@ def main() -> int:
     print(f"\n=== RSI Momentum Paper Ledger ===")
     print(f"Date: {valuation_date} | Signal: {signal_date} | Picks: {len(picks)} | Price source: {price_source}")
     print(f"Portfolio:  ₹{current_value:,.2f}  (Cash: ₹{state.cash:,.2f}, Positions: {len(state.positions)})")
+    print(f"Realized:   ₹{state.realized_pnl:+,.2f}   Unrealized: ₹{unrealized:+,.2f}   Total: ₹{current_value - INITIAL_CAPITAL:+,.2f}")
     if "total_return_pct" in metrics:
         print(f"Return:     {metrics['total_return_pct']:+.2f}%  CAGR: {metrics.get('cagr_pct', 0):+.2f}%")
         print(f"MaxDD:      {metrics['max_drawdown_pct']:+.2f}%  Sharpe: {metrics.get('sharpe', 0):.3f}")
