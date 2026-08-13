@@ -30,6 +30,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.atomic_io import atomic_write_json
+
 OUT_DIR = ROOT / "reports"
 HIST_DIR = Path(os.getenv("RSI_LEDGER_HIST_DIR", str(ROOT / "intermediary_files" / "Hist_Data")))
 OUT_DIR.mkdir(exist_ok=True)
@@ -52,6 +54,10 @@ MIN_PRICE_ROWS = int(os.getenv("RSI_LEDGER_MIN_ROWS", "350"))
 
 class RebalanceDataError(RuntimeError):
     """Raised when a rebalance cannot be executed completely and atomically."""
+
+
+class StateRevisionError(RuntimeError):
+    """Raised when a rebuildable projection does not match authoritative state."""
 
 
 # ── Data loading ──────────────────────────────────────────────
@@ -98,12 +104,19 @@ def load_ohlcv(hist_dir: Path, symbols: set) -> dict:
         cc = next((c for c in ["close", "Close", "CLOSE"] if c in df.columns), None)
         hc = next((c for c in ["high", "High"] if c in df.columns), None)
         lc = next((c for c in ["low", "Low"] if c in df.columns), None)
+        oc = next((c for c in ["open", "Open", "OPEN"] if c in df.columns), None)
         if not all([dc, cc, hc, lc]):
             continue
         df[dc] = pd.to_datetime(df[dc]).dt.tz_localize(None)
         df = df.set_index(dc).sort_index()
-        df = df.rename(columns={cc: "Close", hc: "High", lc: "Low"})
-        ohlcv[sym] = df[["Close", "High", "Low"]]
+        rename = {cc: "Close", hc: "High", lc: "Low"}
+        if oc:
+            rename[oc] = "Open"
+        df = df.rename(columns=rename)
+        columns = ["Close", "High", "Low"]
+        if oc:
+            columns.append("Open")
+        ohlcv[sym] = df[columns]
     return ohlcv
 
 
@@ -223,6 +236,13 @@ class PortfolioState:
     realized_pnl: float = 0.0  # cumulative realized P&L from closed positions
     created_at: str = ""
     updated_at: str = ""
+    schema_version: str = "paper_ledger_state_v2"
+    state_revision: int = 0
+    last_consumed_signal_id: str = ""
+    last_quote_snapshot_id: str = ""
+    target_weights: dict[str, float] = field(default_factory=dict)
+    target_cash_weight: float = 0.0
+    target_weight_deviations: dict[str, dict] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -240,6 +260,13 @@ class PortfolioState:
             realized_pnl=float(d.get("realized_pnl", 0.0) or 0.0),
             created_at=d.get("created_at", ""),
             updated_at=d.get("updated_at", ""),
+            schema_version=d.get("schema_version", "paper_ledger_state_v2"),
+            state_revision=int(d.get("state_revision", 0) or 0),
+            last_consumed_signal_id=d.get("last_consumed_signal_id", ""),
+            last_quote_snapshot_id=d.get("last_quote_snapshot_id", ""),
+            target_weights=d.get("target_weights", {}),
+            target_cash_weight=float(d.get("target_cash_weight", 0.0) or 0.0),
+            target_weight_deviations=d.get("target_weight_deviations", {}),
         )
 
 
@@ -254,8 +281,8 @@ def load_state() -> PortfolioState:
 
 
 def save_state(state: PortfolioState) -> None:
-    state.updated_at = datetime.now().isoformat()
-    STATE_FILE.write_text(json.dumps(state.to_dict(), indent=2), encoding="utf-8")
+    state.updated_at = datetime.now().astimezone().isoformat()
+    atomic_write_json(STATE_FILE, state.to_dict())
 
 
 def _format_money(value: float) -> str:
@@ -337,11 +364,13 @@ def send_paper_telegram_alert(message: str) -> bool:
 # ── Core simulation ──────────────────────────────────────────
 
 def get_latest_signal() -> Optional[dict]:
-    """Read the latest paper shadow signal."""
+    """Read the latest paper shadow signal (v2 document or legacy envelope)."""
     if not PAPER_SHADOW_FILE.exists():
         return None
     try:
         data = json.loads(PAPER_SHADOW_FILE.read_text())
+        if data.get("schema_version") == "paper_signal_v2_target_weights":
+            return data
         return data.get("latest_signal")
     except Exception:
         return None
@@ -403,6 +432,260 @@ def _commit_rebalance_state(
     for field_name in PortfolioState.__dataclass_fields__:
         setattr(original, field_name, copy.deepcopy(getattr(staged, field_name)))
     return original
+
+
+def _aware_datetime(value: object, field_name: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError) as exc:
+        raise RebalanceDataError(f"{field_name} must be an ISO timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise RebalanceDataError(f"{field_name} must be timezone-aware")
+    return parsed
+
+
+def validate_quote_snapshot(
+    snapshot: dict,
+    required_symbols: set[str],
+    now: datetime,
+    *,
+    max_age_sec: float = LIVE_PRICE_MAX_AGE_SEC,
+) -> dict[str, float]:
+    """Validate one strictly-fresh, complete snapshot for actual paper fills."""
+    if snapshot.get("schema_version") != "paper_quote_snapshot_v1":
+        raise RebalanceDataError("quote snapshot schema must be paper_quote_snapshot_v1")
+    if not isinstance(snapshot.get("snapshot_id"), str) or not snapshot["snapshot_id"].strip():
+        raise RebalanceDataError("quote snapshot_id is required")
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise RebalanceDataError("fill clock must be timezone-aware")
+    generated = _aware_datetime(snapshot.get("generated_at"), "generated_at")
+    prices = snapshot.get("prices")
+    price_times = snapshot.get("price_times")
+    if not isinstance(prices, dict) or not isinstance(price_times, dict):
+        raise RebalanceDataError("quote snapshot prices and price_times must be objects")
+    missing = sorted(required_symbols - (set(prices) & set(price_times)))
+    if missing:
+        raise RebalanceDataError(f"quote snapshot missing required symbols: {', '.join(missing)}")
+    if (now - generated).total_seconds() > max_age_sec or generated > now:
+        raise RebalanceDataError("quote snapshot generated_at is stale or in the future")
+    validated: dict[str, float] = {}
+    for symbol in sorted(required_symbols):
+        try:
+            price = float(prices[symbol])
+        except (TypeError, ValueError) as exc:
+            raise RebalanceDataError(f"invalid fill price for {symbol}") from exc
+        if not math.isfinite(price) or price <= 0:
+            raise RebalanceDataError(f"invalid fill price for {symbol}")
+        price_time = _aware_datetime(price_times[symbol], f"price_times.{symbol}")
+        age = (now - price_time).total_seconds()
+        if age > max_age_sec or age < 0:
+            raise RebalanceDataError(f"quote for {symbol} is stale or in the future")
+        validated[symbol] = price
+    return validated
+
+
+def _slippage_bps(action: str, actual: float, modeled: float | None) -> float | None:
+    if modeled is None or not math.isfinite(modeled) or modeled <= 0:
+        return None
+    value = (actual / modeled - 1.0) if action == "BUY" else (modeled / actual - 1.0)
+    return value * 10000.0
+
+
+def execute_target_rebalance(
+    state: PortfolioState,
+    signal: dict,
+    snapshot: dict,
+    now: datetime,
+    *,
+    cost_bps: float = COST_BPS,
+    max_age_sec: float = LIVE_PRICE_MAX_AGE_SEC,
+    modeled_sell_opens: dict[str, float] | None = None,
+) -> bool:
+    """Trade whole-share deltas to published weights using one fresh snapshot."""
+    signal_id = signal.get("signal_id")
+    if not isinstance(signal_id, str) or not signal_id:
+        raise RebalanceDataError("signal_id is required")
+    if signal_id == state.last_consumed_signal_id:
+        return False
+    if signal.get("schema_version") != "paper_signal_v2_target_weights":
+        raise RebalanceDataError("unsupported paper signal schema")
+    weights_raw = signal.get("target_weights")
+    if not isinstance(weights_raw, dict) or not weights_raw:
+        raise RebalanceDataError("target_weights are required")
+    try:
+        weights = {str(s): float(w) for s, w in weights_raw.items()}
+        cash_weight = float(signal.get("target_cash_weight", 0.0))
+    except (TypeError, ValueError) as exc:
+        raise RebalanceDataError("target allocations must be numeric") from exc
+    allocations = [*weights.values(), cash_weight]
+    if any(not math.isfinite(v) or v < 0 for v in allocations):
+        raise RebalanceDataError("target allocations must be finite and non-negative")
+    if not math.isclose(sum(allocations), 1.0, abs_tol=1e-8):
+        raise RebalanceDataError("target allocations must sum to one")
+
+    required = set(state.positions) | set(weights)
+    prices = validate_quote_snapshot(snapshot, required, now, max_age_sec=max_age_sec)
+    staged = copy.deepcopy(state)
+    fee_rate = cost_bps / 10000.0
+    nav = portfolio_value(staged, prices)
+    target_shares = {
+        symbol: math.floor((nav * weight) / (prices[symbol] * (1.0 + fee_rate)))
+        for symbol, weight in weights.items()
+    }
+    target_shares.update({symbol: 0 for symbol in staged.positions if symbol not in weights})
+    buy_models = signal.get("modeled_execution_open")
+    if not isinstance(buy_models, dict):
+        buy_models = {}
+    sell_models = modeled_sell_opens or {}
+
+    def append_trade(action: str, symbol: str, shares: int) -> None:
+        price = prices[symbol]
+        gross = shares * price
+        fee = gross * fee_rate
+        modeled_raw = (buy_models if action == "BUY" else sell_models).get(symbol)
+        try:
+            modeled = float(modeled_raw) if modeled_raw is not None else None
+        except (TypeError, ValueError):
+            modeled = None
+        staged.trade_log.append({
+            "date": now.date().isoformat(),
+            "filled_at": now.isoformat(),
+            "action": action,
+            "symbol": symbol,
+            "shares": int(shares),
+            "price": round(price, 8),
+            "actual_fill": round(price, 8),
+            "gross": round(gross, 2),
+            "actual_notional": round(gross, 2),
+            "cost": round(fee, 2),
+            "net": round(gross + fee if action == "BUY" else gross - fee, 2),
+            "snapshot_id": snapshot["snapshot_id"],
+            "modeled_execution_date": signal.get("modeled_execution_date"),
+            "modeled_open": modeled,
+            "slippage_bps": _slippage_bps(action, price, modeled),
+        })
+
+    # Reductions fund increases; unchanged holdings are never round-tripped.
+    for symbol in sorted(target_shares):
+        current = int(staged.positions.get(symbol, 0))
+        delta = target_shares[symbol] - current
+        if delta >= 0:
+            continue
+        shares = -delta
+        price = prices[symbol]
+        gross = shares * price
+        fee = gross * fee_rate
+        staged.cash += gross - fee
+        entry = float(staged.cost_basis.get(symbol, price))
+        staged.realized_pnl += (price - entry) * shares - fee
+        remaining = current - shares
+        if remaining:
+            staged.positions[symbol] = float(remaining)
+        else:
+            staged.positions.pop(symbol, None)
+            staged.cost_basis.pop(symbol, None)
+        append_trade("SELL", symbol, shares)
+
+    for symbol in sorted(weights):
+        current = int(staged.positions.get(symbol, 0))
+        desired = target_shares[symbol]
+        shares = max(0, desired - current)
+        all_in = prices[symbol] * (1.0 + fee_rate)
+        shares = min(shares, math.floor(max(staged.cash, 0.0) / all_in))
+        if shares <= 0:
+            continue
+        old_cost = float(staged.cost_basis.get(symbol, prices[symbol]))
+        old_shares = current
+        gross = shares * prices[symbol]
+        fee = gross * fee_rate
+        staged.cash -= gross + fee
+        staged.positions[symbol] = float(old_shares + shares)
+        staged.cost_basis[symbol] = (
+            old_cost * old_shares + prices[symbol] * shares
+        ) / (old_shares + shares)
+        append_trade("BUY", symbol, shares)
+
+    actual_nav = portfolio_value(staged, prices)
+    staged.target_weights = dict(sorted(weights.items()))
+    staged.target_cash_weight = cash_weight
+    staged.target_weight_deviations = {
+        symbol: {
+            "target_weight": weight,
+            "actual_weight": round(staged.positions.get(symbol, 0.0) * prices[symbol] / actual_nav, 12)
+            if actual_nav > 0 else 0.0,
+            "deviation": round(
+                (staged.positions.get(symbol, 0.0) * prices[symbol] / actual_nav if actual_nav > 0 else 0.0)
+                - weight,
+                12,
+            ),
+        }
+        for symbol, weight in sorted(weights.items())
+    }
+    staged.last_rebalance_date = now.date().isoformat()
+    staged.last_consumed_signal_id = signal_id
+    staged.last_quote_snapshot_id = snapshot["snapshot_id"]
+    staged.updated_at = now.isoformat()
+    _commit_rebalance_state(state, staged)
+    return True
+
+
+def state_projection(state: PortfolioState, generated_at: datetime) -> dict:
+    return {
+        "schema_version": "paper_ledger_projection_v2",
+        "state_revision": state.state_revision,
+        "generated_at": generated_at.isoformat(),
+        "last_consumed_signal_id": state.last_consumed_signal_id,
+        "portfolio": {
+            "cash": round(state.cash, 2),
+            "positions": copy.deepcopy(state.positions),
+            "target_weights": copy.deepcopy(state.target_weights),
+            "target_cash_weight": state.target_cash_weight,
+            "target_weight_deviations": copy.deepcopy(state.target_weight_deviations),
+        },
+        "latest_trades": copy.deepcopy(state.trade_log[-20:]),
+    }
+
+
+def validate_projection_revision(state_value: dict, projection: dict) -> None:
+    if int(state_value.get("state_revision", -1)) != int(projection.get("state_revision", -2)):
+        raise StateRevisionError("state/output revision mismatch")
+    if state_value.get("last_consumed_signal_id", "") != projection.get("last_consumed_signal_id", ""):
+        raise StateRevisionError("state/output identity mismatch")
+
+
+def commit_signal_run(
+    state: PortfolioState,
+    signal: dict,
+    snapshot: dict,
+    now: datetime,
+    *,
+    state_path: Path = STATE_FILE,
+    output_path: Path = OUTPUT_FILE,
+    writer=atomic_write_json,
+    modeled_sell_opens: dict[str, float] | None = None,
+) -> bool:
+    """Commit authoritative state first, then its rebuildable same-revision projection."""
+    if signal.get("signal_id") == state.last_consumed_signal_id:
+        projection = state_projection(state, now)
+        try:
+            current = json.loads(output_path.read_text())
+            validate_projection_revision(state.to_dict(), current)
+        except (OSError, ValueError, json.JSONDecodeError, StateRevisionError):
+            writer(output_path, projection)
+        return False
+
+    staged = copy.deepcopy(state)
+    executed = execute_target_rebalance(
+        staged, signal, snapshot, now, modeled_sell_opens=modeled_sell_opens
+    )
+    if not executed:
+        return False
+    staged.state_revision = state.state_revision + 1
+    staged.updated_at = now.isoformat()
+    writer(state_path, staged.to_dict())
+    _commit_rebalance_state(state, staged)
+    writer(output_path, state_projection(state, now))
+    return True
 
 
 def execute_rebalance(
@@ -622,8 +905,9 @@ def main() -> int:
         print("WARN: no paper shadow signal found — skipping")
         return 0
 
-    signal_date = signal.get("date", "")
-    picks = signal.get("picks", [])
+    signal_date = signal.get("signal_date", signal.get("date", ""))
+    target_weights = signal.get("target_weights", {})
+    picks = list(target_weights) if isinstance(target_weights, dict) else signal.get("picks", [])
 
     if not picks:
         print("WARN: no picks in signal")
@@ -649,7 +933,52 @@ def main() -> int:
     # Load state
     state = load_state()
 
-    # Check if rebalance needed
+    # Versioned target-weight signals are filled only from one strictly fresh
+    # quote snapshot. Hist_Data above remains available for MTM/model diagnostics
+    # but is never an actual fill source.
+    if signal.get("schema_version") == "paper_signal_v2_target_weights":
+        live_price_file = ROOT / "reports" / "live_prices.json"
+        try:
+            quote_snapshot = json.loads(live_price_file.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"ERROR: target rebalance requires paper_quote_snapshot_v1: {exc}")
+            return 2
+        now = datetime.now().astimezone()
+        modeled_sell_opens: dict[str, float] = {}
+        execution_date = signal.get("modeled_execution_date")
+        dropped = set(state.positions) - set(picks)
+        if execution_date and dropped:
+            sell_ohlcv = load_ohlcv(HIST_DIR, dropped)
+            execution_ts = pd.Timestamp(execution_date)
+            for symbol, frame in sell_ohlcv.items():
+                # load_ohlcv historically exposes only HLC. A sell model is
+                # recorded only when a real Open column is supplied by an
+                # injected/updated dataset; never substitute Close.
+                if "Open" in frame.columns and execution_ts in frame.index:
+                    value = float(frame.loc[execution_ts, "Open"])
+                    if math.isfinite(value) and value > 0:
+                        modeled_sell_opens[symbol] = value
+        try:
+            executed = commit_signal_run(
+                state,
+                signal,
+                quote_snapshot,
+                now,
+                modeled_sell_opens=modeled_sell_opens,
+            )
+        except RebalanceDataError as exc:
+            print(f"ERROR: rebalance aborted without state changes: {exc}")
+            return 2
+        except OSError as exc:
+            print(f"ERROR: ledger commit incomplete: {exc}")
+            return 3
+        print(
+            f"{'REBALANCE' if executed else 'IDEMPOTENT'}: signal {signal.get('signal_id')} "
+            f"at state revision {state.state_revision}"
+        )
+        return 0
+
+    # Check if legacy rebalance needed
     new_trades: list[dict] = []
     trade_log_len_before = len(state.trade_log)
     try:
