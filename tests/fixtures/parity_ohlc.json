@@ -1,0 +1,10 @@
+{
+  "schema_version": "parity_ohlc_v1",
+  "signal_date": "2026-07-17",
+  "modeled_execution_date": "2026-07-20",
+  "closes": {
+    "AAA": [100.0, 101.0, 102.0, 103.0],
+    "BBB": [200.0, 198.0, 202.0, 204.0]
+  },
+  "modeled_opens": {"AAA": 98.0, "BBB": 205.0}
+}

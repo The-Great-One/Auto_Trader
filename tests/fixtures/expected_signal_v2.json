@@ -1,0 +1,11 @@
+{
+  "metadata": {"vol_lookback": 10, "weighting_method": "inverse_volatility"},
+  "modeled_execution_date": "2026-07-20",
+  "modeled_execution_open": {"AAA": 98.0, "BBB": 205.0},
+  "params_fingerprint": "f84d342460dfcb68465f9326ce33ce13c80ed621a208e59f38c73f31b2791304",
+  "schema_version": "paper_signal_v2_target_weights",
+  "signal_date": "2026-07-17",
+  "signal_id": "0146d232795bfd091e5b1521004d35ee2bfd4195600a5e30cb4fbab3d80ba07f",
+  "target_cash_weight": 0.1,
+  "target_weights": {"AAA": 0.6, "BBB": 0.3}
+}
