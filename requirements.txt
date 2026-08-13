@@ -1,26 +1,14 @@
-filelock
-joblib
-kiteconnect
-lightgbm
-multitasking
-numpy
-onetimepass
-pandas
-pandas_market_calendars
-python-telegram-bot
-requests
-retry
-scikit-learn
-scipy
-streamlit
-plotly
-dash
-TA-Lib
-threadpoolctl
-timedelta
-tqdm
-xgboost
-yfinance
-Bharat-sm-data
-mcp
-tickertape-api-client @ git+https://github.com/The-Great-One/tickertape-api-client.git
+# Versions mirror the production Auto_Trader venv on arunnet (2026-08-13).
+filelock==3.16.1
+kiteconnect==5.0.1
+numpy==2.4.4
+pandas==2.2.3
+pandas-market-calendars==4.4.1
+pyarrow==17.0.0
+python-dateutil==2.9.0.post0
+requests==2.32.3
+retry==0.9.2
+TA-Lib==0.6.8
+
+# Test runner (not installed in the production runtime venv).
+pytest==8.4.2

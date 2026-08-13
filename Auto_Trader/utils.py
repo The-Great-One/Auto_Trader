@@ -19,22 +19,46 @@ from filelock import FileLock, Timeout
 from kiteconnect import KiteConnect
 from retry import retry
 from requests.exceptions import RequestException
-from sqlalchemy import create_engine
 
-# Import rule set modules
+# Import rule set modules. The live Trader_Labs qlib tracker sets
+# AT_RESEARCH_MODE=1 and only needs Indicators; retired broker/news/database
+# helpers must not make that import depend on pruned local modules or secrets.
 from . import RULE_SET_2, RULE_SET_7
-from .news_sentiment import apply_news_overlay
-from .tickertape_data import get_mmi_indicator, is_market_open_via_tickertape
-from .my_secrets import (
-    API_KEY,
-    API_SECRET,
-    DATABASE,
-    DB_PASSWORD,
-    HOST,
-    USER,
-    DEBUG_MODE,
-)
-from .Request_Token import get_request_token
+
+_RESEARCH_MODE = os.getenv("AT_RESEARCH_MODE", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
+if not _RESEARCH_MODE:
+    from sqlalchemy import create_engine
+
+    from .Request_Token import get_request_token
+    from .my_secrets import (
+        API_KEY,
+        API_SECRET,
+        DATABASE,
+        DB_PASSWORD,
+        DEBUG_MODE,
+        HOST,
+        USER,
+    )
+    from .news_sentiment import apply_news_overlay
+    from .tickertape_data import get_mmi_indicator, is_market_open_via_tickertape
+else:
+    API_KEY = API_SECRET = DATABASE = DB_PASSWORD = HOST = USER = ""
+    DEBUG_MODE = False
+
+    def _retired_runtime_dependency(*_args, **_kwargs):
+        raise RuntimeError("retired runtime helper unavailable in research mode")
+
+    apply_news_overlay = _retired_runtime_dependency
+    create_engine = _retired_runtime_dependency
+    get_mmi_indicator = _retired_runtime_dependency
+    get_request_token = _retired_runtime_dependency
+    is_market_open_via_tickertape = _retired_runtime_dependency
+
 import logging
 
 logger = logging.getLogger("Auto_Trade_Logger")

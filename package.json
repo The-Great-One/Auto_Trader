@@ -1,8 +1,0 @@
-{
-  "name": "auto-trader",
-  "version": "1.0.0",
-  "scripts": {
-    "strategy-lab": "node strategy-lab.js",
-    "dashboard": "DASH_HOST=0.0.0.0 DASH_PORT=8504 ./scripts/start_dash_ops_dashboard.sh"
-  }
-}

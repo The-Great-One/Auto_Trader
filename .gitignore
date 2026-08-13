@@ -1,40 +1,26 @@
-Hist_Data/*
-__pycache__/
-.vscode/
-.DS_Store
-*.csv
-*.json
+# Runtime data and generated output
+reports/
 *.jsonl
+*.db
+*.sqlite*
 *.log
 *.log.*
-*.db
-*.sqlite
-*.sqlite3
-*.pyc
-*.bak
-Deprecated/
-external/
-*.lock
-Auto_Trader/my_secrets.py
-venv/
-intermediary_files/
-tests/
 log/
-log/reports/
-reports/
-.claude/
-.learnings/
-reports/daily_*.md
-reports/options_research_supervisor_*.md
-reports/strategy_lab_*.md
-reports/weekly_universe_cagr_*.md
-reports/breakout_atr_validation_*.md
-memory/
-scripts/test_mumbai_vpn.py
-scripts/test_kite_login.py
+intermediary_files/
+Hist_Data/
+
+# Python/local environments
+venv/
+__pycache__/
+*.pyc
+
+# Secrets and local configuration
 .env
 *.env
+secrets/*
+Auto_Trader/my_secrets.py
 
-# runtime logs
-log/
-*.log
+# Tooling and OS metadata
+.serena/
+.DS_Store
+external/
