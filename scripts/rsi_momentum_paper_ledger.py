@@ -601,7 +601,7 @@ def execute_target_rebalance(
         staged.cash -= gross + fee
         staged.positions[symbol] = float(old_shares + shares)
         staged.cost_basis[symbol] = (
-            old_cost * old_shares + prices[symbol] * shares
+            old_cost * old_shares + prices[symbol] * shares + fee
         ) / (old_shares + shares)
         append_trade("BUY", symbol, shares)
 
@@ -776,7 +776,7 @@ def execute_rebalance(
             cost = gross * cost_rate
             debit = gross + cost
         state.positions[symbol] = float(shares)
-        state.cost_basis[symbol] = px
+        state.cost_basis[symbol] = px + (cost / shares if shares else 0.0)
         state.cash -= debit
         state.trade_log.append({
             "date": date,
@@ -867,7 +867,10 @@ def log_daily(state: PortfolioState, value: float, date: str) -> None:
 
     The ledger can run intraday/hourly. For metrics, keep one observation per
     trading date by replacing the same-date entry instead of appending multiple
-    fake "daily" returns in one day.
+    fake "daily" returns in one day. The date key is the latest Hist_Data /
+    snapshot date, which can REGRESS when the vendor cache is stale; matching
+    by date anywhere in the list (then sorting) keeps the series monotonic
+    instead of appending backdated duplicates.
     """
     rounded_value = round(value, 2)
     entry = {
@@ -875,21 +878,25 @@ def log_daily(state: PortfolioState, value: float, date: str) -> None:
         "value": rounded_value,
         "positions": len(state.positions),
         "cash": round(state.cash, 2),
+        "return_pct": 0.0,
     }
-
-    if state.daily_values and state.daily_values[-1].get("date") == date:
-        # Preserve the return versus the prior trading day while refreshing MTM.
-        prev_value = state.daily_values[-2]["value"] if len(state.daily_values) > 1 else rounded_value
-        entry["return_pct"] = round(((rounded_value / prev_value) - 1) * 100, 4) if prev_value > 0 else 0.0
-        state.daily_values[-1] = entry
-    else:
-        prev_value = state.daily_values[-1]["value"] if state.daily_values else rounded_value
-        entry["return_pct"] = round(((rounded_value / prev_value) - 1) * 100, 4) if prev_value > 0 else 0.0
-        state.daily_values.append(entry)
+    # Upsert by date and self-heal: collapse duplicate dates from the
+    # stale-cache era (keep the latest value for each date), then append the
+    # new entry and sort so the series is strictly date-ordered.
+    by_date: dict[str, dict] = {e.get("date", ""): e for e in state.daily_values}
+    by_date[date] = entry
+    kept = sorted(by_date.values(), key=lambda e: str(e.get("date", "")))
+    # Recompute returns against the actual predecessor (correct after sorting
+    # and after collapsing duplicate dates from stale-cache regressions).
+    for i, e in enumerate(kept):
+        if i == 0:
+            e["return_pct"] = 0.0
+        else:
+            prev_value = kept[i - 1].get("value", 0.0)
+            e["return_pct"] = round(((e["value"] / prev_value) - 1) * 100, 4) if prev_value > 0 else 0.0
 
     # Keep last 2 years
-    if len(state.daily_values) > 504:
-        state.daily_values = state.daily_values[-504:]
+    state.daily_values = kept[-504:]
 
 
 # ── Main ────────────────────────────────────────────────────
@@ -976,6 +983,24 @@ def main() -> int:
             f"{'REBALANCE' if executed else 'IDEMPOTENT'}: signal {signal.get('signal_id')} "
             f"at state revision {state.state_revision}"
         )
+        # Record the daily value for rebalance days AND every idempotent tick.
+        # The v1 snapshot covers held + target symbols, so MTM needs no Hist_Data.
+        # Best-effort: a failure here must not fail the run or the commit.
+        try:
+            snap_prices = {
+                s: float(quote_snapshot["prices"][s])
+                for s in state.positions
+                if s in quote_snapshot.get("prices", {})
+                and float(quote_snapshot["prices"][s]) > 0
+            }
+            if snap_prices:
+                valuation = portfolio_value(state, snap_prices)
+                snap_dt = quote_snapshot.get("generated_at") or now.isoformat()
+                val_date = datetime.fromisoformat(snap_dt).date().isoformat()
+                log_daily(state, valuation, val_date)
+                atomic_write_json(STATE_FILE, state.to_dict())
+        except Exception as exc:  # noqa: BLE001 - MTM logging is best-effort
+            print(f"WARN: daily value log skipped: {exc}")
         return 0
 
     # Check if legacy rebalance needed
@@ -1007,7 +1032,7 @@ def main() -> int:
     if LIVE_PRICE_FILE.exists():
         try:
             live = json.loads(LIVE_PRICE_FILE.read_text())
-            live_time = live.get("time", "")
+            live_time = live.get("time") or live.get("generated_at", "")
             live_prices = live.get("prices", {})
             price_times = live.get("price_times", {}) if isinstance(live.get("price_times"), dict) else {}
             # Use fresh per-symbol ticks. Some paper positions do not tick every
