@@ -312,7 +312,7 @@ def _format_paper_rebalance_alert(
     total_val = current_value
     lines = [
         f"🔄 RSI Momentum Rebalance — {signal_date}",
-        f"💰 ₹{total_val:,.0f}  |  {position_count} positions  |  2W-FRI",
+        f"💰 ₹{total_val:,.0f}  |  {position_count} positions  |  3W-FRI",
         f"📈 Realized P&L: {_format_money(realized_pnl)}",
     ]
     if sells:

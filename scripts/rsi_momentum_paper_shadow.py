@@ -3,7 +3,7 @@
 
 Runs the auto-iteration champion strategy (see Trader_Labs auto_iteration_lab):
   rsi_periods [22,44,66], momentum_period 63, blend_weight 0.3,
-  regime sma100, MACD filter, top_n 8, 2W-FRI rebalance, vol_weight,
+  regime sma100, MACD filter, top_n 8, 3W-FRI rebalance, vol_weight,
   max_per_sector 3. Publishes paper decision to paper_shadow_rsi_momentum_latest.json.
 No real orders placed.
 """
@@ -45,7 +45,7 @@ PARAMS = {
     "regime_mode": "sma100",
     "use_macd": True,
     "top_n": 8,
-    "rebalance_freq": "2W-FRI",
+    "rebalance_freq": "3W-FRI",
     "cost_bps": 10.0,
     "max_per_sector": 3,
     "blend_weight": 0.3,
