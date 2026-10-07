@@ -70,6 +70,32 @@ def load_instruments() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def instruments_status(instruments: pd.DataFrame | None = None) -> dict:
+    """Explicitly report whether Instruments.feather-backed constraints are active.
+
+    Production has shipped without Instruments.feather, which silently disables
+    the champion max_per_sector cap and the mcap universe filter. Surface that
+    state in every published signal instead of pretending the constraints ran.
+    """
+    df = load_instruments() if instruments is None else instruments
+    available = not df.empty and "Symbol" in getattr(df, "columns", [])
+    status = {
+        "available": bool(available),
+        "path": str(INSTRUMENTS_FILE),
+        "sector_cap_enforced": bool(available),
+        "mcap_filter_enforced": bool(available and "MarketCapCr" in df.columns),
+        "rows": int(len(df)) if available else 0,
+        "warning": None,
+    }
+    if not available:
+        status["warning"] = (
+            f"Instruments.feather missing or unreadable at {INSTRUMENTS_FILE}; "
+            "champion max_per_sector cap and mcap universe filter are DISABLED "
+            "for this signal"
+        )
+    return status
+
+
 def filter_universe(prices: pd.DataFrame, instruments: pd.DataFrame,
                     min_vol: float = 50000.0, min_mcap: float = 500.0) -> pd.DataFrame:
     """Mirror auto_iteration_lab._filter_universe so the paper shadow backtest
@@ -111,17 +137,33 @@ def load_hist(hist_dir: Path) -> pd.DataFrame:
 
 
 def load_market_data(hist_dir: Path) -> dict[str, pd.DataFrame]:
-    """Load real opens and closes; only closes receive the bounded strategy fill."""
+    """Load real opens and closes; only closes receive the bounded strategy fill.
+
+    Returns both the raw (unfilled) close matrix and the strategy-filled one,
+    plus loader context. Freshness/quality guards MUST be evaluated on
+    ``close_raw``: the bounded ffill can otherwise mask a stale vendor cache by
+    manufacturing a fresh-looking latest row.
+    """
     if not hist_dir.is_dir():
-        return {"open": pd.DataFrame(), "close": pd.DataFrame()}
-    ohlc, _ctx = lab_load_ohlc_prices(
+        return {
+            "open": pd.DataFrame(),
+            "close": pd.DataFrame(),
+            "close_raw": pd.DataFrame(),
+            "context": {},
+        }
+    ohlc, ctx = lab_load_ohlc_prices(
         hist_dir,
         min_rows=MIN_ROWS,
         min_end_date=MIN_END_DATE,
         symbols=set(),
         max_symbols=0,
     )
-    return {"open": ohlc["open"], "close": ohlc["close"].ffill(limit=3)}
+    return {
+        "open": ohlc["open"],
+        "close": ohlc["close"].ffill(limit=3),
+        "close_raw": ohlc["close"],
+        "context": ctx,
+    }
 
 
 def modeled_execution(
@@ -158,6 +200,11 @@ def _sector_of(instruments: pd.DataFrame, symbol: str) -> str:
     return str(m.iloc[0].get("Sector", "Unknown"))
 
 
+def _trading_day_age(latest_date: pd.Timestamp, check_date: pd.Timestamp) -> int:
+    """Business-day age between two normalized dates (0 = same day)."""
+    return int(np.busday_count(latest_date.date(), check_date.date()))
+
+
 def signal_data_quality_error(
     prices: pd.DataFrame,
     picks: list[str] | None,
@@ -166,30 +213,44 @@ def signal_data_quality_error(
     min_fresh_coverage: float = 0.8,
     max_data_age_days: int = 5,
     as_of: pd.Timestamp | None = None,
+    raw_prices: pd.DataFrame | None = None,
 ) -> str | None:
-    """Return a fail-closed reason when the latest signal data is unsafe."""
-    if prices.empty or len(prices.columns) == 0:
+    """Return a fail-closed reason when the latest signal data is unsafe.
+
+    ``prices`` may be the strategy-filled matrix; when ``raw_prices`` (unfilled
+    closes) is supplied, freshness and coverage are evaluated on the RAW data so
+    the bounded ffill cannot mask a stale vendor cache. Age is measured in
+    trading days (business days), not calendar days, so weekend/holiday gaps do
+    not false-trip the guard and midweek staleness is not excused.
+    """
+    source = raw_prices if raw_prices is not None and not raw_prices.empty else prices
+    if source.empty or len(source.columns) == 0:
         return "no price data available for signal publication"
 
-    latest_date = pd.Timestamp(prices.index[-1]).tz_localize(None).normalize()
+    latest_date = pd.Timestamp(source.index[-1]).tz_localize(None).normalize()
     check_date = (
         pd.Timestamp.now().tz_localize(None).normalize()
         if as_of is None
         else pd.Timestamp(as_of).tz_localize(None).normalize()
     )
-    age_days = int((check_date - latest_date).days)
+    if latest_date.dayofweek >= 5:
+        return (
+            f"latest price date {latest_date.date()} is not a trading day "
+            "(weekend/synthetic date); refusing to publish"
+        )
+    age_days = _trading_day_age(latest_date, check_date)
     if age_days > max_data_age_days:
         return (
-            f"latest price date {latest_date.date()} is stale by {age_days} days "
+            f"latest price date {latest_date.date()} is stale by {age_days} trading days "
             f"(maximum {max_data_age_days})"
         )
 
-    latest = pd.to_numeric(prices.iloc[-1], errors="coerce")
+    latest = pd.to_numeric(source.iloc[-1], errors="coerce")
     valid = latest.apply(
         lambda value: pd.notna(value) and np.isfinite(float(value)) and float(value) > 0
     )
     fresh_count = int(valid.sum())
-    total_count = len(prices.columns)
+    total_count = len(source.columns)
     coverage = fresh_count / total_count
     required_symbols = max(top_n, min_fresh_symbols)
     if fresh_count < required_symbols or coverage < min_fresh_coverage:
@@ -208,16 +269,47 @@ def signal_data_quality_error(
     return None
 
 
-def compute_rotation(prices: pd.DataFrame, opens: pd.DataFrame | None = None) -> dict:
+def _loader_diagnostics(raw_prices: pd.DataFrame | None, loader_context: dict | None) -> dict:
+    """Compact loader diagnostics for the published signal."""
+    ctx = dict(loader_context or {})
+    diag = {
+        "synthetic_rows_dropped": int(ctx.get("synthetic_rows_dropped", 0) or 0),
+        "synthetic_rows_by_symbol": ctx.get("synthetic_rows_by_symbol", {}),
+        "union_dates_dropped_count": int(ctx.get("union_dates_dropped_count", 0) or 0),
+        "union_dates_dropped": ctx.get("union_dates_dropped", []),
+        "duplicate_rows_dropped": int(ctx.get("duplicate_rows_dropped", 0) or 0),
+        "skipped": ctx.get("skipped", {}),
+    }
+    if raw_prices is not None and not raw_prices.empty:
+        diag["raw_latest_date"] = str(pd.Timestamp(raw_prices.index[-1]).date())
+        diag["raw_symbols_with_latest_observation"] = int(raw_prices.iloc[-1].notna().sum())
+    return diag
+
+
+def compute_rotation(
+    prices: pd.DataFrame,
+    opens: pd.DataFrame | None = None,
+    raw_prices: pd.DataFrame | None = None,
+    loader_context: dict | None = None,
+) -> dict:
     """Compute latest champion-config rotation picks and publish paper decision."""
     p = PARAMS
     top_n = int(p["top_n"])
     if prices.empty or len(prices.columns) < max(3, top_n):
         return {"error": "insufficient symbols", "symbols_loaded": len(prices.columns)}
 
-    pf = filter_universe(prices, load_instruments())
+    instruments = load_instruments()
+    inst_status = instruments_status(instruments)
+    if inst_status["warning"]:
+        print(f"WARN: {inst_status['warning']}")
+    pf = filter_universe(prices, instruments)
     if pf.empty or len(pf.columns) < max(3, top_n):
-        return {"error": "insufficient symbols after universe filter", "symbols_loaded": len(prices.columns), "universe": len(pf.columns)}
+        return {
+            "error": "insufficient symbols after universe filter",
+            "symbols_loaded": len(prices.columns),
+            "universe": len(pf.columns),
+            "instruments": inst_status,
+        }
 
     rsi_periods = p["rsi_periods"]
     score = sum(lab_rsi(pf, per) for per in rsi_periods) / len(rsi_periods)
@@ -250,7 +342,6 @@ def compute_rotation(prices: pd.DataFrame, opens: pd.DataFrame | None = None) ->
         return {"error": "no rebalance dates"}
     actionable_dates = [d for d in dates if pf.index.get_loc(d) + 1 < len(pf.index)]
     latest_date = dates[-1]
-    instruments = load_instruments()
 
     # ---- Latest signal selection (mirrors auto_iteration_lab._simulate) ----
     rsi_at = score.loc[latest_date].copy()
@@ -388,8 +479,15 @@ def compute_rotation(prices: pd.DataFrame, opens: pd.DataFrame | None = None) ->
         eq_12m = (1 + r_series.loc[r_series.index >= last_start]).cumprod()
         ret_12m = eq_12m.iloc[-1] - 1 if len(eq_12m) > 0 else 0.0
 
-    # Fail closed: do not publish a signal built on stale or thin data.
-    quality_error = signal_data_quality_error(prices, picks=picks, top_n=top_n)
+    # Fail closed: do not publish a signal built on stale, thin, or synthetic data.
+    if latest_date.dayofweek >= 5:
+        return {
+            "error": f"signal date {latest_date.date()} is not a trading day (synthetic/union date)",
+            "symbols_loaded": len(prices.columns),
+        }
+    quality_error = signal_data_quality_error(
+        prices, picks=picks, top_n=top_n, raw_prices=raw_prices
+    )
     if quality_error:
         return {"error": quality_error, "symbols_loaded": len(prices.columns)}
 
@@ -407,13 +505,17 @@ def compute_rotation(prices: pd.DataFrame, opens: pd.DataFrame | None = None) ->
             "generated_at": datetime.now().isoformat(),
             "strategy": "rsi_momentum_rotation_champion",
             "vol_lookback": int(p.get("vol_lookback", 20)),
+            "instruments": inst_status,
             "latest_signal_diagnostics": {
                 "date": str(latest_date.date()),
                 "picks": picks,
                 "scores": pick_scores,
-                "symbols_screened": latest_screened_count,
+                "symbols_screened": len(pf.columns),
+                "symbols_passing_filters": latest_screened_count,
+                "symbols_loaded": len(prices.columns),
                 "sectors": {s: _sector_of(instruments, s) for s in picks} if not instruments.empty else {},
             },
+            "loader_diagnostics": _loader_diagnostics(raw_prices, loader_context),
             "legacy_non_promotion_safe_backtest_metrics": {
                 "symbols_loaded": len(pf.columns),
                 "date_range": [str(r_series.index[0].date()), str(r_series.index[-1].date())],
@@ -443,9 +545,23 @@ def main() -> int:
     print(f"Loading {hist_dir}...")
     market_data = load_market_data(hist_dir)
     prices = market_data["close"]
+    raw_prices = market_data.get("close_raw", pd.DataFrame())
+    loader_context = market_data.get("context", {})
     print(f"Loaded {len(prices.columns)} symbols, {len(prices)} days")
+    if loader_context.get("synthetic_rows_dropped"):
+        print(
+            f"Loader dropped {loader_context['synthetic_rows_dropped']} synthetic "
+            f"zero-volume flat rows: {loader_context.get('synthetic_rows_by_symbol')}"
+        )
+    if loader_context.get("union_dates_dropped_count"):
+        print(
+            f"Loader rejected {loader_context['union_dates_dropped_count']} synthetic "
+            f"union dates: {loader_context.get('union_dates_dropped', [])[:5]}"
+        )
 
-    result = compute_rotation(prices, market_data["open"])
+    result = compute_rotation(
+        prices, market_data["open"], raw_prices=raw_prices, loader_context=loader_context
+    )
     if "error" in result:
         print(f"ERROR: {result['error']}")
         return 1
@@ -460,6 +576,12 @@ def main() -> int:
 
     print(f"\n=== RSI + Momentum Rotation Paper Shadow (champion config) ===")
     print(f"Signal date: {result['signal_date']} | Rebalance: {PARAMS['rebalance_freq']} | Top {PARAMS['top_n']}")
+    print(f"Universe: {diagnostics['symbols_loaded']} loaded -> "
+          f"{diagnostics['symbols_screened']} screened -> "
+          f"{diagnostics['symbols_passing_filters']} passing momentum/regime filters")
+    inst = result["metadata"].get("instruments", {})
+    if inst and not inst.get("available", True):
+        print(f"WARN: {inst.get('warning', 'Instruments.feather unavailable')}")
     print(f"Top {PARAMS['top_n']} picks:")
     for s in picks:
         print(f"  {s:<15s} RSI score: {scores.get(s, 'N/A')}")

@@ -28,6 +28,10 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "reports"
+# Fraction of span-active symbols that must observe a date for it to count as a
+# real trading session. Dates seen by only a handful of exports (vendor holiday
+# padding) are rejected as synthetic union dates.
+MIN_DATE_COVERAGE = float(os.getenv("AT_RSI_MIN_DATE_COVERAGE", "0.5") or "0.5")
 DEFAULT_HIST_DIRS = [
     ROOT / "intermediary_files" / "Hist_Data",
     ROOT.parent / "Stocks" / "intermediary_files" / "Hist_Data",
@@ -75,6 +79,44 @@ def is_derivative_symbol(symbol: str) -> bool:
     return any(tag in s for tag in ("CE", "PE", "FUT")) or any(ch.isdigit() for ch in s[-8:])
 
 
+def drop_zero_volume_flat_rows(df: pd.DataFrame, date_col: str = "date") -> tuple[pd.DataFrame, int]:
+    """Reject synthetic zero-volume flat holiday rows.
+
+    Some vendor exports (observed in 4 ETF feathers) append rows for market
+    holidays where volume == 0 and open/close simply repeat the prior session's
+    close. Those rows fabricate union-index dates (e.g. the synthetic
+    2026-10-02 "latest" session in production), which then pass freshness
+    guards and publish signals dated on a day the market never traded.
+
+    A row is dropped only when BOTH conditions hold:
+      1. the row itself has zero/NaN volume, AND
+      2. its close equals the previous kept row's close (flat).
+
+    Real sessions keep volume > 0 even on flat closes, so genuine zero-move
+    trading days are preserved. Files without a volume column are untouched.
+    Returns (cleaned_frame_sorted_by_date, dropped_row_count).
+    """
+    if df.empty or date_col not in df.columns:
+        return df, 0
+    vol_candidates = [c for c in df.columns if str(c).lower() == "volume"]
+    if not vol_candidates:
+        return df, 0
+    work = df.sort_values(date_col).reset_index(drop=True).copy()
+    vol = pd.to_numeric(work[vol_candidates[0]], errors="coerce")
+    close_candidates = [c for c in work.columns if str(c).lower() == "close"]
+    if not close_candidates:
+        return df, 0
+    close = pd.to_numeric(work[close_candidates[0]], errors="coerce")
+    zero_volume = (vol == 0) | vol.isna()
+    prev_close = close.shift(1)
+    flat = close.eq(prev_close) | (close.isna() & prev_close.isna())
+    mask_drop = zero_volume & flat & prev_close.notna()
+    dropped = int(mask_drop.sum())
+    if dropped:
+        work = work.loc[~mask_drop].reset_index(drop=True)
+    return work, dropped
+
+
 def find_hist_dir(value: str | None) -> Path:
     if value:
         p = Path(value).expanduser()
@@ -106,6 +148,8 @@ def load_ohlc_prices(
         "read_error": 0,
     }
     duplicate_rows_dropped = 0
+    synthetic_rows_dropped = 0
+    synthetic_rows_by_symbol: dict[str, int] = {}
     summaries: list[dict] = []
 
     files = sorted(hist_dir.glob("*.feather"))
@@ -123,6 +167,10 @@ def load_ohlc_prices(
             if not {"date", "open", "close"}.issubset(cmap):
                 skipped["missing_ohlc"] += 1
                 continue
+            df, synth_dropped = drop_zero_volume_flat_rows(df, date_col=cmap["date"])
+            if synth_dropped:
+                synthetic_rows_dropped += synth_dropped
+                synthetic_rows_by_symbol[symbol] = synth_dropped
             s = pd.DataFrame(
                 {
                     "date": pd.to_datetime(df[cmap["date"]], errors="coerce", utc=True).dt.tz_localize(None),
@@ -162,11 +210,34 @@ def load_ohlc_prices(
     common_index = opens.index.union(closes.index).sort_values()
     opens = opens.reindex(common_index)
     closes = closes.reindex(common_index)
+
+    # Reject synthetic union dates: a concat of feathers with mismatched vendor
+    # calendars produces index rows that only one or a few symbols observed
+    # (e.g. holiday padding rows from a single export). Such a date can become
+    # the "latest" session and masquerade as fresh data. Keep a date only when
+    # its observed-symbol count is at least MIN_DATE_COVERAGE of the local
+    # consensus (rolling ±10-session max observed count), which tolerates
+    # genuine one-symbol gaps and early thin history.
+    observed = closes.notna().sum(axis=1)
+    consensus = observed.rolling(21, center=True, min_periods=1).max()
+    keep_mask = (observed >= MIN_DATE_COVERAGE * consensus).values
+    dropped_dates = common_index[~keep_mask]
+    if len(dropped_dates) and keep_mask.any():
+        common_index = common_index[keep_mask]
+        opens = opens.reindex(common_index)
+        closes = closes.reindex(common_index)
+    union_dates_dropped = [str(d.date()) for d in dropped_dates]
+
     context = {
         "hist_dir": str(hist_dir),
         "symbols_loaded": len(loaded_close),
         "skipped": skipped,
         "duplicate_rows_dropped": duplicate_rows_dropped,
+        "synthetic_rows_dropped": synthetic_rows_dropped,
+        "synthetic_rows_by_symbol": synthetic_rows_by_symbol,
+        "union_dates_dropped": union_dates_dropped[:50],
+        "union_dates_dropped_count": len(union_dates_dropped),
+        "min_date_coverage": MIN_DATE_COVERAGE,
         "date_range": [str(common_index.min().date()), str(common_index.max().date())],
         "min_rows": min_rows,
         "min_end_date": min_end_date,

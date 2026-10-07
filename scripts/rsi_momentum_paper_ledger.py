@@ -31,6 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.atomic_io import atomic_write_json
+from scripts.rsi_224466_rotation_lab import drop_zero_volume_flat_rows
 
 OUT_DIR = ROOT / "reports"
 HIST_DIR = Path(os.getenv("RSI_LEDGER_HIST_DIR", str(ROOT / "intermediary_files" / "Hist_Data")))
@@ -50,6 +51,10 @@ TELEGRAM_ALERTS = os.getenv("RSI_LEDGER_TELEGRAM_ALERTS", "1").strip().lower() n
 ST_EXIT_MULT = float(os.getenv("RSI_LEDGER_ST_EXIT_MULT", "0"))  # 0=disabled, 2.0=recommended
 MIN_REBALANCE_PICKS = int(os.getenv("RSI_LEDGER_MIN_PICKS", "8"))
 MIN_PRICE_ROWS = int(os.getenv("RSI_LEDGER_MIN_ROWS", "350"))
+# Stale-signal protection: a signal older than this many TRADING days is not
+# actionable (shadow refresh cadence can lag while the ledger runs weekdays).
+# 0 disables the check.
+MAX_SIGNAL_AGE_TRADING_DAYS = int(os.getenv("RSI_LEDGER_MAX_SIGNAL_AGE_TRADING_DAYS", "7"))
 
 
 class RebalanceDataError(RuntimeError):
@@ -80,6 +85,7 @@ def load_prices(hist_dir: Path, min_rows: int = 350) -> pd.DataFrame:
         if date_col is None or close_col is None:
             continue
         df[date_col] = pd.to_datetime(df[date_col]).dt.tz_localize(None)
+        df, _synth_dropped = drop_zero_volume_flat_rows(df, date_col=date_col)
         s = df.set_index(date_col)[close_col].dropna().sort_index()
         if len(s) >= min_rows:
             loaded[symbol] = s
@@ -108,6 +114,7 @@ def load_ohlcv(hist_dir: Path, symbols: set) -> dict:
         if not all([dc, cc, hc, lc]):
             continue
         df[dc] = pd.to_datetime(df[dc]).dt.tz_localize(None)
+        df, _synth_dropped = drop_zero_volume_flat_rows(df, date_col=dc)
         df = df.set_index(dc).sort_index()
         rename = {cc: "Close", hc: "High", lc: "Low"}
         if oc:
@@ -862,6 +869,41 @@ def should_rebalance(state: PortfolioState, signal: dict, today: str) -> bool:
     return signal_date > state.last_rebalance_date
 
 
+def signal_staleness_error(
+    signal_date: str,
+    price_index_date: str,
+    max_age_trading_days: int = MAX_SIGNAL_AGE_TRADING_DAYS,
+) -> str | None:
+    """Fail closed when the shadow signal is too stale to trade.
+
+    The shadow refreshes on a weekly (Saturday) cadence while the ledger runs on
+    weekdays; a signal older than ``max_age_trading_days`` trading days relative
+    to the latest real price session means the pipeline broke upstream, and the
+    ledger must NOT keep re-marking/rebalancing against it. Age is measured in
+    business days so weekends/holidays do not false-trip the guard.
+    """
+    if max_age_trading_days <= 0:
+        return None
+    try:
+        sig_ts = pd.Timestamp(signal_date).normalize()
+        data_ts = pd.Timestamp(price_index_date).normalize()
+    except (TypeError, ValueError):
+        return f"unparseable signal date {signal_date!r}"
+    if sig_ts > data_ts:
+        return (
+            f"signal date {signal_date} is in the future relative to latest "
+            f"price session {price_index_date}"
+        )
+    age = int(np.busday_count(sig_ts.date(), data_ts.date()))
+    if age > max_age_trading_days:
+        return (
+            f"signal date {signal_date} is stale by {age} trading days vs latest "
+            f"price session {price_index_date} (maximum {max_age_trading_days}); "
+            "paper shadow pipeline may be broken"
+        )
+    return None
+
+
 def log_daily(state: PortfolioState, value: float, date: str) -> None:
     """Record/refresh portfolio value for a trading day.
 
@@ -924,6 +966,13 @@ def main() -> int:
     # In cron: this is today's EOD data
     today = str(prices_df.index[-1].date())
     today_prices = prices_df.iloc[-1]  # latest row prices
+
+    # Stale-signal protection: fail closed instead of trading/marking against a
+    # signal whose pipeline has stopped refreshing.
+    staleness_error = signal_staleness_error(signal_date, today)
+    if staleness_error:
+        print(f"ERROR: refusing to run ledger on stale signal: {staleness_error}")
+        return 2
 
     # Signal date prices — for executing buys/sells at correct entry prices
     signal_dt = pd.Timestamp(signal_date)
