@@ -214,25 +214,37 @@ def signal_data_quality_error(
     max_data_age_days: int = 5,
     as_of: pd.Timestamp | None = None,
     raw_prices: pd.DataFrame | None = None,
+    max_symbol_lag_trading_days: int = 1,
 ) -> str | None:
     """Return a fail-closed reason when the latest signal data is unsafe.
 
     ``prices`` may be the strategy-filled matrix; when ``raw_prices`` (unfilled
-    closes) is supplied, freshness and coverage are evaluated on the RAW data so
-    the bounded ffill cannot mask a stale vendor cache. Age is measured in
-    trading days (business days), not calendar days, so weekend/holiday gaps do
-    not false-trip the guard and midweek staleness is not excused.
+    closes) is supplied, freshness and coverage are evaluated on each symbol's
+    actual last observation. A vendor may publish some completed daily bars a
+    day later than others, so requiring every symbol to share one exact latest
+    row is too strict; allowing a bounded one-session lag still rejects a stale
+    or mixed-vintage cache. The bounded ffill is never counted as an observation.
     """
     source = raw_prices if raw_prices is not None and not raw_prices.empty else prices
     if source.empty or len(source.columns) == 0:
         return "no price data available for signal publication"
 
-    latest_date = pd.Timestamp(source.index[-1]).tz_localize(None).normalize()
     check_date = (
         pd.Timestamp.now().tz_localize(None).normalize()
         if as_of is None
         else pd.Timestamp(as_of).tz_localize(None).normalize()
     )
+    last_observations: dict[str, pd.Timestamp] = {}
+    for symbol in source.columns:
+        values = pd.to_numeric(source[symbol], errors="coerce")
+        valid = values.notna() & np.isfinite(values) & (values > 0)
+        if valid.any():
+            last_observations[str(symbol)] = pd.Timestamp(valid[valid].index[-1]).tz_localize(None).normalize()
+
+    if not last_observations:
+        return "no valid raw price observations available for signal publication"
+
+    latest_date = max(last_observations.values())
     if latest_date.dayofweek >= 5:
         return (
             f"latest price date {latest_date.date()} is not a trading day "
@@ -245,17 +257,17 @@ def signal_data_quality_error(
             f"(maximum {max_data_age_days})"
         )
 
-    latest = pd.to_numeric(source.iloc[-1], errors="coerce")
-    valid = latest.apply(
-        lambda value: pd.notna(value) and np.isfinite(float(value)) and float(value) > 0
+    fresh_count = sum(
+        _trading_day_age(observed_date, latest_date) <= max_symbol_lag_trading_days
+        for observed_date in last_observations.values()
     )
-    fresh_count = int(valid.sum())
     total_count = len(source.columns)
     coverage = fresh_count / total_count
     required_symbols = max(top_n, min_fresh_symbols)
     if fresh_count < required_symbols or coverage < min_fresh_coverage:
         return (
-            f"latest-date fresh symbols {fresh_count}/{total_count} below safety threshold "
+            f"fresh symbols within {max_symbol_lag_trading_days} trading day(s) "
+            f"of {latest_date.date()}: {fresh_count}/{total_count} below safety threshold "
             f"(need >= {required_symbols} and coverage >= {min_fresh_coverage:.0%})"
         )
 

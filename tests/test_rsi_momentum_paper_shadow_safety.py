@@ -92,7 +92,7 @@ class ShadowPublicationSafetyTests(unittest.TestCase):
         columns = [f"SYM_{i}" for i in range(100)]
         prices = pd.DataFrame(
             [np.full(100, 100.0), np.array([101.0, 102.0] + [np.nan] * 98)],
-            index=pd.to_datetime(["2026-07-16", "2026-07-17"]),
+            index=pd.to_datetime(["2026-07-15", "2026-07-17"]),
             columns=columns,
         )
 
